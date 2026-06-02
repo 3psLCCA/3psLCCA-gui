@@ -41,9 +41,11 @@ from PySide6.QtWidgets import (
 from three_ps_lcca_gui.gui.themes import get_token
 from .form_definitions import FieldDef, Section
 from .image_utils import compress_image, resolve_img_settings
-from ..validation_helpers import confirm_clear_all
+from ..validation_helpers import _clear_border_style, confirm_clear_all
 from ..doc_link import doc_inline, doc_label
 
+
+COMBO_NONE_ITEM = "-- Select --"
 
 # ---------------------------------------------------------------------------
 # Internal helpers
@@ -339,21 +341,21 @@ def build_form(
         # ── combo ─────────────────────────────────────────────────────────
         elif f.field_type == "combo":
             widget = QComboBox()
-            if f.combo_placeholder is not None:
-                widget.addItem(f.combo_placeholder)
+            if f.selection_none:
+                widget.addItem(COMBO_NONE_ITEM)
             widget.addItems(f.options or [])
             if f.default is not None:
                 idx = widget.findText(str(f.default))
                 if idx >= 0:
                     widget.setCurrentIndex(idx)
-            
+
             widget.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
             widget.setMinimumContentsLength(15)
-            
+
             widget.setMinimumHeight(30)
             setattr(host, f.key, host.field(f.key, widget))
             widget.currentIndexChanged.connect(
-                lambda _, w=widget: w.setStyleSheet(""))
+                lambda _, w=widget: _clear_border_style(w))
 
         # ── upload_img ────────────────────────────────────────────────────
         elif f.field_type == "upload_img":

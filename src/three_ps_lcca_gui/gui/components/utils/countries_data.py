@@ -1692,4 +1692,14 @@ COUNTRY_TO_CURRENCY = {
     for item in data
 }
 
+# ISO3 Code -> Title Cased Name
+CODE_TO_NAME = {
+    item["COUNTRY_CODE"].upper(): item["COUNTRY"].title()
+    for item in data if item["COUNTRY_CODE"] != "-"
+}
 
+# Country Name -> ISO3 Code (Uppercase keys for robust matching)
+NAME_TO_CODE = {
+    item["COUNTRY"].upper(): item["COUNTRY_CODE"]
+    for item in data
+}

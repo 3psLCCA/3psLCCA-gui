@@ -77,7 +77,10 @@ def _apply_border_style(widget, color: str):
     property and leaves the rest of the app QSS intact.
     """
     if isinstance(widget, QComboBox):
-        widget.setProperty("validationState", color)
+        # QSS selectors use the keywords "error" / "warning", not the raw hex color.
+        # Map the color token back to the correct keyword so the selector matches.
+        state = "warning" if color == get_token("warning") else "error"
+        widget.setProperty("validationState", state)
         widget.style().unpolish(widget)
         widget.style().polish(widget)
     else:
@@ -185,8 +188,15 @@ def validate_form(
             _apply_border_style(widget, get_token("danger"))
             errors.append(f"'{f.title}' is required - enter a value above the minimum")
             error_keys.add(f.key)
+        elif (isinstance(widget, QComboBox)
+              and f.selection_none
+              and widget.currentIndex() == 0):
+            # selection_none combos have "-- Select --" at index 0; still there means nothing chosen.
+            _apply_border_style(widget, get_token("danger"))
+            errors.append(f"'{f.title}' is required - select an option from the list")
+            error_keys.add(f.key)
         # QSpinBox/QDoubleSpinBox without default: 0 is a valid value - use warn_rules
-        # QComboBox: always has a selection - no check needed
+        # QComboBox without selection_none: always has a meaningful selection - no check needed
 
     # ── Step 3: Range/warn checks ─────────────────────────────────────────────
     # Behaviour by case:

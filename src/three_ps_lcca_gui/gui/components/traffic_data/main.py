@@ -24,7 +24,7 @@ from three_ps_lcca_gui.gui.themes import get_token, theme_manager
 
 from ..base_widget import ScrollableForm
 from ..utils.form_builder.form_definitions import FieldDef, Section, ValidationStatus
-from ..utils.form_builder.form_builder import build_form
+from ..utils.form_builder.form_builder import build_form, COMBO_NONE_ITEM
 from ..utils.validation_helpers import clear_field_styles, freeze_form, freeze_widgets, validate_form, confirm_clear_all
 from ..utils.remarks_editor import RemarksEditor
 from ..utils.wpi_manager import WPIManager, WPIProfile
@@ -123,10 +123,11 @@ LANE_TYPES = [
     },
 ]
 
-_NONE_LANE = "- Select -"
+
 _BY_NAME = {lt["name"]: lt for lt in LANE_TYPES}
 _BY_CODE = {lt["code"]: lt["name"] for lt in LANE_TYPES}
-_LANE_NAMES = [_NONE_LANE] + [lt["name"] for lt in LANE_TYPES]
+_LANE_NAMES = [lt["name"] for lt in LANE_TYPES]
+_NONE_LANE = COMBO_NONE_ITEM
 
 _VEHICLES = [
     ("small_cars", "Small Car"),
@@ -155,7 +156,7 @@ TRAFFIC_FIELDS = [
         "combo",
         options=_LANE_NAMES,
         required=True,
-        default=_NONE_LANE,
+        selection_none=True,
     ),
     FieldDef(
         "carriage_width_in_m",
