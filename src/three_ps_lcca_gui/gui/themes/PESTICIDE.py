@@ -1,5 +1,7 @@
 from __future__ import annotations
 import sys
+import inspect
+import subprocess
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -379,6 +381,48 @@ def _create_inspector():
             if name:
                 self._add(self._row("objectName", name))
             self._add(self._row("module",      mod))
+            src_file, src_line = _source_location(w)
+            if src_file:
+                # Show path relative to cwd if possible
+                try:
+                    import os
+                    rel = os.path.relpath(src_file)
+                except ValueError:
+                    rel = src_file
+                filename = os.path.basename(src_file)
+                src_row = QtWidgets.QWidget()
+                sr_lay  = QtWidgets.QVBoxLayout(src_row)
+                sr_lay.setContentsMargins(4, 0, 0, 0)
+                sr_lay.setSpacing(2)
+                # Row 1: key + filename:line
+                top = QtWidgets.QWidget()
+                tl  = QtWidgets.QHBoxLayout(top)
+                tl.setContentsMargins(0, 0, 0, 0)
+                tl.setSpacing(4)
+                k = QtWidgets.QLabel("source")
+                k.setObjectName("key")
+                k.setFixedWidth(96)
+                v = QtWidgets.QLabel(f"{filename} : {src_line}")
+                v.setObjectName("val")
+                v.setToolTip(rel)
+                v.setWordWrap(True)
+                v.setTextInteractionFlags(QtCore.Qt.TextSelectableByMouse)
+                tl.addWidget(k)
+                tl.addWidget(v, 1)
+                # Row 2: open button (indented to align with value column)
+                bot = QtWidgets.QWidget()
+                bl  = QtWidgets.QHBoxLayout(bot)
+                bl.setContentsMargins(100, 0, 0, 0)
+                bl.setSpacing(0)
+                btn = QtWidgets.QPushButton("→ Open in VS Code")
+                btn.clicked.connect(lambda _=False, f=src_file, l=src_line: _open_in_editor(f, l))
+                bl.addWidget(btn)
+                bl.addStretch()
+                sr_lay.addWidget(top)
+                sr_lay.addWidget(bot)
+                self._add(src_row)
+            else:
+                self._add(self._row("source", "(built-in Qt)"))
 
             # ── Geometry ──
             self._add(self._section("GEOMETRY"))
@@ -683,6 +727,25 @@ def _inject_pesticide_style(w):
 
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
+
+def _source_location(widget) -> tuple[str | None, int | None]:
+    """Return (filepath, line) for the widget's class definition, or (None, None) for built-in Qt types."""
+    try:
+        cls  = type(widget)
+        file = inspect.getfile(cls)
+        _, line = inspect.getsourcelines(cls)
+        return file, line
+    except (TypeError, OSError):
+        return None, None
+
+
+def _open_in_editor(filepath: str, line: int):
+    try:
+        subprocess.Popen(["code", "--goto", f"{filepath}:{line}"],
+                         shell=True, creationflags=subprocess.CREATE_NO_WINDOW)
+    except Exception:
+        pass
+
 
 def _policy_name(val) -> str:
     # PySide6 returns an enum with .name; older bindings return an int
