@@ -56,7 +56,7 @@ def _make_section_header(title: str) -> list[QWidget]:
     """Return [header QLabel, divider QWidget] ready to add to a QFormLayout."""
     header = QLabel(title)
     header.setStyleSheet(
-        f"font-size: 15px; font-weight: {get_token('weight-semibold')}; padding-top: 16px; padding-bottom: 4px;"
+        f"font-size: 14px; font-weight: {get_token('weight-semibold')}; padding-top: 10px; padding-bottom: 2px;"
     )
 
     divider = QWidget()
@@ -257,7 +257,7 @@ def build_form(
 
         section = QWidget()
         layout = QVBoxLayout(section)
-        layout.setContentsMargins(0, 8, 0, 8)
+        layout.setContentsMargins(0, 2, 0, 2)
         layout.setSpacing(4)
 
         # Title
@@ -376,6 +376,9 @@ def build_form(
         # upload_img adds its own container widget above; all others add here
         if f.field_type != "upload_img":
             layout.addWidget(widget)
+
+        # Secondary safeguard: keep content at top if row stretches
+        layout.addStretch(1)
 
         # Permanently blocked fields are frozen at build time
         if f.blocked:

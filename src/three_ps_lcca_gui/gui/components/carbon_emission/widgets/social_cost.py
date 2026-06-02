@@ -6,6 +6,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QFormLayout,
     QStackedWidget,
+    QSizePolicy,
 )
 from PySide6.QtCore import Qt, QTimer
 
@@ -226,34 +227,38 @@ class SocialCost(ScrollableForm):
 
     def _build_ui(self):
         f = self.form  # main QFormLayout
+        f.setSpacing(8)
 
         # Header: methodology selector
         build_form(self, HEADER_FIELDS)
         self._field_map.pop("source", None)  # managed manually, not via base autosave
         self.source.currentIndexChanged.connect(self._on_mode_changed)
 
-        # Effective SCC summary
-        _rc, self._result_lbl = self._padded_label(top=10, bottom=6)
-        f.addRow(_rc)
-
         # Stack - one panel per methodology
         self._stack = QStackedWidget()
+        self._stack.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Maximum)
         f.addRow(self._stack)
 
-        # Clear button — in a proper QWidget container so Qt gives it real geometry
-        self.btn_clear = QPushButton("Clear All")
-        self.btn_clear.setMinimumHeight(35)
-        self.btn_clear.setMaximumHeight(35)
-        self.btn_clear.clicked.connect(self.clear_all)
-        _btn_container = QWidget()
-        _btn_layout = QHBoxLayout(_btn_container)
-        _btn_layout.setContentsMargins(0, 8, 0, 0)
-        _btn_layout.addWidget(self.btn_clear)
-        f.addRow(_btn_container)
 
         self._stack.addWidget(self._build_niti_panel())  # index 0
         self._stack.addWidget(self._build_ricke_panel())  # index 1
         self._stack.addWidget(self._build_custom_panel())  # index 2
+
+        # Effective SCC summary (moved to bottom)
+        _rc, self._result_lbl = self._padded_label(top=4, bottom=4, use_box=True)
+        f.addRow(_rc)
+
+        # Clear All
+        self.btn_clear_all = QPushButton("Clear All")
+        self.btn_clear_all.setMinimumHeight(35)
+        self.btn_clear_all.clicked.connect(self.clear_all)
+
+        btn_row = QHBoxLayout()
+        btn_row.addWidget(self.btn_clear_all)
+        btn_widget = QWidget()
+        btn_widget.setLayout(btn_row)
+        btn_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        f.addRow(btn_widget)
 
         QTimer.singleShot(0, self._fit_stack)
 
@@ -261,17 +266,38 @@ class SocialCost(ScrollableForm):
         """Return a QFormLayout on `parent` matching the main form's style."""
         layout = QFormLayout(parent)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(12)
+        layout.setSpacing(8)
         layout.setLabelAlignment(Qt.AlignRight)
         return layout
 
-    def _padded_label(self, text="", top=8, bottom=8):
+    def _padded_label(self, text="", top=8, bottom=8, use_box=False):
         """Wrap a QLabel in a slim container widget so vertical breathing room
         is controlled by explicit margins, not QFormLayout row stretch."""
         container = QWidget()
         vbox = QVBoxLayout(container)
-        vbox.setContentsMargins(0, top, 0, bottom)
         vbox.setSpacing(0)
+
+        if use_box:
+            # Internal padding for the box
+            vbox.setContentsMargins(15, 12, 15, 12)
+            # Use container margins for the 'top' and 'bottom' spacing around the box
+            container.setContentsMargins(0, top, 0, bottom)
+            bg = get_token("surface")
+            border = get_token("border-subtle")
+            container.setStyleSheet(f"""
+                QWidget {{
+                    background-color: {bg};
+                    border: 1px solid {border};
+                    border-radius: 8px;
+                }}
+                QLabel {{
+                    background-color: transparent;
+                    border: none;
+                }}
+            """)
+        else:
+            vbox.setContentsMargins(0, top, 0, bottom)
+
         lbl = QLabel(text)
         lbl.setTextFormat(Qt.RichText)
         lbl.setWordWrap(True)
@@ -302,6 +328,7 @@ class SocialCost(ScrollableForm):
 
     def _build_niti_panel(self):
         w = QWidget()
+        w.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
         layout = self._make_panel_layout(w)
 
         _bc, _ = self._padded_label(
@@ -323,12 +350,11 @@ class SocialCost(ScrollableForm):
         self._niti_layout = layout
         self._inr_row = self._find_row_for_widget(layout, self.inr_to_local_rate)
 
-        _nrc, self._niti_result_lbl = self._padded_label(top=6, bottom=4)
-        layout.addRow(_nrc)
         return w
 
     def _build_ricke_panel(self):
         w = QWidget()
+        w.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
         layout = self._make_panel_layout(w)
 
         _ref_c, _ref_lbl = self._padded_label(
@@ -370,9 +396,6 @@ class SocialCost(ScrollableForm):
         self._ricke_layout = layout
         self._usd_row = self._find_row_for_widget(layout, self.usd_to_local_rate)
 
-        _rrc, self._ricke_result_lbl = self._padded_label(top=6, bottom=4)
-        layout.addRow(_rrc)
-
         self.usd_to_local_rate.valueChanged.connect(self._update_ricke_result)
         self.country_iso3.currentIndexChanged.connect(self._update_ricke_result)
         self.ssp_scenario.currentIndexChanged.connect(self._update_ricke_result)
@@ -398,6 +421,7 @@ class SocialCost(ScrollableForm):
 
     def _build_custom_panel(self):
         w = QWidget()
+        w.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
         layout = self._make_panel_layout(w)
 
         self.form, _saved = layout, self.form
@@ -410,14 +434,6 @@ class SocialCost(ScrollableForm):
         self.scc_value.valueChanged.connect(self._update_custom_result)
         return w
 
-    # ── Stack height ──────────────────────────────────────────────────────────
-
-    def _fit_stack(self):
-        """Lock the stack to exactly its current panel's natural height."""
-        w = self._stack.currentWidget()
-        if w:
-            self._stack.setFixedHeight(max(w.sizeHint().height(), 0))
-            self._stack.updateGeometry()
 
     # ── Mode switching ────────────────────────────────────────────────────────
 
@@ -425,11 +441,6 @@ class SocialCost(ScrollableForm):
         if self._suppress_signals:
             return
         mode = self.source.currentText()
-
-        # Release the fixed height BEFORE the panel swap - otherwise Qt stretches
-        # the new (shorter) panel's rows to fill the old panel's locked height.
-        self._stack.setMaximumHeight(16777215)
-        self._stack.setMinimumHeight(0)
 
         if _MODE_NITI in mode:
             self._stack.setCurrentIndex(0)
@@ -442,6 +453,19 @@ class SocialCost(ScrollableForm):
             self._update_custom_result()
 
         QTimer.singleShot(0, self._fit_stack)
+
+    def _fit_stack(self):
+        """
+        Force the stack to shrink/grow to match the current page's requirements.
+        This prevents the 'Ricke' panel (large) from leaving a huge gap when
+        switched to 'Custom' mode (small).
+        """
+        curr = self._stack.currentWidget()
+        if curr:
+            curr.updateGeometry()
+            # We use the layout's sizeHint to ensure we capture all fields and labels
+            h = curr.layout().sizeHint().height() if curr.layout() else curr.sizeHint().height()
+            self._stack.setFixedHeight(h)
 
     # ── Calculations ──────────────────────────────────────────────────────────
 
@@ -461,16 +485,6 @@ class SocialCost(ScrollableForm):
         rate = self.inr_to_local_rate.value() if cur != "INR" else 1.0
         val = NITI_AAYOG_SCC_INR * rate
 
-        if cur == "INR":
-            self._niti_result_lbl.setText(
-                f"NITI Aayog Base: <b>{fmt(NITI_AAYOG_SCC_INR)} INR/kgCO₂e</b>"
-            )
-        else:
-            self._niti_result_lbl.setText(
-                f"NITI Aayog Base: <b>{fmt(NITI_AAYOG_SCC_INR)} INR/kgCO₂e</b><br/>"
-                f"Adjusted Local Cost: <b>{fmt(val)} {cur}/kgCO₂e</b>"
-            )
-
         self._set_result(
             val,
             mode=_MODE_NITI,
@@ -480,6 +494,7 @@ class SocialCost(ScrollableForm):
             rate_unit=f"{cur}/INR",
         )
         self._on_field_changed()
+        QTimer.singleShot(0, self._fit_stack)
 
     def _update_ricke_result(self):
         if self._suppress_signals:
@@ -520,10 +535,9 @@ class SocialCost(ScrollableForm):
         inflated_usd = self._ricke_base_usd * cpi_factor
         val = inflated_usd * usd_rate
 
+        extra = []
         if error_msg:
-            self._ricke_result_lbl.setText(
-                f"<span style='color:gray;'>{error_msg}</span>"
-            )
+            extra.append(f"<span style='color:gray;'>{error_msg}</span>")
             self._set_result(
                 0.0,
                 mode=_MODE_RICKE,
@@ -531,20 +545,17 @@ class SocialCost(ScrollableForm):
                 base_unit="USD/kgCO₂e (2018)",
                 conversion_rate=usd_rate,
                 rate_unit=f"{cur}/USD",
+                extra_info=extra,
             )
         else:
-            lines = [
-                f"Scenario Estimate ({iso3}, {ssp_key}/{rcp_key.upper()}/{run_key}): "
-                f"<b>${fmt(self._ricke_base_usd)} USD/kgCO₂e</b> (2018 USD)"
-            ]
+            extra.append(
+                f"Scenario: {iso3}, {ssp_key}/{rcp_key.upper()}/{run_key}"
+            )
             if cpi_factor != 1.0:
-                lines.append(
-                    f"CPI-inflated: <b>${fmt(inflated_usd)} USD/kgCO₂e</b> "
-                    f"(×{fmt(cpi_factor)} factor)"
+                extra.append(
+                    f"CPI Factor: ×{fmt(cpi_factor)}"
                 )
-            if cur != "USD":
-                lines.append(f"Adjusted Local Cost: <b>{fmt(val)} {cur}/kgCO₂e</b>")
-            self._ricke_result_lbl.setText("<br/>".join(lines))
+
             self._set_result(
                 val,
                 mode=_MODE_RICKE,
@@ -552,8 +563,10 @@ class SocialCost(ScrollableForm):
                 base_unit="USD/kgCO₂e",
                 conversion_rate=usd_rate,
                 rate_unit=f"{cur}/USD",
+                extra_info=extra,
             )
         self._on_field_changed()
+        QTimer.singleShot(0, self._fit_stack)
 
     def _update_custom_result(self):
         if self._suppress_signals:
@@ -569,16 +582,21 @@ class SocialCost(ScrollableForm):
             rate_unit="(direct entry)",
         )
         self._on_field_changed()
+        QTimer.singleShot(0, self._fit_stack)
 
-    def _set_result(self, value, mode=None, base_price=None, base_unit=None, conversion_rate=None, rate_unit=None):
+    def _set_result(self, value, mode=None, base_price=None, base_unit=None, conversion_rate=None, rate_unit=None, extra_info=None):
         cur = self._project_currency or ""
         if mode is not None and base_price is not None and conversion_rate is not None:
             lines = [
                 f"<b>Selected Mode:</b> {mode}",
                 f"<b>Base Price:</b> {fmt(base_price)} {base_unit}",
             ]
-            if rate_unit not in ("INR/INR", "USD/USD"):
+            if rate_unit not in ("INR/INR", "USD/USD") and rate_unit != "(direct entry)":
                 lines.append(f"<b>Conversion Rate:</b> {fmt(conversion_rate)} {rate_unit}")
+            
+            if extra_info:
+                lines.extend(extra_info)
+
             lines.append(f"<b>Effective SCC:</b> {fmt(value)} {cur}/kgCO₂e")
             self._result_lbl.setText("<br/>".join(lines))
         else:
@@ -855,30 +873,32 @@ class SocialCost(ScrollableForm):
         return {"errors": errors, "warnings": warnings}
 
     def freeze(self, frozen: bool = True):
-        freeze_widgets(frozen, self.btn_clear)
+        freeze_widgets(frozen, self.btn_clear_all)
         freeze_form(
             HEADER_FIELDS + NITI_FIELDS + RICKE_FIELDS + CUSTOM_FIELDS,
             self,
             frozen,
         )
 
+
     def clear_all(self):
         if not confirm_clear_all(self):
             return
 
-        self._suppress_signals = True
-        self.source.setCurrentIndex(0)
-        self.inr_to_local_rate.setValue(1.0)
-        self.usd_to_local_rate.setValue(1.0)
-        self.country_iso3.setCurrentIndex(0)
-        self.ssp_scenario.setCurrentIndex(0)
-        self.rcp_scenario.setCurrentIndex(0)
-        self.ricke_run.setCurrentIndex(0)
-        self.cpi_ratio.setValue(1.0)
-        self.scc_value.setValue(0.0)
-        self._ricke_base_usd = 0.0
-        self._suppress_signals = False
-        self._on_mode_changed()
+        self._loading = True
+        try:
+            self.inr_to_local_rate.setValue(1.0)
+            self.usd_to_local_rate.setValue(1.0)
+            self.country_iso3.setCurrentIndex(0)
+            self.ssp_scenario.setCurrentIndex(0)
+            self.rcp_scenario.setCurrentIndex(0)
+            self.ricke_run.setCurrentIndex(0)
+            self.cpi_ratio.setValue(1.0)
+            self.scc_value.setValue(0.0)
+        finally:
+            self._loading = False
+
+        self._sync_with_global_settings()
         self._on_field_changed()
 
     def get_data(self) -> dict:

@@ -248,6 +248,17 @@ def main():
 
     # Pass main window so Qt waits until it's visible AND MIN_DISPLAY_MS has elapsed
     main_win = manager.windows[0] if manager.windows else None
+    
+    # Pesticide: Simplified API activation
+    from three_ps_lcca_gui.gui.themes import PESTICIDE
+    if PESTICIDE or os.environ.get("GUI_PESTICIDE") == "true":
+        try:
+            from three_ps_lcca_gui.gui.themes.PESTICIDE import paraside
+            # Available modes: 'rainbow' (default), 'beast', 'off'
+            paraside(mode="beast") 
+        except ImportError:
+            pass
+
     splash.finish(main_win)
 
     sys.exit(app.exec())

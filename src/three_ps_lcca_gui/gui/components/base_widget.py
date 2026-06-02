@@ -222,33 +222,33 @@ class ScrollableForm(BaseDataWidget):
         super().__init__(controller=controller, chunk_name=chunk_name)
 
         self._content = QWidget()
-        # Fixed vertical policy: _content never grows beyond its sizeHint.
-        # Preferred/Minimum still allow the scroll area to push extra height
-        # into the QFormLayout rows, producing visible gaps between fields.
-        # Ignored horizontal policy: qSmartMinSize() skips minimumSizeHint() for
-        # the horizontal axis entirely, so no child's minimum width can force the
-        # scroll area to make _content wider than the viewport.
-        self._content.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
+        self._content_layout = QVBoxLayout(self._content)
+        self._content_layout.setContentsMargins(0, 0, 0, 0)
+        self._content_layout.setSpacing(0)
 
-        self.form = QFormLayout(self._content)
-        self.form.setContentsMargins(24, 20, 24, 20)
-        self.form.setSpacing(12)
+        # Container for the form to control its size policy strictly
+        self._form_widget = QWidget()
+        self.form = QFormLayout(self._form_widget)
+        self.form.setContentsMargins(24, 12, 24, 12)
+        self.form.setSpacing(8)
         self.form.setLabelAlignment(Qt.AlignRight)
-        # Stop QFormLayout distributing leftover vertical space into rows.
-        # build_form() wraps every field in a single-column QWidget row -
-        # without this, those rows absorb extra height as padding gaps.
         self.form.setFieldGrowthPolicy(QFormLayout.AllNonFixedFieldsGrow)
         self.form.setRowWrapPolicy(QFormLayout.DontWrapRows)
 
-        # Wrap in scroll area.
-        # No QSS - use palette propagation instead.
-        # Setting WA_TranslucentBackground + autoFillBackground=False on both
-        # the content widget and the scroll viewport tells Qt to skip painting
-        # any background of their own and let the parent's Window colour show
-        # through uniformly in both light and dark themes.
+        # Force the form widget to never grow beyond what it needs
+        self._form_widget.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
+
+        self._content_layout.addWidget(self._form_widget)
+        self._content_layout.addStretch(1)
+
+        # Scroll area setup
+        self._content.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
+
         scroll = QScrollArea()
         scroll.setWidget(self._content)
         scroll.setWidgetResizable(True)
+        # ROOT CAUSE FIX: Anchor content to the top so it doesn't stretch to fill the viewport.
+        scroll.setAlignment(Qt.AlignTop)
         scroll.setFrameShape(QScrollArea.NoFrame)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
 

@@ -64,6 +64,7 @@ def theme_manager() -> _ThemeManager:
 ACTIVE_LIGHT: str = "soft_light"  # built-in: "default" | "soft_light"
 ACTIVE_DARK: str = "dracula"  # built-in: "default" | "dracula"
 APPEARANCE_MODE: str = "auto"  # "auto" | "light" | "dark"
+PESTICIDE: bool = False  # Set to True to enable layout debugging borders
 # ──────────────────────────────────────────────────────────────────────────
 
 _PKG = "three_ps_lcca_gui.gui.themes"
@@ -580,7 +581,7 @@ def reapply(app=None) -> None:
                 "url(gui/assets/themes/arrow_down_disabled.svg)",
                 f'url("{_arrow_disabled}")',
             )
-                
+
             # Clear first - forces Qt to fully re-evaluate all style rules
             # on every existing widget, including window backgrounds.
             app.setStyleSheet("")
