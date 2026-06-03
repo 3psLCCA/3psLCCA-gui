@@ -253,11 +253,12 @@ class SocialCost(ScrollableForm):
         self.btn_clear_all.setMinimumHeight(35)
         self.btn_clear_all.clicked.connect(self.clear_all)
 
-        btn_row = QHBoxLayout()
-        btn_row.addWidget(self.btn_clear_all)
         btn_widget = QWidget()
-        btn_widget.setLayout(btn_row)
-        btn_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        btn_row = QHBoxLayout(btn_widget)
+        btn_row.addWidget(self.btn_clear_all)
+        btn_row.setContentsMargins(0, 10, 0, 10)
+        btn_row.setSpacing(10)
+
         f.addRow(btn_widget)
 
         QTimer.singleShot(0, self._fit_stack)
