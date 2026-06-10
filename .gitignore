@@ -41,6 +41,7 @@ MANIFEST
 # Installer logs
 pip-log.txt
 pip-delete-this-directory.txt
+**/installer/**.exe
 
 # Unit test / coverage
 htmlcov/
