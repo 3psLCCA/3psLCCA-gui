@@ -1,7 +1,7 @@
 from pylatex import NoEscape
 from pylatex.utils import escape_latex
 
-from ..gui.components.utils.common_requested_data import get_chunk
+from ..gui.components.utils.common_requested_data import get_chunk, get_currency
 from .SETTINGS import DECIMAL_PLACES_FOR_LATEX
 from .html_to_latex import format_remarks_latex
 from .structure_work_data_latex import (
@@ -12,15 +12,8 @@ from .structure_work_data_latex import (
 
 _EMDASH = r"\textemdash"
 
-_INC_COLS    = 7
-_INC_SPEC    = "p{3.5cm}rp{1cm}rrrr"
-_INC_HEADERS = [
-    "Material", "Quantity", "Unit",
-    NoEscape(r"Recyclability \%"),
-    "Recyclable Quantity",
-    "Scrap Rate",
-    "Recovered Value",
-]
+_INC_COLS = 6
+_INC_SPEC = "p{3.5cm}rrrp{1cm}r"
 
 _EXC_COLS    = 2
 _EXC_SPEC    = "p{7cm}p{5cm}"
@@ -38,15 +31,24 @@ def _get_included_table(included: dict) -> str:
     if not included:
         return ""
 
+    currency = escape_latex(get_currency())
+    headers = [
+        "Material",
+        NoEscape(r"Recyclability \%"),
+        "Recyclable Quantity",
+        "Unit",
+        f"Scrap Rate ({currency})",
+        f"Recovered Value ({currency})",
+    ]
+
     sections = []
     for (category, comp_name), rows in included.items():
         cells = [
             [
                 escape_latex(r["name"]),
-                _fmt(r["qty"]),
-                escape_latex(r["unit"]),
                 _fmt(r["pct"]),
                 _fmt(r["rec_qty"]),
+                escape_latex(r["unit"]),
                 _fmt(r["scrap"]),
                 _fmt(r["rec_val"]),
             ]
@@ -58,7 +60,7 @@ def _get_included_table(included: dict) -> str:
         _INC_SPEC, _INC_COLS,
         "Materials Included in Recyclability Calculation",
         "tab:recycling_included",
-        _INC_HEADERS, sections,
+        headers, sections,
     )
 
 
