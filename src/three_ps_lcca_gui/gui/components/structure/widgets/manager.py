@@ -23,6 +23,7 @@ from ...utils.definitions import UNIT_DISPLAY
 from ...utils.validation_helpers import freeze_widgets
 from ...utils.display_format import fmt, fmt_comma
 from three_ps_lcca_gui.gui.styles import btn_danger
+from ...utils.common_requested_data import get_chunk
 
 
 # ---------------------------------------------------------------------------
@@ -292,7 +293,10 @@ class StructureManagerWidget(QWidget):
 
     def open_edit_dialog(self, comp_name, original_index):
         try:
-            current_data = self.data  # use in-memory state — always reflects latest saves
+            # Always fetch fresh so the dialog reflects changes made by other pages
+            # (e.g. recycling toggling included_in_recyclability) since last load.
+            current_data = get_chunk(self.chunk_name)
+            self.data = current_data
             items = current_data.get(comp_name, [])
 
             if original_index < len(items):
