@@ -1,197 +1,231 @@
-# 3psLCCA - Bridge Life Cycle Cost Analysis
+<div align="center">
 
-3psLCCA is a desktop application for performing Life Cycle Cost Analysis (LCCA) on bridge infrastructure projects. It evaluates the economic performance of steel design options over their entire life cycle.
+<img src="./src/three_ps_lcca_gui/gui/assets/logo/logo-3psLCCA-dark.svg" alt="3psLCCA Logo" width="480"/>
+
+<!-- # 3psLCCA -->
+
+<!-- ### Bridge Life Cycle Cost Analysis -->
+
+[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white)](https://www.python.org/)
+[![PySide6](https://img.shields.io/badge/PySide6-GUI-41CD52?style=flat-square&logo=qt&logoColor=white)](https://doc.qt.io/qtforpython/)
+[![Version](https://img.shields.io/badge/version-1.0.0-blue?style=flat-square)](https://github.com/swas02/3psLCCA-gui/releases)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey?style=flat-square&logo=windows&logoColor=white)](https://github.com/swas02/3psLCCA-gui)
+[![Conda](https://img.shields.io/badge/conda--forge-available-44A833?style=flat-square&logo=anaconda&logoColor=white)](https://conda-forge.org/)
+[![LaTeX](https://img.shields.io/badge/PDF%20Reports-LaTeX-008080?style=flat-square&logo=latex&logoColor=white)](https://miktex.org/)
+[![Maintained](https://img.shields.io/badge/maintained-yes-brightgreen?style=flat-square)](https://github.com/swas02/3psLCCA-gui/commits/main)
+
+**3psLCCA** is a desktop application for evaluating the full economic life cycle of bridge infrastructure — from construction through maintenance, traffic disruption, carbon impact, and end-of-life recycling — with professional PDF report output.
+
+[Features](#-features) · [Installation](#-installation) · [Running the App](#-running-the-app) · [Development Setup](#-development-setup) · [PDF Reports](#-pdf-report-generation) · [Troubleshooting](#-troubleshooting)
+
+</div>
 
 ---
 
-## ⚙️ Installation (via Conda)
+## ✨ Features
 
-This is the recommended method as it automatically handles all dependencies, including a **portable LaTeX environment** for PDF reports. Using `conda-forge` avoids any Anaconda Terms of Service (ToS) requirements.
+| Module | Description |
+|---|---|
+| 🏗️ **Bridge & Project Data** | Dimensions, design life, construction schedule, country, agency |
+| 💰 **Financial Parameters** | Discount rate, inflation, interest rates, investment ratios |
+| 🧱 **Structure Work Data** | Bill of quantities — foundation, sub-structure, super-structure, misc |
+| 🔧 **Maintenance & Repair** | Routine inspection, periodic/major maintenance, bearing & joint replacement |
+| 🚗 **Traffic & Road Costs** | Vehicle counts, road user costs, accident rates, work-zone multipliers |
+| 🏚️ **Demolition** | End-of-life cost and carbon cost as % of construction value |
+| 🌿 **Carbon Emissions** | Machinery, material transport, traffic diversion, and social cost of carbon |
+| ♻️ **Recyclability** | Scrap/salvage value of materials at demolition |
+| 📊 **Outputs & Reports** | LCCA summary charts, PDF/LaTeX reports, Excel export |
 
-### 1. Prerequisites
-- **Install Miniconda**: [Download and install Miniconda](https://docs.conda.io/en/latest/miniconda.html).
+---
 
-### 2. Clean Conda Configuration (Run Once)
-Run these commands to ensure your Conda setup is clean and uses reliable open-source channels:
+## 📦 Installation
+
+### Recommended — Conda (includes portable LaTeX for PDF reports)
+
+> Requires [Miniconda](https://docs.conda.io/en/latest/miniconda.html) installed.
+
+**Step 1 — Configure channels** *(run once)*
 
 ```bash
-# Remove problematic default channels
 conda config --remove channels defaults
-
-# Add required channels
 conda config --add channels conda-forge
 conda config --add channels osdag
 conda config --add channels zehen-249
-
 ```
 
-### 3. Setup and Run
+**Step 2 — Create and activate the environment**
+
 ```bash
-# Create the environment using the provided file
 conda create -n 3pslcca
-
-# Activate the environment
 conda activate 3pslcca
+```
 
-# Install application
-conda install three-ps-lcca-gui 
+**Step 3 — Install**
 
-# Run the application
+```bash
+conda install three-ps-lcca-gui
+```
+
+---
+
+### Lightweight — Python venv
+
+> PDF reports require a separately installed [MiKTeX](https://miktex.org/) (added to PATH).
+
+```bash
+# 1. Create and activate virtual environment
+python -m venv venv
+source venv/bin/activate        # Linux / macOS
+venv\Scripts\activate           # Windows
+
+# 2. Clone the repos
+git clone https://github.com/3psLCCA/3psLCCA-gui.git
+cd 3psLCCA-gui
+git clone https://github.com/3psLCCA/3psLCCA-core.git
+
+# 3. Install dependencies
+pip install -r requirements.txt
+
+# 4. Run
+cd src
+python -m three_ps_lcca_gui.gui.main
+```
+
+<details>
+<summary><b>Windows PowerShell — script execution error?</b></summary>
+
+Run once in PowerShell as Administrator, then retry activation:
+
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+```
+
+</details>
+
+---
+
+## 🚀 Running the App
+
+```bash
+conda activate 3pslcca
 threePSLCCA
 ```
 
----
-
-## 🔄 Keeping Up to Date
-
-To get the latest features and bug fixes for both the interface and the calculation engine:
-
-1. **Update the source code**:
-   ```bash
-   git pull origin main
-   ```
-
-2. **Update the environment**:
-   ```bash
-   # Ensure your environment is active
-   conda activate 3pslcca
-
-   # Update libraries and prune old ones
-   conda env update -f environment.yml --prune
-
-   # Force update the internal Core engine from GitHub
-   pip install --upgrade git+https://github.com/swas02/3psLCCA-core.git@main
-
-   # Re-sync local package entry points
-   pip install -e .
-
-   # Launch the application
-   three-ps-lcca-gui
-   ```
+> Re-activate the environment every time you open a new terminal.
 
 ---
 
-## 🗑️ Uninstallation & Cleanup
-
-To completely remove the application and its environment from your system:
+## 🔄 Updating
 
 ```bash
-# Deactivate the environment (if active)
-conda deactivate
-
-# Remove the conda environment
-conda env remove -n 3pslcca
+conda activate 3pslcca
+git pull origin main
+conda env update -f environment.yml --prune
+pip install --upgrade git+https://github.com/swas02/3psLCCA-core.git@main
+pip install -e .
+threePSLCCA
 ```
 
 ---
 
 ## 🛠️ Development Setup
 
-### Option A - Conda (Recommended)
+```bash
+# Clone
+git clone https://github.com/swas02/3psLCCA-gui.git
+cd 3psLCCA-gui
 
-If you are contributing to the source code, please **first follow the [Installation (via Conda)](#⚙️-installation-via-conda) steps above**, then complete these additional steps:
+# Create environment from file
+conda env create -f environment.yml -n 3pslcca
+conda activate 3pslcca
 
-1. **Clone the Project**:
-   ```bash
-   git clone https://github.com/swas02/3psLCCA-gui.git
-   cd 3psLCCA-gui
-   ```
+# Install in editable mode
+pip install -e .
 
-2. **Install in Editable Mode**:
-   This allows you to see your code changes immediately without reinstalling the package:
-   ```bash
-   # Ensure your environment is active
-   conda activate 3pslcca
-   
-   # Install the project locally for development
-   conda env create -f environment.yml -n 3pslcca
-   ```
+# Run
+threePSLCCA
+```
 
-### Option B - Python venv (Lightweight)
+### Internal Dev Tools
 
-A minimal setup using only Python and `pip` - no Conda required. Note: PDF report generation will require a separately installed LaTeX distribution (see [PDF Report Generation](#-pdf-report-generation)).
+```bash
+python devtools/launcher.py
+```
 
-1. **Create a virtual environment**:
-   This isolates the project's dependencies from your global Python installation:
-   ```bash
-   python3 -m venv venv
-   ```
-
-2. **Activate the virtual environment**:
-   You must activate it before installing anything or running the app. Your terminal prompt will show `(venv)` once active:
-   - Linux / macOS:
-     ```bash
-     source venv/bin/activate
-     ```
-   - Windows:
-     ```bash
-     venv\Scripts\activate
-     ```
-     > **First-time Windows users**: PowerShell restricts running scripts by default. If you get a `cannot be loaded because running scripts is disabled` error, run this once in PowerShell as Administrator, then retry activation:
-     > ```powershell
-     > Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-     > ```
-
-3. **Clone the GUI repo**:
-   This is the main interface and entry point of the application:
-   ```bash
-   git clone https://github.com/3psLCCA/3psLCCA-gui.git
-   ```
-
-4. **Enter the project folder**:
-   ```bash
-   cd 3psLCCA-gui
-   ```
-
-5. **Clone the core engine repo** (inside this folder):
-   The calculation engine is maintained as a separate repository and must sit alongside the GUI source:
-   ```bash
-   git clone https://github.com/3psLCCA/3psLCCA-core.git
-   ```
-
-6. **Install dependencies**:
-   This installs all required Python packages into your active virtual environment:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-7. **Navigate to the source folder**:
-   The app's entry point lives inside the `src` directory:
-   ```bash
-   cd src
-   ```
-
-8. **Run the app**:
-   ```bash
-   python -m three_ps_lcca_gui.gui.main
-   ```
-
-> **Every time you open a new terminal**, you must activate the virtual environment before running the app (steps 2 → 7 → 8). The environment is not persistent across terminal sessions.
+| Tool | Purpose |
+|---|---|
+| **WPI Database** | Manage Wholesale Price Index data |
+| **Catalog Builder** | Rebuild material and section catalogs |
+| **Project Inspector** | Repair and inspect `.3ps` project files |
 
 ---
 
 ## 📄 PDF Report Generation
-- **Conda Environment**: Uses a built-in portable LaTeX engine (no extra setup required).
-- **Manual Installation**: Requires a system-wide LaTeX distribution (e.g., [MiKTeX](https://miktex.org/)) added to your system PATH.
+
+| Setup | LaTeX |
+|---|---|
+| **Conda** | Portable LaTeX bundled — no extra setup |
+| **venv / manual** | Install [MiKTeX](https://miktex.org/) and add to system `PATH` |
 
 ---
 
 ## ❓ Troubleshooting
 
-### SSL Errors (CondaSSLError)
-If you encounter an SSL error on Windows (`record layer failure`):
-1. Disable SSL verification temporarily: `conda config --set ssl_verify false`.
-2. Try the installation again: `conda env create -f environment.yml`.
-3. If you use a VPN, try disconnecting it before running the setup.
+<details>
+<summary><b>SSL Error on Windows (CondaSSLError / record layer failure)</b></summary>
+
+```bash
+conda config --set ssl_verify false
+conda env create -f environment.yml
+```
+
+> Disconnect any active VPN and retry if the error persists.
+
+</details>
+
+<details>
+<summary><b>App won't launch after update</b></summary>
+
+```bash
+conda activate 3pslcca
+pip install -e .
+threePSLCCA
+```
+
+</details>
 
 ---
 
-## 🔧 Maintenance & Tools
-To access internal database management and debugging tools:
+## 🗑️ Uninstall
+
 ```bash
-python devtools/launcher.py
+conda deactivate
+conda env remove -n 3pslcca
 ```
-Available tools:
-- **WPI Database**: Manage Wholesale Price Index data.
-- **Catalog Builder**: Rebuild material and section catalogs.
-- **Project Inspector**: Repair and inspect `.3ps` project files.
+
+---
+
+## 🏗️ Project Structure
+
+```
+3psLCCA-gui/
+├── src/three_ps_lcca_gui/
+│   ├── gui/               # PySide6 UI components
+│   ├── core/              # Report generation (LaTeX/PDF)
+│   └── code_to_latex/     # Data → LaTeX converters
+├── 3psLCCA-core/          # Calculation engine (submodule)
+├── devtools/              # Internal admin tools
+└── environment.yml        # Conda environment spec
+```
+
+---
+
+## 📬 Contact & Credits
+
+Developed by the [Osdag](https://osdag.fossee.in) team at IIT Bombay under FOSSEE.
+
+---
+
+<div align="center">
+<sub>Built with PySide6 · LaTeX · matplotlib · pandas</sub>
+</div>
