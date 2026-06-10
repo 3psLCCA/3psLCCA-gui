@@ -1,0 +1,58 @@
+# open ..miniconda3\..\Lib\site-packages\constructor\nsis folder 
+# open main.nsi.tmpl file comment these lines 197-199 and 203-204 this will remove the default welcome and header images from the installer.
+
+# yaml-language-server: $schema=https://schemas.conda.org/constructor/v0/construct.schema.json
+
+name: "threePSLCCA"
+version: "1.0.2"
+uninstall_name: ${NAME}
+installer_type: exe # [win]
+installer_type: sh  # [linux]
+
+icon_image: icon.ico
+welcome_text: |
+  Welcome to the 3PS LCCA GUI Installer.
+  This will install 3PS LCCA with all required runtime components.
+
+# license_file: license.txt
+extra_files:
+  - post_install.bat  # [win]
+  - pre_uninstall.bat # [win]
+  - launch_lcca-gui.vbs  # [win]
+  - post_install.sh   # [linux]
+  - Uninstall-lcca-gui.sh  # [linux]
+  - icon.ico
+  - create_shortcuts.ps1  # [win]
+  - remove_shortcuts.ps1  # [win]
+
+
+
+channels:
+  - conda-forge
+  - zehen-249
+
+specs:
+  - zehen-249::three-ps-lcca-gui=1.0.2
+
+# Add in system env variables
+initialize_conda: false
+register_python: false
+
+# Set Default installation location
+default_prefix: "%LOCALAPPDATA%\\threePSLCCA" # [win]
+default_prefix_all_users: "%ProgramData%\\threePSLCCA" # [win]
+default_prefix: "$HOME/threePSLCCA"  # [linux]
+default_prefix_all_users: "/opt/threePSLCCA"  # [linux]
+
+
+post_install: post_install.bat  # [win]
+pre_uninstall: pre_uninstall.bat  # [win]
+post_install: post_install.sh   # [linux]
+
+post_install_desc: |
+ This will create shortcuts for 3PS LCCA and add it to the start menu. You can also launch 3PS LCCA from the desktop shortcut.(Recommended)
+
+
+conclusion_text: |
+  3PS LCCA has been successfully installed.
+  You can launch 3PS LCCA from the start menu or desktop shortcut. To uninstall 3PS LCCA, please go to the Control Panel and remove it from the list of installed programs. If you have any issues, please contact https://osdag.fossee.in. 
