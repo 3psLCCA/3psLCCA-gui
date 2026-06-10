@@ -39,6 +39,7 @@ from three_ps_lcca_gui.gui.theme import (
     SP4, RADIUS_MD, BTN_LG
 )
 from three_ps_lcca_gui.gui.styles import font as _f, btn_primary, btn_outline
+from three_ps_lcca_gui.gui._CONFIG import ALLOW_TEX
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Config keys & Schema
@@ -334,7 +335,7 @@ class _PdfGenWorker(QThread):
                 self.finished.emit(final_pdf)
             else:
                 tex_path = work_stem + ".tex"
-                if os.path.exists(tex_path):
+                if os.path.exists(tex_path) and ALLOW_TEX:
                     # Keep work_dir alive- dialog cleans it up after export/close
                     self.errored.emit(
                         f"PDF compilation failed- LaTeX could not produce a PDF.\n"
@@ -344,9 +345,10 @@ class _PdfGenWorker(QThread):
                     )
                 else:
                     shutil.rmtree(work_dir, ignore_errors=True)
-                    self.errored.emit(
-                        "Report generation completed but no output file was found.", ""
-                    )
+                    err_msg = "Report generation completed but no output file was found."
+                    if os.path.exists(tex_path):
+                        err_msg = "PDF compilation failed- LaTeX could not produce a PDF."
+                    self.errored.emit(err_msg, "")
 
         except Exception as e:
             shutil.rmtree(work_dir, ignore_errors=True)

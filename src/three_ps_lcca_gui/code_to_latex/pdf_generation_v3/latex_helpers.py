@@ -14,8 +14,7 @@ V3_PREAMBLE = [
     # ── Encoding & fonts ──────────────────────────────────────────────────────
     r"\usepackage[utf8]{inputenc}",
     r"\usepackage[T1]{fontenc}",       # proper output font encoding
-    r"\usepackage{newtxtext}",         # Times-style body font (professional)
-    r"\usepackage{newtxmath}",         # matching math font
+    r"\usepackage{mathptmx}",          # Times-style body font (widely available)
     r"\usepackage{microtype}",         # microtypography: protrusion + expansion
 
     # ── Core layout ───────────────────────────────────────────────────────────

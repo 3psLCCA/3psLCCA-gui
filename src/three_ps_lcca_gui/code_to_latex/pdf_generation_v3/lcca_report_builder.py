@@ -20,6 +20,7 @@ except Exception:
     _PDFLATEX = "pdflatex"
 
 from pylatex.utils import escape_latex
+from three_ps_lcca_gui.gui._CONFIG import ALLOW_TEX
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Report Configuration Keys
@@ -547,7 +548,7 @@ def compile_lcca_report_pdf(
     filename: str = "structured_code_to_latex_report",
     keep_artifacts: bool = False,
     config: dict | None = None,
-) -> tuple[Path, Path]:
+) -> tuple[Path | None, Path]:
     if _set_controller is not None:
         try:
             _set_controller(controller)
@@ -596,8 +597,9 @@ def compile_lcca_report_pdf(
             logo_path=logo_path,
         )
         tex_path.write_text(tex_content, encoding="utf-8")
-        # Always write .tex to the final output dir so it's recoverable if compilation fails
-        final_tex_path.write_text(tex_content, encoding="utf-8")
+        # Only write .tex to final output dir if ALLOW_TEX is True
+        if ALLOW_TEX:
+            final_tex_path.write_text(tex_content, encoding="utf-8")
 
         if not shutil.which(_PDFLATEX):
             raise RuntimeError(
@@ -623,10 +625,11 @@ def compile_lcca_report_pdf(
                     lines = log_file.read_text(encoding="utf-8", errors="replace").splitlines()
                     error_lines = [l for l in lines if l.startswith("!") or "Error" in l or "error" in l]
                     log_snippet = "\n".join(error_lines[-30:]) if error_lines else "\n".join(lines[-40:])
+                
+                tex_msg = f"\n\nThe .tex file has been saved to:\n  {final_tex_path}" if ALLOW_TEX else ""
                 raise RuntimeError(
                     f"pdflatex failed (exit {result.returncode}).\n\n"
-                    f"LaTeX errors:\n{log_snippet or result.stdout[-3000:] or '(no output)'}\n\n"
-                    f"The .tex file has been saved to:\n  {final_tex_path}"
+                    f"LaTeX errors:\n{log_snippet or result.stdout[-3000:] or '(no output)'}{tex_msg}"
                 )
 
         lot_path = tex_path.with_suffix(".lot")
@@ -642,7 +645,7 @@ def compile_lcca_report_pdf(
         if pdf_path.resolve() != final_pdf_path.resolve():
             shutil.copy2(pdf_path, final_pdf_path)
 
-        return final_tex_path, final_pdf_path
+        return (final_tex_path if ALLOW_TEX else None), final_pdf_path
 
     finally:
         if cleanup is not None:
