@@ -63,6 +63,12 @@ QPlainTextEdit:read-only {
     color: $text_secondary;
 }
 
+QLineEdit[frozen="true"],
+QTextEdit[frozen="true"],
+QPlainTextEdit[frozen="true"] {
+    color: $text_disabled;
+}
+
 QLineEdit:disabled,
 QTextEdit:disabled,
 QPlainTextEdit:disabled {
@@ -98,6 +104,11 @@ QDoubleSpinBox:disabled {
     background-color: $window;
     color: $text_disabled;
     border-color: $border;
+}
+
+QSpinBox[frozen="true"],
+QDoubleSpinBox[frozen="true"] {
+    color: $text_disabled;
 }
 
 QSpinBox[validationState="error"],
