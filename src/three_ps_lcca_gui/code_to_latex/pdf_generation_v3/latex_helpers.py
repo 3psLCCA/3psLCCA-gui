@@ -2,69 +2,48 @@ from __future__ import annotations
 
 from pylatex.utils import escape_latex
 
-from ..SETTINGS import LATEX_FONT_SIZE
+from ..SETTINGS import LATEX_FONT_SIZE, REQUIRED_LATEX_PACKAGES
 from datetime import date
 
 
 EMDASH = r"\textemdash"
 generated_date = date.today().strftime("%d-%m-%Y")
+
+def _generate_package_imports() -> list[str]:
+    lines = []
+    for pkg, options in REQUIRED_LATEX_PACKAGES.items():
+        if options:
+            lines.append(rf"\usepackage[{','.join(options)}]{{{pkg}}}")
+        else:
+            lines.append(rf"\usepackage{{{pkg}}}")
+    return lines
+
 V3_PREAMBLE = [
     r"\documentclass[12pt,a4paper]{article}",
+    "",
+    *(_generate_package_imports()),
+    "",
+    # ── Captions setup ────────────────────────────────────────────────────────
+    r"\captionsetup{font=small, labelfont=bf, labelsep=period, skip=4pt}",
+    
+    # ── List setup ────────────────────────────────────────────────────────────
+    r"\setlist{noitemsep, topsep=4pt, partopsep=0pt}",
 
-    # ── Encoding & fonts ──────────────────────────────────────────────────────
-    r"\usepackage[utf8]{inputenc}",
-    r"\usepackage[T1]{fontenc}",       # proper output font encoding
-    r"\usepackage{mathptmx}",          # Times-style body font (widely available)
-    r"\usepackage{microtype}",         # microtypography: protrusion + expansion
-
-    # ── Core layout ───────────────────────────────────────────────────────────
-    r"\usepackage[a4paper, top=2.5cm, bottom=2.5cm, left=2.5cm, right=2.5cm]{geometry}",
-    r"\usepackage{setspace}",          # line-spacing control
+    # ── Core layout overrides ─────────────────────────────────────────────────
     r"\setstretch{1.15}",              # comfortable reading spacing
     r"\setlength{\parskip}{6pt}",      # space between paragraphs
     r"\setlength{\parindent}{0pt}",    # no first-line indent (modern style)
 
-    # ── Tables ────────────────────────────────────────────────────────────────
-    r"\usepackage{booktabs}",
-    r"\usepackage{array}",
-    r"\usepackage{longtable}",
-    r"\usepackage{tabularx}",
-    r"\usepackage{multirow}",
-    r"\usepackage{makecell}",          # \thead, per-cell formatting
-
-    # ── Graphics & floats ─────────────────────────────────────────────────────
-    r"\usepackage{graphicx}",
-    r"\usepackage{float}",
-    r"\usepackage{pdflscape}",
-    r"\usepackage{adjustbox}",
-
-    # ── Captions ──────────────────────────────────────────────────────────────
-    r"\usepackage{caption}",
-    r"\captionsetup{font=small, labelfont=bf, labelsep=period, skip=4pt}",
-
-    # ── Math ──────────────────────────────────────────────────────────────────
-    r"\usepackage{amsmath}",
-
-    # ── Colour & lists ────────────────────────────────────────────────────────
-    r"\usepackage{xcolor}",
-    r"\usepackage{enumitem}",
-    r"\setlist{noitemsep, topsep=4pt, partopsep=0pt}",
-
     # ── Headers / footers ─────────────────────────────────────────────────────
-    r"\usepackage{fancyhdr}",
-    r"\usepackage{lastpage}",
     r"\fancyhf{}",
     r"\renewcommand{\headrulewidth}{0.4pt}",
     r"\renewcommand{\footrulewidth}{0.4pt}",
     r"\fancyhead[L]{\small\nouppercase{\leftmark}}",
-    r"\fancyhead[R]{\small 3psLCCA}",
+    r"\fancyhead[R]{\small 3PS LCCA}",
     r"\fancyfoot[C]{\small Page~\thepage~of~\pageref*{LastPage}}",
     r"\AtBeginDocument{\pagestyle{fancy}}",
 
     # ── Section / ToC styling ─────────────────────────────────────────────────
-    r"\usepackage{tocloft}",
-    r"\usepackage{titlesec}",
-    r"\usepackage{etoolbox}",
     r"\titleformat{\section}{\Large\bfseries\color{blue!55!black}}{\thesection}{0.75em}{}",
     r"\titleformat{\subsection}{\large\bfseries\color{blue!55!black}}{\thesubsection}{0.75em}{}",
     r"\titleformat{\subsubsection}{\normalsize\bfseries\color{blue!55!black}}{\thesubsubsection}{0.75em}{}",
@@ -76,10 +55,6 @@ V3_PREAMBLE = [
     r"\renewcommand{\listfigurename}{List of Figures}",
     r"\renewcommand{\cftsecleader}{\cftdotfill{\cftdotsep}}",
     r"\renewcommand{\cftsubsecleader}{\cftdotfill{\cftdotsep}}",
-
-    # ── PDF metadata & bookmarks ──────────────────────────────────────────────
-    r"\usepackage[hidelinks,hypertexnames=false]{hyperref}",
-    r"\usepackage{bookmark}",          # reliable PDF bookmarks (load after hyperref)
 
     # ── Unicode shorthands ────────────────────────────────────────────────────
     r"\DeclareUnicodeCharacter{20B9}{Rs.}",

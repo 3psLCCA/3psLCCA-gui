@@ -21,6 +21,7 @@ except Exception:
 
 from pylatex.utils import escape_latex
 from three_ps_lcca_gui.gui._CONFIG import ALLOW_TEX
+from ..SETTINGS import REQUIRED_LATEX_PACKAGES
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Report Configuration Keys
@@ -542,6 +543,39 @@ def _copy_static_assets(work_dir: Path) -> None:
     shutil.copy2(src, dst)
 
 
+def _check_and_report_missing_packages() -> str:
+    """Helper to identify missing LaTeX packages from the REQUIRED list."""
+    missing = []
+    executable = _PDFLATEX if os.path.isabs(_PDFLATEX) else shutil.which(_PDFLATEX)
+    if not executable:
+        return ""
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        for pkg in REQUIRED_LATEX_PACKAGES.keys():
+            test_file = Path(tmpdir) / "check.tex"
+            test_file.write_text(f"\\documentclass{{article}}\\usepackage{{{pkg}}}\\begin{{document}}x\\end{{document}}")
+            try:
+                result = subprocess.run(
+                    [executable, "-interaction=nonstopmode", "check.tex"],
+                    cwd=tmpdir,
+                    capture_output=True,
+                    text=True,
+                    timeout=10
+                )
+                if result.returncode != 0 and f"{pkg}.sty' not found" in (result.stdout + result.stderr):
+                    missing.append(pkg)
+            except Exception:
+                pass
+    
+    if missing:
+        msg = "\n\nCRITICAL: The following LaTeX packages are missing from your system:\n"
+        for m in missing:
+            msg += f"  • {m}\n"
+        msg += "\nPlease install them using your LaTeX distribution's package manager (e.g., MiKTeX Console or TeX Live Manager) and try again."
+        return msg
+    return ""
+
+
 def compile_lcca_report_pdf(
     controller=None,
     output_dir: str | Path | None = None,
@@ -563,90 +597,107 @@ def compile_lcca_report_pdf(
     final_tex_path = output_dir / f"{filename}.tex"
     final_pdf_path = output_dir / f"{filename}.pdf"
 
-    cleanup = None
-    try:
-        if keep_artifacts:
-            work_dir = output_dir
-        else:
-            cleanup = tempfile.TemporaryDirectory(prefix="3psLCCA_report_")
-            work_dir = Path(cleanup.name)
+    # We allow up to 2 attempts for report generation
+    max_attempts = 2
+    last_error = None
 
-        tex_path = work_dir / f"{filename}.tex"
-        pdf_path = work_dir / f"{filename}.pdf"
-        _copy_static_assets(work_dir)
-
-        plot_paths = {}
+    for attempt in range(1, max_attempts + 1):
+        cleanup = None
         try:
-            cache = _valid_result_cache(controller)
-            if cache.get("results"):
-                currency = (
-                    cache.get("currency")
-                    or _chunk(controller, "general_info").get("project_currency")
-                    or "INR"
-                )
-                plot_paths = generate_plots(cache["results"], str(work_dir), str(currency))
-        except Exception as exc:
-            print(f"[structured_code_to_latex_report] chart generation failed: {exc}")
+            if keep_artifacts:
+                work_dir = output_dir
+            else:
+                cleanup = tempfile.TemporaryDirectory(prefix="3psLCCA_report_")
+                work_dir = Path(cleanup.name)
 
-        logo_file = Path(__file__).resolve().parents[2] / "gui" / "assets" / "logo" / "3pslcca_header.png"
-        logo_path = os.path.relpath(logo_file, work_dir).replace("\\", "/")
-        tex_content = build_structured_code_to_latex_report_document(
-            controller,
-            plot_paths,
-            config=config,
-            logo_path=logo_path,
-        )
-        tex_path.write_text(tex_content, encoding="utf-8")
-        # Only write .tex to final output dir if ALLOW_TEX is True
-        if ALLOW_TEX:
-            final_tex_path.write_text(tex_content, encoding="utf-8")
+            tex_path = work_dir / f"{filename}.tex"
+            pdf_path = work_dir / f"{filename}.pdf"
+            _copy_static_assets(work_dir)
 
-        if not shutil.which(_PDFLATEX):
-            raise RuntimeError(
-                "pdflatex was not found. To generate PDF reports, please install a TeX distribution:\n"
-                "  • Windows: MiKTeX — https://miktex.org\n"
-                "  • Windows: TeX Live — https://tug.org/texlive\n"
-                "  • macOS:   MacTeX — https://www.tug.org/mactex\n"
-                "  • Linux:   sudo apt install texlive-latex-recommended\n\n"
-                "After installation, restart the application."
+            plot_paths = {}
+            try:
+                cache = _valid_result_cache(controller)
+                if cache.get("results"):
+                    currency = (
+                        cache.get("currency")
+                        or _chunk(controller, "general_info").get("project_currency")
+                        or "INR"
+                    )
+                    plot_paths = generate_plots(cache["results"], str(work_dir), str(currency))
+            except Exception as exc:
+                print(f"[structured_code_to_latex_report] chart generation failed: {exc}")
+
+            logo_file = Path(__file__).resolve().parents[2] / "gui" / "assets" / "logo" / "3pslcca_header.png"
+            logo_path = os.path.relpath(logo_file, work_dir).replace("\\", "/")
+            tex_content = build_structured_code_to_latex_report_document(
+                controller,
+                plot_paths,
+                config=config,
+                logo_path=logo_path,
             )
+            tex_path.write_text(tex_content, encoding="utf-8")
+            # Only write .tex to final output dir if ALLOW_TEX is True
+            if ALLOW_TEX:
+                final_tex_path.write_text(tex_content, encoding="utf-8")
 
-        def _run_pdflatex(*extra_args):
-            result = subprocess.run(
-                [_PDFLATEX, "-interaction=nonstopmode", *extra_args, tex_path.name],
-                cwd=work_dir,
-                capture_output=True,
-                text=True,
-            )
-            if result.returncode != 0:
-                log_file = tex_path.with_suffix(".log")
-                log_snippet = ""
-                if log_file.exists():
-                    lines = log_file.read_text(encoding="utf-8", errors="replace").splitlines()
-                    error_lines = [l for l in lines if l.startswith("!") or "Error" in l or "error" in l]
-                    log_snippet = "\n".join(error_lines[-30:]) if error_lines else "\n".join(lines[-40:])
-                
-                tex_msg = f"\n\nThe .tex file has been saved to:\n  {final_tex_path}" if ALLOW_TEX else ""
+            if not shutil.which(_PDFLATEX) and not os.path.exists(_PDFLATEX):
                 raise RuntimeError(
-                    f"pdflatex failed (exit {result.returncode}).\n\n"
-                    f"LaTeX errors:\n{log_snippet or result.stdout[-3000:] or '(no output)'}{tex_msg}"
+                    "pdflatex was not found. To generate PDF reports, please install a TeX distribution:\n"
+                    "  • Windows: MiKTeX — https://miktex.org\n"
+                    "  • Windows: TeX Live — https://tug.org/texlive\n"
+                    "  • macOS:   MacTeX — https://www.tug.org/mactex\n"
+                    "  • Linux:   sudo apt install texlive-latex-recommended\n\n"
+                    "After installation, restart the application."
                 )
 
-        lot_path = tex_path.with_suffix(".lot")
-        _run_pdflatex("-draftmode")
-        _dedupe_lot_entries(lot_path)
-        _run_pdflatex()
+            def _run_pdflatex(*extra_args):
+                result = subprocess.run(
+                    [_PDFLATEX, "-interaction=nonstopmode", *extra_args, tex_path.name],
+                    cwd=work_dir,
+                    capture_output=True,
+                    text=True,
+                )
+                if result.returncode != 0:
+                    log_file = tex_path.with_suffix(".log")
+                    log_snippet = ""
+                    if log_file.exists():
+                        lines = log_file.read_text(encoding="utf-8", errors="replace").splitlines()
+                        error_lines = [l for l in lines if l.startswith("!") or "Error" in l or "error" in l]
+                        log_snippet = "\n".join(error_lines[-30:]) if error_lines else "\n".join(lines[-40:])
+                    
+                    tex_msg = f"\n\nThe .tex file has been saved to:\n  {final_tex_path}" if ALLOW_TEX else ""
+                    
+                    # On failure, check for missing packages to provide a better error message
+                    missing_pkg_msg = _check_and_report_missing_packages()
+                    
+                    raise RuntimeError(
+                        f"pdflatex failed (exit {result.returncode}) on attempt {attempt}/{max_attempts}.\n\n"
+                        f"LaTeX errors:\n{log_snippet or result.stdout[-3000:] or '(no output)'}{tex_msg}{missing_pkg_msg}"
+                    )
 
-        _dedupe_lot_entries(lot_path)
+            lot_path = tex_path.with_suffix(".lot")
+            _run_pdflatex("-draftmode")
+            _dedupe_lot_entries(lot_path)
+            _run_pdflatex()
 
-        if not pdf_path.exists():
-            raise FileNotFoundError(f"PDF was not generated: {pdf_path}")
+            _dedupe_lot_entries(lot_path)
 
-        if pdf_path.resolve() != final_pdf_path.resolve():
-            shutil.copy2(pdf_path, final_pdf_path)
+            if not pdf_path.exists():
+                raise FileNotFoundError(f"PDF was not generated: {pdf_path}")
 
-        return (final_tex_path if ALLOW_TEX else None), final_pdf_path
+            if pdf_path.resolve() != final_pdf_path.resolve():
+                shutil.copy2(pdf_path, final_pdf_path)
 
-    finally:
-        if cleanup is not None:
-            cleanup.cleanup()
+            return (final_tex_path if ALLOW_TEX else None), final_pdf_path
+
+        except Exception as e:
+            last_error = e
+            print(f"[structured_code_to_latex_report] Attempt {attempt} failed: {e}")
+            if attempt == max_attempts:
+                raise last_error
+        finally:
+            if cleanup is not None:
+                cleanup.cleanup()
+
+    # Should not reach here due to raise in loop
+    raise last_error
