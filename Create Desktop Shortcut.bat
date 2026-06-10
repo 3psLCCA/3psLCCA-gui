@@ -10,13 +10,13 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "$sc = $ws.CreateShortcut($desktop + '\3psLCCA.lnk');" ^
   "$sc.TargetPath = $root + '\launch.bat';" ^
   "$sc.WorkingDirectory = $root;" ^
-  "$sc.Description = 'Launch 3ps LCCA';" ^
+  "$sc.Description = 'Launch 3psLCCA';" ^
   "$sc.IconLocation = $ico;" ^
   "$sc.Save();" ^
   "$sc2 = $ws.CreateShortcut($desktop + '\Update 3psLCCA.lnk');" ^
   "$sc2.TargetPath = $root + '\Update.bat';" ^
   "$sc2.WorkingDirectory = $root;" ^
-  "$sc2.Description = 'Update 3ps LCCA';" ^
+  "$sc2.Description = 'Update 3psLCCA';" ^
   "$sc2.IconLocation = $ico;" ^
   "$sc2.Save()"
 

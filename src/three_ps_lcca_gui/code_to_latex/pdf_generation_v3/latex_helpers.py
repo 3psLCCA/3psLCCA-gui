@@ -57,7 +57,7 @@ V3_PREAMBLE = [
     r"\renewcommand{\headrulewidth}{0.4pt}",
     r"\renewcommand{\footrulewidth}{0.4pt}",
     r"\fancyhead[L]{\small\nouppercase{\leftmark}}",
-    r"\fancyhead[R]{\small 3PS LCCA}",
+    r"\fancyhead[R]{\small 3psLCCA}",
     r"\fancyfoot[C]{\small Page~\thepage~of~\pageref*{LastPage}}",
     r"\AtBeginDocument{\pagestyle{fancy}}",
 

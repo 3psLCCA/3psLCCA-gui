@@ -70,13 +70,13 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "$sc.TargetPath = $pythonw;" ^
   "$sc.Arguments = '-m three_ps_lcca_gui.gui.main';" ^
   "$sc.WorkingDirectory = $root + '\src';" ^
-  "$sc.Description = 'Launch 3ps LCCA';" ^
+  "$sc.Description = 'Launch 3psLCCA';" ^
   "$sc.IconLocation = $ico;" ^
   "$sc.Save();" ^
   "$sc2 = $ws.CreateShortcut($desktop + '\Update 3psLCCA.lnk');" ^
   "$sc2.TargetPath = $root + '\Update.bat';" ^
   "$sc2.WorkingDirectory = $root;" ^
-  "$sc2.Description = 'Update 3ps LCCA';" ^
+  "$sc2.Description = 'Update 3psLCCA';" ^
   "$sc2.IconLocation = $ico;" ^
   "$sc2.Save()"
 echo [OK] Desktop shortcuts recreated.
