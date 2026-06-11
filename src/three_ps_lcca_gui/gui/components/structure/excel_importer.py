@@ -1999,6 +1999,16 @@ def _emit_result(
                                 self.chunk_name = chunk
                                 self.save_current_state = mgr.save_current_state
                                 self.on_refresh = lambda: None  # deferred
+                                self._page_registry = {}
+                                self._del_comp_btn_map = {}
+
+                            def _get_registry(self):
+                                return self.controller.engine.fetch_chunk("str_component_registry") or {}
+
+                            def _save_registry(self, registry):
+                                self.controller.engine.stage_update(
+                                    chunk_name="str_component_registry", data=registry
+                                )
 
                         proxy = _Proxy(manager, chunk_key)
                         from .widgets.manager import StructureManagerWidget as _SMW
