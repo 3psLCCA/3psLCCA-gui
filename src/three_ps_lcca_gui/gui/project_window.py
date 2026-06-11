@@ -297,16 +297,15 @@ class _HoverHandle(QSplitterHandle):
         super().leaveEvent(event)
 
     def paintEvent(self, event):
-        if not self._hovered:
-            return
-
         painter = QPainter(self)
         r = self.rect()
 
-        # Theme-consistent background + highlight: only on hover
         painter.fillRect(r, self.palette().window())
         painter.setPen(Qt.NoPen)
-        painter.setBrush(QColor(get_token("primary")))
+        if self._hovered:
+            painter.setBrush(QColor(get_token("primary")))
+        else:
+            painter.setBrush(QColor(get_token("primary", "pressed")))
 
         if self.orientation() == Qt.Horizontal:
             painter.drawRect((r.width() - 2) // 2, 0, 2, r.height())
@@ -374,6 +373,8 @@ class ProjectWindow(QMainWindow):
                 "Unsaved changes...") if d else None
         )
 
+        theme_manager().theme_changed.connect(self._refresh_lock_btn)
+
         self.show_home()
 
     # ── Home screen ───────────────────────────────────────────────────────────
@@ -432,12 +433,14 @@ class ProjectWindow(QMainWindow):
 
         self.actionExportResultsJSON = QAction("Export Results as JSON", self)
         self.actionExportResultsJSON.setEnabled(False)
-        self.actionExportResultsJSON.triggered.connect(self._export_results_json)
+        self.actionExportResultsJSON.triggered.connect(
+            self._export_results_json)
         self.menuExport.addAction(self.actionExportResultsJSON)
 
         self.actionExportAllDataJSON = QAction("Export All Data as JSON", self)
         self.actionExportAllDataJSON.setEnabled(False)
-        self.actionExportAllDataJSON.triggered.connect(self._export_all_data_json)
+        self.actionExportAllDataJSON.triggered.connect(
+            self._export_all_data_json)
         self.menuExport.addAction(self.actionExportAllDataJSON)
 
         self.menuFile.addMenu(self.menuExport)
@@ -703,7 +706,8 @@ class ProjectWindow(QMainWindow):
         self.main_stack.setCurrentWidget(self.home_widget)
         self.manager.refresh_all_home_screens()
         if tab == "compare":
-            QTimer.singleShot(0, lambda: self.home_widget.switch_to_compare(preselect_pid=project_select))
+            QTimer.singleShot(0, lambda: self.home_widget.switch_to_compare(
+                preselect_pid=project_select))
 
     def show_project_view(self):
         if not self.has_project_loaded():
@@ -744,7 +748,8 @@ class ProjectWindow(QMainWindow):
             else:
                 self.content_stack.setCurrentWidget(
                     self._get_or_create_widget("General Information"))
-                items = self.sidebar.findItems("General Information", Qt.MatchExactly)
+                items = self.sidebar.findItems(
+                    "General Information", Qt.MatchExactly)
                 if items:
                     self.sidebar.setCurrentItem(items[0])
 
@@ -797,6 +802,22 @@ class ProjectWindow(QMainWindow):
         self._on_lock_toggled(True)
         self.actionExportResultsJSON.setEnabled(True)
         self.actionExportAllDataJSON.setEnabled(True)
+
+    def _refresh_lock_btn(self):
+        if not self._project_ui_ready:
+            return
+        _r = "border-radius:15px; min-width:30px; min-height:30px; padding:0px; border:none;"
+        self.btn_lock.setStyleSheet(
+            f"QPushButton               {{ {_r} background:transparent; }}"
+            f"QPushButton:hover         {{ {_r} background:palette(midlight); }}"
+            f"QPushButton:pressed       {{ {_r} background:palette(mid); }}"
+            f"QPushButton:checked       {{ {_r} background:{get_token('primary')}; }}"
+            f"QPushButton:checked:hover {{ {_r} background:{get_token('primary')}; }}"
+        )
+        self.btn_lock.setIcon(
+            make_icon("lock", color=get_token("base")) if self._frozen
+            else make_icon("lock-open", color=get_token("text"))
+        )
 
     def _on_lock_toggled(self, checked: bool):
         if not checked and self.outputs_page._has_results:
@@ -899,7 +920,8 @@ class ProjectWindow(QMainWindow):
     def _close_project(self):
         if FLUSH_MODE:
             if DEV_MODE:
-                SysTracker.instance().snapshot(f"_close_project [{self.project_id}]")
+                SysTracker.instance().snapshot(
+                    f"_close_project [{self.project_id}]")
             flush_project_window(self)
         else:
             if self.controller.engine and self.controller.engine.is_active():
@@ -938,7 +960,8 @@ class ProjectWindow(QMainWindow):
         display = self.controller.active_display_name or self.project_id
 
         # Set default directory to Documents
-        default_dir = QStandardPaths.writableLocation(QStandardPaths.DocumentsLocation)
+        default_dir = QStandardPaths.writableLocation(
+            QStandardPaths.DocumentsLocation)
         default_path = os.path.join(default_dir, f"{display}.3ps")
 
         dest, _ = QFileDialog.getSaveFileName(
@@ -965,7 +988,8 @@ class ProjectWindow(QMainWindow):
         for name in self._page_names:
             self._get_or_create_widget(name)
         display = self.controller.active_display_name or self.project_id or "project"
-        default_dir = QStandardPaths.writableLocation(QStandardPaths.DocumentsLocation)
+        default_dir = QStandardPaths.writableLocation(
+            QStandardPaths.DocumentsLocation)
         default_path = os.path.join(default_dir, f"{display}_inputs.json")
         dest, _ = QFileDialog.getSaveFileName(
             self, "Export Inputs as JSON", default_path, "JSON Files (*.json)"
@@ -974,7 +998,8 @@ class ProjectWindow(QMainWindow):
             return
         try:
             from three_ps_lcca_gui.gui.components.utils.export import export_inputs_json
-            count = export_inputs_json(self.widget_map, dest, project_name=display)
+            count = export_inputs_json(
+                self.widget_map, dest, project_name=display)
             QMessageBox.information(
                 self, "Export Complete",
                 f"Exported {count} input section(s) to:\n{dest}",
@@ -988,7 +1013,8 @@ class ProjectWindow(QMainWindow):
             QMessageBox.warning(self, "No Results", "Run the analysis first.")
             return
         display = self.controller.active_display_name or self.project_id or "project"
-        default_dir = QStandardPaths.writableLocation(QStandardPaths.DocumentsLocation)
+        default_dir = QStandardPaths.writableLocation(
+            QStandardPaths.DocumentsLocation)
         default_path = os.path.join(default_dir, f"{display}_results.json")
         dest, _ = QFileDialog.getSaveFileName(
             self, "Export Results as JSON", default_path, "JSON Files (*.json)"
@@ -1010,7 +1036,8 @@ class ProjectWindow(QMainWindow):
             QMessageBox.warning(self, "No Results", "Run the analysis first.")
             return
         display = self.controller.active_display_name or self.project_id or "project"
-        default_dir = QStandardPaths.writableLocation(QStandardPaths.DocumentsLocation)
+        default_dir = QStandardPaths.writableLocation(
+            QStandardPaths.DocumentsLocation)
         default_path = os.path.join(default_dir, f"{display}_all_data.json")
         dest, _ = QFileDialog.getSaveFileName(
             self, "Export All Data as JSON", default_path, "JSON Files (*.json)"
@@ -1092,7 +1119,7 @@ class ProjectWindow(QMainWindow):
                 copy_btn.setText("Copied!")
             except Exception:
                 copy_btn.setText("Failed!")
-            
+
             # Reset text after 2 seconds
             QTimer.singleShot(2000, lambda: copy_btn.setText("Copy All"))
 
@@ -1126,7 +1153,8 @@ class ProjectWindow(QMainWindow):
     def closeEvent(self, event):
         if FLUSH_MODE:
             if DEV_MODE:
-                SysTracker.instance().snapshot(f"closeEvent [{self.project_id}]")
+                SysTracker.instance().snapshot(
+                    f"closeEvent [{self.project_id}]")
             flush_project_window(self)
         else:
             if self.controller.engine:
