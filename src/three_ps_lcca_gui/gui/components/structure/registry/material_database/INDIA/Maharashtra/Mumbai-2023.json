@@ -1,7 +1,6 @@
 [
   {
     "sheetName": "Foundation",
-    "type": "Excavation",
     "data": [
       {
         "src_id": "12.02",
@@ -12,7 +11,8 @@
         "carbon_emission": null,
         "carbon_emission_units_den": null,
         "conversion_factor": null,
-        "carbon_emission_src": null
+        "carbon_emission_src": null,
+        "component": "Excavation"
       },
       {
         "src_id": "12.02",
@@ -23,7 +23,8 @@
         "carbon_emission": null,
         "carbon_emission_units_den": null,
         "conversion_factor": null,
-        "carbon_emission_src": null
+        "carbon_emission_src": null,
+        "component": "Excavation"
       },
       {
         "src_id": "12.02",
@@ -34,7 +35,8 @@
         "carbon_emission": null,
         "carbon_emission_units_den": null,
         "conversion_factor": null,
-        "carbon_emission_src": null
+        "carbon_emission_src": null,
+        "component": "Excavation"
       },
       {
         "src_id": "12.02",
@@ -45,7 +47,8 @@
         "carbon_emission": null,
         "carbon_emission_units_den": null,
         "conversion_factor": null,
-        "carbon_emission_src": null
+        "carbon_emission_src": null,
+        "component": "Excavation"
       },
       {
         "src_id": "12.02",
@@ -56,7 +59,8 @@
         "carbon_emission": null,
         "carbon_emission_units_den": null,
         "conversion_factor": null,
-        "carbon_emission_src": null
+        "carbon_emission_src": null,
+        "component": "Excavation"
       },
       {
         "src_id": "12.03",
@@ -67,7 +71,8 @@
         "carbon_emission": null,
         "carbon_emission_units_den": null,
         "conversion_factor": null,
-        "carbon_emission_src": null
+        "carbon_emission_src": null,
+        "component": "Excavation"
       },
       {
         "src_id": "12.03",
@@ -78,7 +83,8 @@
         "carbon_emission": null,
         "carbon_emission_units_den": null,
         "conversion_factor": null,
-        "carbon_emission_src": null
+        "carbon_emission_src": null,
+        "component": "Excavation"
       },
       {
         "src_id": "12.03",
@@ -89,7 +95,8 @@
         "carbon_emission": null,
         "carbon_emission_units_den": null,
         "conversion_factor": null,
-        "carbon_emission_src": null
+        "carbon_emission_src": null,
+        "component": "Excavation"
       },
       {
         "src_id": "12.03",
@@ -100,7 +107,8 @@
         "carbon_emission": null,
         "carbon_emission_units_den": null,
         "conversion_factor": null,
-        "carbon_emission_src": null
+        "carbon_emission_src": null,
+        "component": "Excavation"
       },
       {
         "src_id": "12.03",
@@ -111,7 +119,8 @@
         "carbon_emission": null,
         "carbon_emission_units_den": null,
         "conversion_factor": null,
-        "carbon_emission_src": null
+        "carbon_emission_src": null,
+        "component": "Excavation"
       },
       {
         "src_id": "12.04",
@@ -122,7 +131,8 @@
         "carbon_emission": null,
         "carbon_emission_units_den": null,
         "conversion_factor": null,
-        "carbon_emission_src": null
+        "carbon_emission_src": null,
+        "component": "Excavation"
       },
       {
         "src_id": "12.04",
@@ -133,7 +143,8 @@
         "carbon_emission": null,
         "carbon_emission_units_den": null,
         "conversion_factor": null,
-        "carbon_emission_src": null
+        "carbon_emission_src": null,
+        "component": "Excavation"
       },
       {
         "src_id": "12.04",
@@ -144,7 +155,8 @@
         "carbon_emission": null,
         "carbon_emission_units_den": null,
         "conversion_factor": null,
-        "carbon_emission_src": null
+        "carbon_emission_src": null,
+        "component": "Excavation"
       },
       {
         "src_id": "12.04",
@@ -155,7 +167,8 @@
         "carbon_emission": null,
         "carbon_emission_units_den": null,
         "conversion_factor": null,
-        "carbon_emission_src": null
+        "carbon_emission_src": null,
+        "component": "Excavation"
       },
       {
         "src_id": "12.04",
@@ -166,7 +179,8 @@
         "carbon_emission": null,
         "carbon_emission_units_den": null,
         "conversion_factor": null,
-        "carbon_emission_src": null
+        "carbon_emission_src": null,
+        "component": "Excavation"
       },
       {
         "src_id": "12.06",
@@ -177,7 +191,8 @@
         "carbon_emission": null,
         "carbon_emission_units_den": null,
         "conversion_factor": null,
-        "carbon_emission_src": null
+        "carbon_emission_src": null,
+        "component": "Excavation"
       },
       {
         "src_id": "12.06",
@@ -188,7 +203,8 @@
         "carbon_emission": null,
         "carbon_emission_units_den": null,
         "conversion_factor": null,
-        "carbon_emission_src": null
+        "carbon_emission_src": null,
+        "component": "Excavation"
       },
       {
         "src_id": "12.06",
@@ -199,7 +215,8 @@
         "carbon_emission": null,
         "carbon_emission_units_den": null,
         "conversion_factor": null,
-        "carbon_emission_src": null
+        "carbon_emission_src": null,
+        "component": "Excavation"
       },
       {
         "src_id": "12.06",
@@ -210,7 +227,8 @@
         "carbon_emission": null,
         "carbon_emission_units_den": null,
         "conversion_factor": null,
-        "carbon_emission_src": null
+        "carbon_emission_src": null,
+        "component": "Excavation"
       },
       {
         "src_id": "12.06",
@@ -221,7 +239,8 @@
         "carbon_emission": null,
         "carbon_emission_units_den": null,
         "conversion_factor": null,
-        "carbon_emission_src": null
+        "carbon_emission_src": null,
+        "component": "Excavation"
       },
       {
         "src_id": "12.08",
@@ -232,7 +251,8 @@
         "carbon_emission": null,
         "carbon_emission_units_den": null,
         "conversion_factor": null,
-        "carbon_emission_src": null
+        "carbon_emission_src": null,
+        "component": "Excavation"
       },
       {
         "src_id": "12.08",
@@ -243,7 +263,8 @@
         "carbon_emission": null,
         "carbon_emission_units_den": null,
         "conversion_factor": null,
-        "carbon_emission_src": null
+        "carbon_emission_src": null,
+        "component": "Excavation"
       },
       {
         "src_id": "12.08",
@@ -254,7 +275,8 @@
         "carbon_emission": null,
         "carbon_emission_units_den": null,
         "conversion_factor": null,
-        "carbon_emission_src": null
+        "carbon_emission_src": null,
+        "component": "Excavation"
       },
       {
         "src_id": "12.08",
@@ -265,7 +287,8 @@
         "carbon_emission": null,
         "carbon_emission_units_den": null,
         "conversion_factor": null,
-        "carbon_emission_src": null
+        "carbon_emission_src": null,
+        "component": "Excavation"
       },
       {
         "src_id": "12.08",
@@ -276,7 +299,8 @@
         "carbon_emission": null,
         "carbon_emission_units_den": null,
         "conversion_factor": null,
-        "carbon_emission_src": null
+        "carbon_emission_src": null,
+        "component": "Excavation"
       },
       {
         "src_id": "12.09",
@@ -287,7 +311,8 @@
         "carbon_emission": null,
         "carbon_emission_units_den": null,
         "conversion_factor": null,
-        "carbon_emission_src": null
+        "carbon_emission_src": null,
+        "component": "Excavation"
       },
       {
         "src_id": "12.09",
@@ -298,7 +323,8 @@
         "carbon_emission": null,
         "carbon_emission_units_den": null,
         "conversion_factor": null,
-        "carbon_emission_src": null
+        "carbon_emission_src": null,
+        "component": "Excavation"
       },
       {
         "src_id": "12.09",
@@ -309,7 +335,8 @@
         "carbon_emission": null,
         "carbon_emission_units_den": null,
         "conversion_factor": null,
-        "carbon_emission_src": null
+        "carbon_emission_src": null,
+        "component": "Excavation"
       },
       {
         "src_id": "12.09",
@@ -320,7 +347,8 @@
         "carbon_emission": null,
         "carbon_emission_units_den": null,
         "conversion_factor": null,
-        "carbon_emission_src": null
+        "carbon_emission_src": null,
+        "component": "Excavation"
       },
       {
         "src_id": "12.09",
@@ -331,7 +359,8 @@
         "carbon_emission": null,
         "carbon_emission_units_den": null,
         "conversion_factor": null,
-        "carbon_emission_src": null
+        "carbon_emission_src": null,
+        "component": "Excavation"
       },
       {
         "src_id": "12.1",
@@ -342,7 +371,8 @@
         "carbon_emission": null,
         "carbon_emission_units_den": null,
         "conversion_factor": null,
-        "carbon_emission_src": null
+        "carbon_emission_src": null,
+        "component": "Excavation"
       },
       {
         "src_id": "12.1",
@@ -353,7 +383,8 @@
         "carbon_emission": null,
         "carbon_emission_units_den": null,
         "conversion_factor": null,
-        "carbon_emission_src": null
+        "carbon_emission_src": null,
+        "component": "Excavation"
       },
       {
         "src_id": "12.1",
@@ -364,7 +395,8 @@
         "carbon_emission": null,
         "carbon_emission_units_den": null,
         "conversion_factor": null,
-        "carbon_emission_src": null
+        "carbon_emission_src": null,
+        "component": "Excavation"
       },
       {
         "src_id": "12.1",
@@ -375,7 +407,8 @@
         "carbon_emission": null,
         "carbon_emission_units_den": null,
         "conversion_factor": null,
-        "carbon_emission_src": null
+        "carbon_emission_src": null,
+        "component": "Excavation"
       },
       {
         "src_id": "12.1",
@@ -386,7 +419,8 @@
         "carbon_emission": null,
         "carbon_emission_units_den": null,
         "conversion_factor": null,
-        "carbon_emission_src": null
+        "carbon_emission_src": null,
+        "component": "Excavation"
       },
       {
         "src_id": "12.11",
@@ -397,7 +431,8 @@
         "carbon_emission": null,
         "carbon_emission_units_den": null,
         "conversion_factor": null,
-        "carbon_emission_src": null
+        "carbon_emission_src": null,
+        "component": "Excavation"
       },
       {
         "src_id": "12.11",
@@ -408,7 +443,8 @@
         "carbon_emission": null,
         "carbon_emission_units_den": null,
         "conversion_factor": null,
-        "carbon_emission_src": null
+        "carbon_emission_src": null,
+        "component": "Excavation"
       },
       {
         "src_id": "12.11",
@@ -419,7 +455,8 @@
         "carbon_emission": null,
         "carbon_emission_units_den": null,
         "conversion_factor": null,
-        "carbon_emission_src": null
+        "carbon_emission_src": null,
+        "component": "Excavation"
       },
       {
         "src_id": "12.11",
@@ -430,7 +467,8 @@
         "carbon_emission": null,
         "carbon_emission_units_den": null,
         "conversion_factor": null,
-        "carbon_emission_src": null
+        "carbon_emission_src": null,
+        "component": "Excavation"
       },
       {
         "src_id": "12.11",
@@ -441,7 +479,8 @@
         "carbon_emission": null,
         "carbon_emission_units_den": null,
         "conversion_factor": null,
-        "carbon_emission_src": null
+        "carbon_emission_src": null,
+        "component": "Excavation"
       },
       {
         "src_id": "12.12",
@@ -452,7 +491,8 @@
         "carbon_emission": null,
         "carbon_emission_units_den": null,
         "conversion_factor": null,
-        "carbon_emission_src": null
+        "carbon_emission_src": null,
+        "component": "Excavation"
       },
       {
         "src_id": "12.12",
@@ -463,7 +503,8 @@
         "carbon_emission": null,
         "carbon_emission_units_den": null,
         "conversion_factor": null,
-        "carbon_emission_src": null
+        "carbon_emission_src": null,
+        "component": "Excavation"
       },
       {
         "src_id": "12.12",
@@ -474,7 +515,8 @@
         "carbon_emission": null,
         "carbon_emission_units_den": null,
         "conversion_factor": null,
-        "carbon_emission_src": null
+        "carbon_emission_src": null,
+        "component": "Excavation"
       },
       {
         "src_id": "12.12",
@@ -485,7 +527,8 @@
         "carbon_emission": null,
         "carbon_emission_units_den": null,
         "conversion_factor": null,
-        "carbon_emission_src": null
+        "carbon_emission_src": null,
+        "component": "Excavation"
       },
       {
         "src_id": "12.12",
@@ -496,14 +539,9 @@
         "carbon_emission": null,
         "carbon_emission_units_den": null,
         "conversion_factor": null,
-        "carbon_emission_src": null
-      }
-    ]
-  },
-  {
-    "sheetName": "Foundation",
-    "type": "Pile",
-    "data": [
+        "carbon_emission_src": null,
+        "component": "Excavation"
+      },
       {
         "src_id": "14.01",
         "name": "Steel Rebar (Fe500)",
@@ -513,7 +551,8 @@
         "carbon_emission": 2.6,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1000,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.02",
@@ -524,7 +563,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 381.51,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.02",
@@ -535,7 +575,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 381.51,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.02",
@@ -546,7 +587,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 381.51,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.02",
@@ -557,7 +599,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 381.51,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.02",
@@ -568,7 +611,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 381.51,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.04",
@@ -579,7 +623,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 425.0775,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.04",
@@ -590,7 +635,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 425.0775,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.04",
@@ -601,7 +647,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 425.0775,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.04",
@@ -612,7 +659,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 425.0775,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.04",
@@ -623,7 +671,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 425.0775,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.06",
@@ -634,7 +683,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 471,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.06",
@@ -645,7 +695,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 471,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.06",
@@ -656,7 +707,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 471,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.06",
@@ -667,7 +719,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 471,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.06",
@@ -678,7 +731,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 471,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.08",
@@ -689,7 +743,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 519.2775,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.08",
@@ -700,7 +755,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 519.2775,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.08",
@@ -711,7 +767,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 519.2775,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.08",
@@ -722,7 +779,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 519.2775,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.08",
@@ -733,7 +791,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 519.2775,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.1",
@@ -744,7 +803,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 569.91,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.1",
@@ -755,7 +815,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 569.91,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.1",
@@ -766,7 +827,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 569.91,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.1",
@@ -777,7 +839,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 569.91,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.1",
@@ -788,7 +851,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 569.91,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.12",
@@ -799,7 +863,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 678.24,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.12",
@@ -810,7 +875,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 678.24,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.12",
@@ -821,7 +887,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 678.24,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.12",
@@ -832,7 +899,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 678.24,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.12",
@@ -843,7 +911,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 678.24,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.14",
@@ -854,7 +923,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 735.9375,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.14",
@@ -865,7 +935,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 735.9375,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.14",
@@ -876,7 +947,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 735.9375,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.14",
@@ -887,7 +959,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 735.9375,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.14",
@@ -898,7 +971,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 735.9375,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.16",
@@ -909,7 +983,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 795.99,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.16",
@@ -920,7 +995,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 795.99,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.16",
@@ -931,7 +1007,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 795.99,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.16",
@@ -942,7 +1019,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 795.99,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.16",
@@ -953,7 +1031,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 795.99,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.18",
@@ -964,7 +1043,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1059.75,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.18",
@@ -975,7 +1055,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1059.75,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.18",
@@ -986,7 +1067,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1059.75,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.18",
@@ -997,7 +1079,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1059.75,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.18",
@@ -1008,7 +1091,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1059.75,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.2",
@@ -1019,7 +1103,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1205.76,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.2",
@@ -1030,7 +1115,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1205.76,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.2",
@@ -1041,7 +1127,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1205.76,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.2",
@@ -1052,7 +1139,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1205.76,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.2",
@@ -1063,7 +1151,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1205.76,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.58",
@@ -1074,7 +1163,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1282.2975,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.58",
@@ -1085,7 +1175,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1282.2975,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.58",
@@ -1096,7 +1187,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1282.2975,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.58",
@@ -1107,7 +1199,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1282.2975,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.58",
@@ -1118,7 +1211,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1282.2975,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.6",
@@ -1129,7 +1223,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1526.04,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.6",
@@ -1140,7 +1235,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1526.04,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.6",
@@ -1151,7 +1247,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1526.04,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.6",
@@ -1162,7 +1259,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1526.04,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.6",
@@ -1173,7 +1271,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1526.04,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.62",
@@ -1184,7 +1283,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1790.9775,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.62",
@@ -1195,7 +1295,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1790.9775,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.62",
@@ -1206,7 +1307,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1790.9775,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.62",
@@ -1217,7 +1319,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1790.9775,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.62",
@@ -1228,7 +1331,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1790.9775,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.64",
@@ -1239,7 +1343,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1884,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.64",
@@ -1250,7 +1355,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1884,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.64",
@@ -1261,7 +1367,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1884,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.64",
@@ -1272,7 +1379,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1884,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.64",
@@ -1283,7 +1391,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1884,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.66",
@@ -1294,7 +1403,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2077.11,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.66",
@@ -1305,7 +1415,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2077.11,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.66",
@@ -1316,7 +1427,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2077.11,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.66",
@@ -1327,7 +1439,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2077.11,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.66",
@@ -1338,7 +1451,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2077.11,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.68",
@@ -1349,7 +1463,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2279.64,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.68",
@@ -1360,7 +1475,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2279.64,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.68",
@@ -1371,7 +1487,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2279.64,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.68",
@@ -1382,7 +1499,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2279.64,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.68",
@@ -1393,7 +1511,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2279.64,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.7",
@@ -1404,7 +1523,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2712.96,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.7",
@@ -1415,7 +1535,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2712.96,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.7",
@@ -1426,7 +1547,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2712.96,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.7",
@@ -1437,7 +1559,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2712.96,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.7",
@@ -1448,7 +1571,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2712.96,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.72",
@@ -1459,7 +1583,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 4239,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.72",
@@ -1470,7 +1595,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 4239,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.72",
@@ -1481,7 +1607,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 4239,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.72",
@@ -1492,7 +1619,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 4239,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.72",
@@ -1503,7 +1631,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 4239,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.11",
@@ -1514,7 +1643,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 381.51,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.11",
@@ -1525,7 +1655,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 381.51,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.11",
@@ -1536,7 +1667,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 381.51,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.11",
@@ -1547,7 +1679,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 381.51,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.11",
@@ -1558,7 +1691,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 381.51,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.111",
@@ -1569,7 +1703,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 425.0775,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.111",
@@ -1580,7 +1715,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 425.0775,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.111",
@@ -1591,7 +1727,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 425.0775,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.111",
@@ -1602,7 +1739,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 425.0775,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.111",
@@ -1613,7 +1751,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 425.0775,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.112",
@@ -1624,7 +1763,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 471,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.112",
@@ -1635,7 +1775,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 471,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.112",
@@ -1646,7 +1787,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 471,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.112",
@@ -1657,7 +1799,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 471,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.112",
@@ -1668,7 +1811,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 471,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.113",
@@ -1679,7 +1823,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 519.2775,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.113",
@@ -1690,7 +1835,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 519.2775,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.113",
@@ -1701,7 +1847,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 519.2775,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.113",
@@ -1712,7 +1859,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 519.2775,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.113",
@@ -1723,7 +1871,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 519.2775,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.114",
@@ -1734,7 +1883,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 569.91,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.114",
@@ -1745,7 +1895,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 569.91,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.114",
@@ -1756,7 +1907,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 569.91,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.114",
@@ -1767,7 +1919,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 569.91,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.114",
@@ -1778,7 +1931,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 569.91,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.115",
@@ -1789,7 +1943,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 678.24,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.115",
@@ -1800,7 +1955,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 678.24,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.115",
@@ -1811,7 +1967,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 678.24,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.115",
@@ -1822,7 +1979,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 678.24,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.115",
@@ -1833,7 +1991,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 678.24,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.116",
@@ -1844,7 +2003,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 735.9375,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.116",
@@ -1855,7 +2015,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 735.9375,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.116",
@@ -1866,7 +2027,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 735.9375,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.116",
@@ -1877,7 +2039,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 735.9375,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.116",
@@ -1888,7 +2051,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 735.9375,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.117",
@@ -1899,7 +2063,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 795.99,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.117",
@@ -1910,7 +2075,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 795.99,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.117",
@@ -1921,7 +2087,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 795.99,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.117",
@@ -1932,7 +2099,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 795.99,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.117",
@@ -1943,7 +2111,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 795.99,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.118",
@@ -1954,7 +2123,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1059.75,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.118",
@@ -1965,7 +2135,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1059.75,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.118",
@@ -1976,7 +2147,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1059.75,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.118",
@@ -1987,7 +2159,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1059.75,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.118",
@@ -1998,7 +2171,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1059.75,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.119",
@@ -2009,7 +2183,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1205.76,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.119",
@@ -2020,7 +2195,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1205.76,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.119",
@@ -2031,7 +2207,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1205.76,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.119",
@@ -2042,7 +2219,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1205.76,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.119",
@@ -2053,7 +2231,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1205.76,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.12",
@@ -2064,7 +2243,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1282.2975,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.12",
@@ -2075,7 +2255,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1282.2975,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.12",
@@ -2086,7 +2267,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1282.2975,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.12",
@@ -2097,7 +2279,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1282.2975,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.12",
@@ -2108,7 +2291,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1282.2975,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.121",
@@ -2119,7 +2303,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1526.04,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.121",
@@ -2130,7 +2315,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1526.04,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.121",
@@ -2141,7 +2327,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1526.04,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.121",
@@ -2152,7 +2339,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1526.04,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.121",
@@ -2163,7 +2351,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1526.04,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.122",
@@ -2174,7 +2363,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1790.9775,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.122",
@@ -2185,7 +2375,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1790.9775,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.122",
@@ -2196,7 +2387,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1790.9775,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.122",
@@ -2207,7 +2399,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1790.9775,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.122",
@@ -2218,7 +2411,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1790.9775,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.123",
@@ -2229,7 +2423,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1884,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.123",
@@ -2240,7 +2435,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1884,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.123",
@@ -2251,7 +2447,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1884,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.123",
@@ -2262,7 +2459,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1884,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.123",
@@ -2273,7 +2471,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1884,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.124",
@@ -2284,7 +2483,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2077.11,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.124",
@@ -2295,7 +2495,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2077.11,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.124",
@@ -2306,7 +2507,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2077.11,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.124",
@@ -2317,7 +2519,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2077.11,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.124",
@@ -2328,7 +2531,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2077.11,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.125",
@@ -2339,7 +2543,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2279.64,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.125",
@@ -2350,7 +2555,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2279.64,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.125",
@@ -2361,7 +2567,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2279.64,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.125",
@@ -2372,7 +2579,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2279.64,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.125",
@@ -2383,7 +2591,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2279.64,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.126",
@@ -2394,7 +2603,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2712.96,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.126",
@@ -2405,7 +2615,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2712.96,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.126",
@@ -2416,7 +2627,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2712.96,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.126",
@@ -2427,7 +2639,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2712.96,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.126",
@@ -2438,7 +2651,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2712.96,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.127",
@@ -2449,7 +2663,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 4239,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.127",
@@ -2460,7 +2675,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 4239,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.127",
@@ -2471,7 +2687,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 4239,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.127",
@@ -2482,7 +2699,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 4239,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.127",
@@ -2493,7 +2711,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 4239,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.129",
@@ -2504,7 +2723,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 381.51,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.129",
@@ -2515,7 +2735,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 381.51,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.129",
@@ -2526,7 +2747,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 381.51,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.129",
@@ -2537,7 +2759,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 381.51,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.129",
@@ -2548,7 +2771,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 381.51,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.13",
@@ -2559,7 +2783,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 425.0775,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.13",
@@ -2570,7 +2795,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 425.0775,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.13",
@@ -2581,7 +2807,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 425.0775,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.13",
@@ -2592,7 +2819,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 425.0775,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.13",
@@ -2603,7 +2831,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 425.0775,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.131",
@@ -2614,7 +2843,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 471,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.131",
@@ -2625,7 +2855,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 471,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.131",
@@ -2636,7 +2867,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 471,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.131",
@@ -2647,7 +2879,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 471,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.131",
@@ -2658,7 +2891,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 471,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.132",
@@ -2669,7 +2903,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 519.2775,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.132",
@@ -2680,7 +2915,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 519.2775,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.132",
@@ -2691,7 +2927,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 519.2775,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.132",
@@ -2702,7 +2939,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 519.2775,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.132",
@@ -2713,7 +2951,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 519.2775,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.133",
@@ -2724,7 +2963,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 569.91,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.133",
@@ -2735,7 +2975,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 569.91,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.133",
@@ -2746,7 +2987,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 569.91,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.133",
@@ -2757,7 +2999,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 569.91,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.133",
@@ -2768,7 +3011,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 569.91,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.134",
@@ -2779,7 +3023,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 678.24,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.134",
@@ -2790,7 +3035,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 678.24,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.134",
@@ -2801,7 +3047,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 678.24,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.134",
@@ -2812,7 +3059,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 678.24,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.134",
@@ -2823,7 +3071,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 678.24,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.135",
@@ -2834,7 +3083,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 735.9375,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.135",
@@ -2845,7 +3095,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 735.9375,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.135",
@@ -2856,7 +3107,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 735.9375,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.135",
@@ -2867,7 +3119,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 735.9375,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.135",
@@ -2878,7 +3131,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 735.9375,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.136",
@@ -2889,7 +3143,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 795.99,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.136",
@@ -2900,7 +3155,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 795.99,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.136",
@@ -2911,7 +3167,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 795.99,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.136",
@@ -2922,7 +3179,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 795.99,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.136",
@@ -2933,7 +3191,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 795.99,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.137",
@@ -2944,7 +3203,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1059.75,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.137",
@@ -2955,7 +3215,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1059.75,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.137",
@@ -2966,7 +3227,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1059.75,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.137",
@@ -2977,7 +3239,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1059.75,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.137",
@@ -2988,7 +3251,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1059.75,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.138",
@@ -2999,7 +3263,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1205.76,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.138",
@@ -3010,7 +3275,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1205.76,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.138",
@@ -3021,7 +3287,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1205.76,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.138",
@@ -3032,7 +3299,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1205.76,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.138",
@@ -3043,7 +3311,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1205.76,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.139",
@@ -3054,7 +3323,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1282.2975,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.139",
@@ -3065,7 +3335,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1282.2975,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.139",
@@ -3076,7 +3347,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1282.2975,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.139",
@@ -3087,7 +3359,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1282.2975,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.139",
@@ -3098,7 +3371,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1282.2975,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.14",
@@ -3109,7 +3383,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1526.04,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.14",
@@ -3120,7 +3395,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1526.04,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.14",
@@ -3131,7 +3407,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1526.04,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.14",
@@ -3142,7 +3419,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1526.04,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.14",
@@ -3153,7 +3431,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1526.04,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.141",
@@ -3164,7 +3443,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1790.9775,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.141",
@@ -3175,7 +3455,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1790.9775,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.141",
@@ -3186,7 +3467,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1790.9775,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.141",
@@ -3197,7 +3479,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1790.9775,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.141",
@@ -3208,7 +3491,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1790.9775,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.142",
@@ -3219,7 +3503,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1884,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.142",
@@ -3230,7 +3515,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1884,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.142",
@@ -3241,7 +3527,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1884,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.142",
@@ -3252,7 +3539,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1884,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.142",
@@ -3263,7 +3551,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1884,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.143",
@@ -3274,7 +3563,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2077.11,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.143",
@@ -3285,7 +3575,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2077.11,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.143",
@@ -3296,7 +3587,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2077.11,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.143",
@@ -3307,7 +3599,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2077.11,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.143",
@@ -3318,7 +3611,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2077.11,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.144",
@@ -3329,7 +3623,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2279.64,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.144",
@@ -3340,7 +3635,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2279.64,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.144",
@@ -3351,7 +3647,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2279.64,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.144",
@@ -3362,7 +3659,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2279.64,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.144",
@@ -3373,7 +3671,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2279.64,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.145",
@@ -3384,7 +3683,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2712.96,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.145",
@@ -3395,7 +3695,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2712.96,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.145",
@@ -3406,7 +3707,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2712.96,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.145",
@@ -3417,7 +3719,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2712.96,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.145",
@@ -3428,7 +3731,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2712.96,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.146",
@@ -3439,7 +3743,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 4239,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.146",
@@ -3450,7 +3755,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 4239,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.146",
@@ -3461,7 +3767,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 4239,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.146",
@@ -3472,7 +3779,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 4239,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
       },
       {
         "src_id": "15.146",
@@ -3483,14 +3791,9 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 4239,
-        "carbon_emission_src": "IFC"
-      }
-    ]
-  },
-  {
-    "sheetName": "Foundation",
-    "type": "Pile Cap",
-    "data": [
+        "carbon_emission_src": "IFC",
+        "component": "Pile"
+      },
       {
         "src_id": "12.02",
         "name": "Steel Rebar (Fe500)",
@@ -3500,7 +3803,8 @@
         "carbon_emission": 2.6,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1000,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile Cap"
       },
       {
         "src_id": "15.13",
@@ -3511,7 +3815,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2400,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile Cap"
       },
       {
         "src_id": "17.32",
@@ -3522,7 +3827,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2400,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile Cap"
       },
       {
         "src_id": "17.33",
@@ -3533,7 +3839,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2400,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile Cap"
       },
       {
         "src_id": "17.34",
@@ -3544,7 +3851,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2400,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile Cap"
       },
       {
         "src_id": "17.35",
@@ -3555,13 +3863,13 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2400,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pile Cap"
       }
     ]
   },
   {
     "sheetName": "Sub Structure",
-    "type": "Pier",
     "data": [
       {
         "src_id": "12.02",
@@ -3572,7 +3880,8 @@
         "carbon_emission": 2.6,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1000,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pier"
       },
       {
         "src_id": "17.47",
@@ -3583,7 +3892,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2400,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pier"
       },
       {
         "src_id": "17.47",
@@ -3594,7 +3904,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2400,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pier"
       },
       {
         "src_id": "17.47",
@@ -3605,7 +3916,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2400,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pier"
       },
       {
         "src_id": "17.47",
@@ -3616,7 +3928,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2400,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pier"
       },
       {
         "src_id": "17.47",
@@ -3627,7 +3940,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2400,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pier"
       },
       {
         "src_id": "17.48",
@@ -3638,7 +3952,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2400,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pier"
       },
       {
         "src_id": "17.48",
@@ -3649,7 +3964,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2400,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pier"
       },
       {
         "src_id": "17.48",
@@ -3660,7 +3976,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2400,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pier"
       },
       {
         "src_id": "17.48",
@@ -3671,7 +3988,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2400,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pier"
       },
       {
         "src_id": "17.48",
@@ -3682,7 +4000,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2400,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pier"
       },
       {
         "src_id": "17.49",
@@ -3693,7 +4012,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2400,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pier"
       },
       {
         "src_id": "17.49",
@@ -3704,7 +4024,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2400,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pier"
       },
       {
         "src_id": "17.49",
@@ -3715,7 +4036,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2400,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pier"
       },
       {
         "src_id": "17.49",
@@ -3726,7 +4048,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2400,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pier"
       },
       {
         "src_id": "17.49",
@@ -3737,7 +4060,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2400,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pier"
       },
       {
         "src_id": "17.5",
@@ -3748,7 +4072,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2400,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pier"
       },
       {
         "src_id": "17.5",
@@ -3759,7 +4084,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2400,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pier"
       },
       {
         "src_id": "17.5",
@@ -3770,7 +4096,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2400,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pier"
       },
       {
         "src_id": "17.5",
@@ -3781,7 +4108,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2400,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pier"
       },
       {
         "src_id": "17.5",
@@ -3792,14 +4120,9 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2400,
-        "carbon_emission_src": "IFC"
-      }
-    ]
-  },
-  {
-    "sheetName": "Sub Structure",
-    "type": "Pier Cap",
-    "data": [
+        "carbon_emission_src": "IFC",
+        "component": "Pier"
+      },
       {
         "src_id": "12.02",
         "name": "Steel Rebar (Fe500)",
@@ -3809,7 +4132,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1000,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pier Cap"
       },
       {
         "src_id": "17.52",
@@ -3820,7 +4144,8 @@
         "carbon_emission": 2.6,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2400,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pier Cap"
       },
       {
         "src_id": "17.53",
@@ -3831,7 +4156,8 @@
         "carbon_emission": 2.6,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2400,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pier Cap"
       },
       {
         "src_id": "17.54",
@@ -3842,7 +4168,8 @@
         "carbon_emission": 2.6,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2400,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pier Cap"
       },
       {
         "src_id": "17.55",
@@ -3853,14 +4180,9 @@
         "carbon_emission": 2.6,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2400,
-        "carbon_emission_src": "IFC"
-      }
-    ]
-  },
-  {
-    "sheetName": "Sub Structure",
-    "type": "Pedestal",
-    "data": [
+        "carbon_emission_src": "IFC",
+        "component": "Pier Cap"
+      },
       {
         "src_id": "12.02",
         "name": "Steel Rebar (Fe500)",
@@ -3870,7 +4192,8 @@
         "carbon_emission": 2.6,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1000,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pedestal"
       },
       {
         "src_id": "17.58",
@@ -3881,7 +4204,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2400,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pedestal"
       },
       {
         "src_id": "17.59",
@@ -3892,7 +4216,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2400,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pedestal"
       },
       {
         "src_id": "17.6",
@@ -3903,7 +4228,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2400,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Pedestal"
       },
       {
         "src_id": "17.61",
@@ -3914,14 +4240,9 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2400,
-        "carbon_emission_src": "IFC"
-      }
-    ]
-  },
-  {
-    "sheetName": "Sub Structure",
-    "type": "Bearings",
-    "data": [
+        "carbon_emission_src": "IFC",
+        "component": "Pedestal"
+      },
       {
         "src_id": "13.04",
         "name": "Cast Steel Rocker bearing",
@@ -3931,7 +4252,8 @@
         "carbon_emission": 2.5,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1000,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Bearings"
       },
       {
         "src_id": "13.05",
@@ -3942,7 +4264,8 @@
         "carbon_emission": 2.5,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1000,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Bearings"
       },
       {
         "src_id": "13.06",
@@ -3953,7 +4276,8 @@
         "carbon_emission": 2.5,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1000,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Bearings"
       },
       {
         "src_id": "13.08",
@@ -3964,7 +4288,8 @@
         "carbon_emission": 2.5,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1000,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Bearings"
       },
       {
         "src_id": "13.09",
@@ -3975,13 +4300,13 @@
         "carbon_emission": 2.5,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1000,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Bearings"
       }
     ]
   },
   {
     "sheetName": "Super Structure",
-    "type": "Girder",
     "data": [
       {
         "src_id": "12.02",
@@ -3992,7 +4317,8 @@
         "carbon_emission": 2.6,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1000,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Girder"
       },
       {
         "src_id": "14.06",
@@ -4003,7 +4329,8 @@
         "carbon_emission": 2.5,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1000,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Girder"
       },
       {
         "src_id": "17.67",
@@ -4014,7 +4341,8 @@
         "carbon_emission": 2.5,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1000,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Girder"
       },
       {
         "src_id": "14.92",
@@ -4025,7 +4353,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2400,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Girder"
       },
       {
         "src_id": "14.92",
@@ -4036,7 +4365,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2400,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Girder"
       },
       {
         "src_id": "14.92",
@@ -4047,7 +4377,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2400,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Girder"
       },
       {
         "src_id": "14.92",
@@ -4058,7 +4389,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2400,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Girder"
       },
       {
         "src_id": "14.92",
@@ -4069,7 +4401,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2400,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Girder"
       },
       {
         "src_id": "14.6",
@@ -4080,14 +4413,9 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2400,
-        "carbon_emission_src": "IFC"
-      }
-    ]
-  },
-  {
-    "sheetName": "Super Structure",
-    "type": "Deck Slab",
-    "data": [
+        "carbon_emission_src": "IFC",
+        "component": "Girder"
+      },
       {
         "src_id": "12.02",
         "name": "Steel Rebar (Fe500)",
@@ -4097,7 +4425,8 @@
         "carbon_emission": 2.6,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1000,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Deck Slab"
       },
       {
         "src_id": "14.89",
@@ -4108,7 +4437,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2400,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Deck Slab"
       },
       {
         "src_id": "14.89",
@@ -4119,7 +4449,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2400,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Deck Slab"
       },
       {
         "src_id": "14.89",
@@ -4130,7 +4461,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2400,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Deck Slab"
       },
       {
         "src_id": "14.89",
@@ -4141,7 +4473,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2400,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Deck Slab"
       },
       {
         "src_id": "14.89",
@@ -4152,7 +4485,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2400,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Deck Slab"
       },
       {
         "src_id": "14.9",
@@ -4163,7 +4497,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2400,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Deck Slab"
       },
       {
         "src_id": "14.9",
@@ -4174,7 +4509,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2400,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Deck Slab"
       },
       {
         "src_id": "14.9",
@@ -4185,7 +4521,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2400,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Deck Slab"
       },
       {
         "src_id": "14.9",
@@ -4196,7 +4533,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2400,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Deck Slab"
       },
       {
         "src_id": "14.9",
@@ -4207,7 +4545,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2400,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Deck Slab"
       },
       {
         "src_id": "17.7",
@@ -4218,14 +4557,9 @@
         "carbon_emission": 2.5,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1000,
-        "carbon_emission_src": "IFC"
-      }
-    ]
-  },
-  {
-    "sheetName": "Super Structure",
-    "type": "Diaphragm",
-    "data": [
+        "carbon_emission_src": "IFC",
+        "component": "Deck Slab"
+      },
       {
         "src_id": "12.02",
         "name": "Steel Rebar (Fe500)",
@@ -4235,7 +4569,8 @@
         "carbon_emission": 2.6,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1000,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Diaphragm"
       },
       {
         "src_id": "14.91",
@@ -4246,7 +4581,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2400,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Diaphragm"
       },
       {
         "src_id": "14.91",
@@ -4257,7 +4593,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2400,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Diaphragm"
       },
       {
         "src_id": "14.91",
@@ -4268,7 +4605,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2400,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Diaphragm"
       },
       {
         "src_id": "14.91",
@@ -4279,7 +4617,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2400,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Diaphragm"
       },
       {
         "src_id": "14.91",
@@ -4290,7 +4629,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2400,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Diaphragm"
       },
       {
         "src_id": "14.92",
@@ -4301,7 +4641,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2400,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Diaphragm"
       },
       {
         "src_id": "14.92",
@@ -4312,7 +4653,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2400,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Diaphragm"
       },
       {
         "src_id": "14.92",
@@ -4323,7 +4665,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2400,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Diaphragm"
       },
       {
         "src_id": "14.92",
@@ -4334,7 +4677,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2400,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Diaphragm"
       },
       {
         "src_id": "14.92",
@@ -4345,14 +4689,9 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2400,
-        "carbon_emission_src": "IFC"
-      }
-    ]
-  },
-  {
-    "sheetName": "Super Structure",
-    "type": "Cross Bracings",
-    "data": [
+        "carbon_emission_src": "IFC",
+        "component": "Diaphragm"
+      },
       {
         "src_id": "23.02",
         "name": "Steel Cross Bracing",
@@ -4362,13 +4701,13 @@
         "carbon_emission": 2.5,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1000,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Cross Bracings"
       }
     ]
   },
   {
     "sheetName": "Miscellaneous",
-    "type": "Railing & Crash Barrier & Median",
     "data": [
       {
         "src_id": "14.48",
@@ -4379,7 +4718,8 @@
         "carbon_emission": 2.5,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 7.418,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Railing & Crash Barrier & Median"
       },
       {
         "src_id": "14.49",
@@ -4390,7 +4730,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": null,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Railing & Crash Barrier & Median"
       },
       {
         "src_id": "7.35",
@@ -4401,7 +4742,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 609.6,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Railing & Crash Barrier & Median"
       },
       {
         "src_id": "7.35",
@@ -4412,7 +4754,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 715.2,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Railing & Crash Barrier & Median"
       },
       {
         "src_id": "7.36",
@@ -4423,7 +4766,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 609.6,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Railing & Crash Barrier & Median"
       },
       {
         "src_id": "7.36",
@@ -4434,7 +4778,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 715.2,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Railing & Crash Barrier & Median"
       },
       {
         "src_id": "7.37",
@@ -4445,7 +4790,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 609.6,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Railing & Crash Barrier & Median"
       },
       {
         "src_id": "7.37",
@@ -4456,7 +4802,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 715.2,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Railing & Crash Barrier & Median"
       },
       {
         "src_id": "7.35",
@@ -4467,7 +4814,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 609.6,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Railing & Crash Barrier & Median"
       },
       {
         "src_id": "7.36",
@@ -4478,7 +4826,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 609.6,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Railing & Crash Barrier & Median"
       },
       {
         "src_id": "7.37",
@@ -4489,14 +4838,9 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 609.6,
-        "carbon_emission_src": "IFC"
-      }
-    ]
-  },
-  {
-    "sheetName": "Miscellaneous",
-    "type": "Drainage",
-    "data": [
+        "carbon_emission_src": "IFC",
+        "component": "Railing & Crash Barrier & Median"
+      },
       {
         "src_id": "17.36",
         "name": "PVC Pipe (110 mm)",
@@ -4506,7 +4850,8 @@
         "carbon_emission": 3.23,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1.1,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Drainage"
       },
       {
         "src_id": "14.41",
@@ -4517,14 +4862,9 @@
         "carbon_emission": 2.8,
         "carbon_emission_units_den": "kg",
         "conversion_factor": null,
-        "carbon_emission_src": null
-      }
-    ]
-  },
-  {
-    "sheetName": "Miscellaneous",
-    "type": "Asphalt, Utilities and and Other materials",
-    "data": [
+        "carbon_emission_src": null,
+        "component": "Drainage"
+      },
       {
         "src_id": "17.69",
         "name": "Coating on Structural Steel (Aluminum Paint, Etch and Zinc primer)",
@@ -4534,7 +4874,8 @@
         "carbon_emission": 3.76,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 0.266,
-        "carbon_emission_src": "ICE"
+        "carbon_emission_src": "ICE",
+        "component": "Asphalt, Utilities and and Other materials"
       },
       {
         "src_id": "14.55.a",
@@ -4545,7 +4886,8 @@
         "carbon_emission": 0.162,
         "carbon_emission_units_den": "sqm-mm",
         "conversion_factor": 12,
-        "carbon_emission_src": "ICE"
+        "carbon_emission_src": "ICE",
+        "component": "Asphalt, Utilities and and Other materials"
       },
       {
         "src_id": "19.04",
@@ -4556,7 +4898,8 @@
         "carbon_emission": 3.76,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 0.298,
-        "carbon_emission_src": "ICE"
+        "carbon_emission_src": "ICE",
+        "component": "Asphalt, Utilities and and Other materials"
       },
       {
         "src_id": "6.12 a",
@@ -4567,7 +4910,8 @@
         "carbon_emission": 2.152,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2.75,
-        "carbon_emission_src": "ICE"
+        "carbon_emission_src": "ICE",
+        "component": "Asphalt, Utilities and and Other materials"
       },
       {
         "src_id": "26.36",
@@ -4578,7 +4922,8 @@
         "carbon_emission": 3.76,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1000,
-        "carbon_emission_src": "ICE"
+        "carbon_emission_src": "ICE",
+        "component": "Asphalt, Utilities and and Other materials"
       },
       {
         "src_id": "26.37",
@@ -4589,7 +4934,8 @@
         "carbon_emission": 3.76,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1000,
-        "carbon_emission_src": "ICE"
+        "carbon_emission_src": "ICE",
+        "component": "Asphalt, Utilities and and Other materials"
       },
       {
         "src_id": "26.38",
@@ -4600,7 +4946,8 @@
         "carbon_emission": 3.76,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1000,
-        "carbon_emission_src": "ICE"
+        "carbon_emission_src": "ICE",
+        "component": "Asphalt, Utilities and and Other materials"
       },
       {
         "src_id": "26.39",
@@ -4611,7 +4958,8 @@
         "carbon_emission": 3.76,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1000,
-        "carbon_emission_src": "ICE"
+        "carbon_emission_src": "ICE",
+        "component": "Asphalt, Utilities and and Other materials"
       },
       {
         "src_id": "26.4",
@@ -4622,7 +4970,8 @@
         "carbon_emission": 3.76,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1000,
-        "carbon_emission_src": "ICE"
+        "carbon_emission_src": "ICE",
+        "component": "Asphalt, Utilities and and Other materials"
       },
       {
         "src_id": "26.41",
@@ -4633,7 +4982,8 @@
         "carbon_emission": 3.76,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1000,
-        "carbon_emission_src": "ICE"
+        "carbon_emission_src": "ICE",
+        "component": "Asphalt, Utilities and and Other materials"
       },
       {
         "src_id": "26.42",
@@ -4644,7 +4994,8 @@
         "carbon_emission": 3.76,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1000,
-        "carbon_emission_src": "ICE"
+        "carbon_emission_src": "ICE",
+        "component": "Asphalt, Utilities and and Other materials"
       },
       {
         "src_id": "26.44",
@@ -4655,7 +5006,8 @@
         "carbon_emission": 3.76,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 1000,
-        "carbon_emission_src": "ICE"
+        "carbon_emission_src": "ICE",
+        "component": "Asphalt, Utilities and and Other materials"
       },
       {
         "src_id": "14.68",
@@ -4666,14 +5018,9 @@
         "carbon_emission": 2.547,
         "carbon_emission_units_den": "kg",
         "conversion_factor": null,
-        "carbon_emission_src": "ICE"
-      }
-    ]
-  },
-  {
-    "sheetName": "Miscellaneous",
-    "type": "Waterproofing",
-    "data": [
+        "carbon_emission_src": "ICE",
+        "component": "Asphalt, Utilities and and Other materials"
+      },
       {
         "src_id": "31.01",
         "name": "Damp Proof course (M20) 50 mm",
@@ -4683,7 +5030,8 @@
         "carbon_emission": 0.11,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 120,
-        "carbon_emission_src": "ICE"
+        "carbon_emission_src": "ICE",
+        "component": "Waterproofing"
       },
       {
         "src_id": "31.02",
@@ -4694,7 +5042,8 @@
         "carbon_emission": 0.191,
         "carbon_emission_units_den": "kg",
         "conversion_factor": 2,
-        "carbon_emission_src": "IFC"
+        "carbon_emission_src": "IFC",
+        "component": "Waterproofing"
       }
     ]
   }

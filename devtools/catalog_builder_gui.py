@@ -128,13 +128,13 @@ def _auto_detect_catalog_py() -> Path | None:
     Try to find material_catalog.py relative to this devtools file's location.
     Expected structure:
         <project>/devtools/catalog_builder_gui.py  ← this file
-        <project>/gui/components/structure/registry/material_catalog.py
+        <project>/src/three_ps_lcca_gui/gui/components/structure/registry/material_catalog.py
     """
     here = Path(__file__).resolve().parent          # devtools/
     project_root = here.parent                      # <project>/
     candidate = (
         project_root
-        / "gui" / "components" / "structure" / "registry"
+        / "src" / "three_ps_lcca_gui" / "gui" / "components" / "structure" / "registry"
         / "material_catalog.py"
     )
     return candidate if candidate.exists() else None

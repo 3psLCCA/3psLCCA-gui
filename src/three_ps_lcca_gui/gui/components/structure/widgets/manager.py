@@ -115,9 +115,6 @@ class StructureManagerWidget(QWidget):
         currency = getattr(self, "_currency", "")
 
         for comp_name, items in self.data.items():
-            active = [i for i in items if not i.get("state", {}).get("in_trash", False)]
-            if not active:
-                continue
             self.create_section(comp_name)
             table = self.sections.get(comp_name)
             if table:

@@ -165,3 +165,4 @@ pnpm-debug.log*
 coverage/
 .nyc_output
 /src/three_ps_lcca_gui/code_to_latex/tests
+src/three_ps_lcca_gui/gui/components/structure/registry/material_database/INDIA/Bihar/Darbhanga-2025-notes.md

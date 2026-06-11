@@ -3,11 +3,10 @@ sor_json_generator.py
 =====================
 Converts a CID#-formatted SOR Excel file to the MumbaiSOR.json schema.
 
-Output format (array of section objects):
+Output format (array of section objects, one per sheet):
   [
     {
       "sheetName": "Foundation",
-      "type": "Excavation",
       "data": [
         {
           "name": "...",
@@ -17,13 +16,19 @@ Output format (array of section objects):
           "carbon_emission": null | <float>,
           "carbon_emission_units_den": null | "<unit>",
           "conversion_factor": null | <float>,
-          "carbon_emission_src": null | "IFC" | "ICE" | ...
+          "carbon_emission_src": null | "IFC" | "ICE" | ...,
+          "component": "Excavation" | ["Pier", "Pier Cap"],
+          "description": null | "..."
         },
         ...
       ]
     },
     ...
   ]
+
+  Sections are grouped by sheetName only. "type" has been eliminated — component
+  on each entry is the sole authority. Single component → plain string (backward
+  compat). Multiple components → array.
 
 Usage:
   python devtools/sor_json_generator.py <path/to/file.xlsx> [output.json]
@@ -36,15 +41,22 @@ Column format expected in Excel (same as excel_importer.py):
     CID#Name*, CID#Unit*, CID#Rate*, CID#Component,
     CID#ID (optional), CID#Quantity, CID#Rate_Src,
     CID#Carbon_Emission_Factor, CID#Carbon_Emission_units,
-    CID#Conversion_Factor, CID#Carbon_Emission_Src, ...
+    CID#Conversion_Factor, CID#Carbon_Emission_Src,
+    CID#Description (optional)
   (* = required; all other columns are optional)
 
 Sheet name → sheetName mapping:
+  Strips optional "CAT#" prefix, normalises hyphens to spaces, then:
   "Foundation"      → "Foundation"
   "Sub Structure"   → "Sub Structure"
   "Super Structure" → "Super Structure"
   "Misc"            → "Miscellaneous"
-  (anything else)   → sheet name as-is
+  (anything else)   → "Miscellaneous"
+  "Metadata" sheet  → optional; skipped with [warn] if absent, [skip] if present
+
+CID#Component multi-value syntax:
+  "{Pier}, {Pier Cap}" → component stored as ["Pier", "Pier Cap"] (array)
+  "Excavation"         → component stored as "Excavation" (string, backward compat)
 
 Type comes from CID#Component column.
 """
@@ -52,6 +64,7 @@ Type comes from CID#Component column.
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -66,6 +79,8 @@ except ImportError:
 # ---------------------------------------------------------------------------
 
 CID_PREFIX = "cid#"
+CAT_PREFIX = "cat#"
+METADATA_SHEET = "metadata"
 
 # All keys are lowercase - lookup uses field_part.lower() for case-insensitive matching.
 # Required columns: name, unit, rate.  All others (including id) are optional.
@@ -86,6 +101,7 @@ CID_TO_INTERNAL: dict[str, str] = {
     "grade": "grade",
     "type": "type",
     "component": "component",
+    "description": "description",
 }
 
 # Strings that are recognised as a carbon emission source.
@@ -104,6 +120,45 @@ SHEET_TO_SHEET_NAME: dict[str, str] = {
 }
 
 NA = None
+
+# ---------------------------------------------------------------------------
+# Sheet name normalisation
+# ---------------------------------------------------------------------------
+
+
+def _normalise_sheet_name(raw: str) -> str:
+    """
+    Strip optional CAT# prefix, normalise hyphens to spaces, then look up
+    in SHEET_TO_SHEET_NAME. Falls back to "Miscellaneous" for unknown names.
+    """
+    name = raw.strip()
+    if name.lower().startswith(CAT_PREFIX):
+        name = name[len(CAT_PREFIX):]
+    name_key = name.replace("-", " ").strip().lower()
+    return SHEET_TO_SHEET_NAME.get(name_key, "Miscellaneous")
+
+
+# ---------------------------------------------------------------------------
+# Multi-component parsing
+# ---------------------------------------------------------------------------
+
+_BRACE_RE = re.compile(r"\{([^}]+)\}")
+
+
+def _parse_component(raw: str) -> str | list[str]:
+    """
+    Parse CID#Component cell value.
+    "{Pier}, {Pier Cap}" → ["Pier", "Pier Cap"]  (array when 2+ components)
+    "Excavation"         → "Excavation"           (plain str for backward compat)
+    """
+    tokens = [m.group(1).strip() for m in _BRACE_RE.finditer(raw)]
+    if len(tokens) >= 2:
+        return tokens
+    if len(tokens) == 1:
+        return tokens[0]
+    # No braces - treat whole value as single component
+    return raw.strip() or "Uncategorised"
+
 
 # ---------------------------------------------------------------------------
 # CID# parsing helpers (same logic as excel_importer.py, no PySide6)
@@ -162,6 +217,8 @@ def parse_excel(path: str) -> dict[str, list[dict]]:
     Read all sheets.
     Returns { sheet_name: [record_dict, ...] }
     where each record_dict has internal keys (name, unit, rate, component, ...).
+
+    Metadata sheet is optional — warns if absent, silently skipped if present.
     """
     try:
         all_sheets: dict[str, "pd.DataFrame"] = pd.read_excel(
@@ -170,9 +227,18 @@ def parse_excel(path: str) -> dict[str, list[dict]]:
     except Exception as exc:
         sys.exit(f"Could not open file: {exc}")
 
+    sheet_names_lower = {s.strip().lower(): s for s in all_sheets}
+    if METADATA_SHEET not in sheet_names_lower:
+        print(f"  [warn] 'Metadata' sheet not found in '{Path(path).name}' - skipping metadata")
+
     result: dict[str, list[dict]] = {}
 
     for sheet_name, df in all_sheets.items():
+        # Metadata sheet: skip silently (no data rows for SOR)
+        if sheet_name.strip().lower() == METADATA_SHEET:
+            print(f"  [skip] '{sheet_name}': metadata sheet")
+            continue
+
         if df.empty:
             continue
 
@@ -237,16 +303,16 @@ def _make_field(value: str) -> Any:
 
 def build_sor_json(parsed: dict[str, list[dict]]) -> list[dict]:
     """
-    Group records by (sheetName, type/component) and build the output array.
+    Group records by sheetName only and build the output array.
+    One section object per sheet; component on each entry is the sole authority.
     Ordering: sections appear in the order first encountered, preserving
     within-section row order.
     """
-    # Ordered list of (sheetName, component) keys to preserve insertion order
-    section_order: list[tuple[str, str]] = []
-    sections: dict[tuple[str, str], list[dict]] = {}
+    sheet_order: list[str] = []
+    sections: dict[str, list[dict]] = {}
 
     for sheet_name, rows in parsed.items():
-        sheet_label = SHEET_TO_SHEET_NAME.get(sheet_name.strip().lower(), sheet_name.strip())
+        sheet_label = _normalise_sheet_name(sheet_name)
 
         for record in rows:
             name = record.get("name", "").strip()
@@ -260,13 +326,15 @@ def build_sor_json(parsed: dict[str, list[dict]]) -> list[dict]:
                 print(f"  [warn] skipping '{name}': non-numeric rate '{rate_str}'")
                 continue
 
-            component = record.get("component", "").strip() or "Uncategorised"
-            key = (sheet_label, component)
-            if key not in sections:
-                section_order.append(key)
-                sections[key] = []
+            raw_component = record.get("component", "").strip()
+            component_val = _parse_component(raw_component) if raw_component else "Uncategorised"
+
+            if sheet_label not in sections:
+                sheet_order.append(sheet_label)
+                sections[sheet_label] = []
 
             id_val = record.get("src_id", "").strip()
+            desc_val = _make_field(record.get("description", ""))
             entry: dict[str, Any] = {
                 **({"src_id": id_val} if id_val else {}),
                 "name": name,
@@ -277,18 +345,12 @@ def build_sor_json(parsed: dict[str, list[dict]]) -> list[dict]:
                 "carbon_emission_units_den": _make_field(record.get("carbon_emission_units_den", "")),
                 "conversion_factor": _make_field(record.get("conversion_factor", "")),
                 "carbon_emission_src": _make_field(record.get("carbon_emission_src", "")),
+                "component": component_val,
+                **({"description": desc_val} if desc_val is not None else {}),
             }
-            sections[key].append(entry)
+            sections[sheet_label].append(entry)
 
-    output: list[dict] = []
-    for sheet_label, component in section_order:
-        output.append({
-            "sheetName": sheet_label,
-            "type": component,
-            "data": sections[(sheet_label, component)],
-        })
-
-    return output
+    return [{"sheetName": s, "data": sections[s]} for s in sheet_order]
 
 
 # ---------------------------------------------------------------------------
@@ -312,9 +374,9 @@ def main(xlsx_path: str, out_path: str | None = None) -> None:
     sor = build_sor_json(parsed)
 
     total_entries = sum(len(s["data"]) for s in sor)
-    print(f"\nSections generated: {len(sor)}")
+    print(f"\nSheets generated: {len(sor)}")
     for s in sor:
-        print(f"  {s['sheetName']} / {s['type']}: {len(s['data'])} entries")
+        print(f"  {s['sheetName']}: {len(s['data'])} entries")
 
     dest.parent.mkdir(parents=True, exist_ok=True)
     with open(dest, "w", encoding="utf-8") as f:
@@ -328,5 +390,3 @@ if __name__ == "__main__":
         print(__doc__)
         sys.exit(0)
     main(sys.argv[1], sys.argv[2] if len(sys.argv) > 2 else None)
-
-

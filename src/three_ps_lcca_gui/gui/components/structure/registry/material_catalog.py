@@ -1,4 +1,4 @@
-﻿"""
+"""
 material_catalog.py
 ===================
 Auto-discovers every material database JSON file under a configurable
@@ -19,13 +19,35 @@ db_key is the full relative path from the material_database root, without the
 .json extension, using forward slashes.  This guarantees uniqueness even when
 multiple regions use identically-named JSON files.
 
+Schema (v2)
+-----------
+Sections are grouped by sheetName only — one object per sheet.
+"type" has been removed; "component" on each entry is the sole authority.
+  [
+    {
+      "sheetName": "Foundation",
+      "data": [
+        {
+          "name": "...", "unit": "...", "rate": 239,
+          "component": "Excavation" | ["Pier", "Pier Cap"],
+          "rate_src": "...",
+          "carbon_emission": null | <float>,
+          "carbon_emission_units_den": null | "<unit>",
+          "conversion_factor": null | <float>,
+          "carbon_emission_src": null | "IFC" | ...,
+          "description": null | "..."   (optional field)
+        }, ...
+      ]
+    }, ...
+  ]
+
 Usage
 -----
 # Build / refresh the registry manifest
 python material_catalog.py
 
 # In other modules
-from material_catalog import get_registry, get_path, load, check_integrity
+from material_catalog import get_registry, get_path, load, search, check_integrity
 """
 
 import json
@@ -39,7 +61,7 @@ from pathlib import Path
 # ─────────────────────────────────────────────────────────────────────────────
 
 # Increment when the manifest JSON structure changes incompatibly
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 # Root folder that contains <COUNTRY>/<REGION>/ sub-trees
 MATERIAL_DB_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -51,10 +73,10 @@ CATALOG_MANIFEST_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
 
 # Schema every SOR JSON file must satisfy
 EXPECTED_SCHEMA = {
-    "required_top_keys": ["sheetName", "type", "data"],
+    "required_top_keys": ["sheetName", "data"],
     "required_item_keys": [
-        "name", "unit", "rate", "rate_src",
-        "carbon_emission", "carbon_emission_units_den",
+        "name", "unit", "rate", "component",
+        "rate_src", "carbon_emission", "carbon_emission_units_den",
         "conversion_factor", "carbon_emission_src",
     ],
     "numeric_item_fields": ["rate", "conversion_factor"],
@@ -100,21 +122,26 @@ def _derive_region_info(json_path: str, root: str) -> dict:
       country  ← top-level folder under root          (e.g. INDIA)
       region   ← everything between country and file  (e.g. Maharashtra/PWD)
       db_key   ← full relative path without extension   (e.g. INDIA/Maharashtra/PWD/PWD_SOR)
-
-    Using region as a db_key prefix guarantees uniqueness across sub-folders
-    even when multiple regions use identically-named JSON files.
     """
     rel          = Path(json_path).relative_to(root)
-    parts        = rel.parts   # ('INDIA', 'Maharashtra', 'PWD', 'PWD_SOR.json')
+    parts        = rel.parts
 
     country      = parts[0]              if len(parts) >= 1 else "UNKNOWN"
-    region_parts = list(parts[1:-1])     # everything between country and filename
-    stem         = Path(parts[-1]).stem  # drop .json extension
+    region_parts = list(parts[1:-1])
+    stem         = Path(parts[-1]).stem
 
-    region = "/".join(region_parts)      # '' when file is directly in country folder
+    region = "/".join(region_parts)
     db_key = "/".join([country] + region_parts + [stem])
 
     return {"country": country, "region": region, "db_key": db_key}
+
+
+def _component_matches(component_val, query: str) -> bool:
+    """Case-insensitive check whether query matches any component in the entry."""
+    q = query.lower()
+    if isinstance(component_val, list):
+        return any(q in c.lower() for c in component_val)
+    return q in str(component_val).lower()
 
 
 def _validate_data(data, db_key: str) -> tuple[list[str], list[str]]:
@@ -137,9 +164,7 @@ def _validate_data(data, db_key: str) -> tuple[list[str], list[str]]:
     numeric_item  = set(EXPECTED_SCHEMA["numeric_item_fields"])
 
     for idx, record in enumerate(data):
-        ref = (f"Record[{idx}] "
-               f"(sheetName='{record.get('sheetName','?')}', "
-               f"type='{record.get('type','?')}')")
+        ref = f"Record[{idx}] (sheetName='{record.get('sheetName', '?')}')"
 
         # Top-level keys
         for key in required_top:
@@ -155,9 +180,9 @@ def _validate_data(data, db_key: str) -> tuple[list[str], list[str]]:
             warnings.append(f"{ref}: 'data' array is empty.")
 
         for i_idx, item in enumerate(items):
-            _src_id = item.get("src_id", "")
+            _src_id     = item.get("src_id", "")
             _item_label = f"[{_src_id}] {item.get('name', '?')}" if _src_id else item.get("name", "?")
-            iref = f"{ref} › Item[{i_idx}] ('{_item_label}')"
+            iref        = f"{ref} › Item[{i_idx}] ('{_item_label}')"
 
             for key in required_item:
                 if key not in item:
@@ -165,18 +190,55 @@ def _validate_data(data, db_key: str) -> tuple[list[str], list[str]]:
 
             for field in numeric_item:
                 val = item.get(field)
-                if val is None:
-                    continue
                 if val is not None and not isinstance(val, (int, float)):
                     errors.append(
                         f"{iref}: '{field}' must be numeric or null, "
                         f"got {type(val).__name__} ({val!r})."
                     )
 
+            # component must be a non-empty str or a list of non-empty strings
+            comp = item.get("component")
+            if comp is not None:
+                if isinstance(comp, list):
+                    if not comp:
+                        errors.append(f"{iref}: 'component' array is empty.")
+                    elif not all(isinstance(c, str) and c.strip() for c in comp):
+                        errors.append(f"{iref}: 'component' array must contain non-empty strings.")
+                elif not isinstance(comp, str) or not comp.strip():
+                    errors.append(f"{iref}: 'component' must be a non-empty string or array.")
+
             if item.get("carbon_emission") is None:
                 warnings.append(f"{iref}: carbon_emission is not available.")
 
     return errors, warnings
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  PRIVATE - collect index fields from a loaded SOR file
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _collect_indexes(raw: list[dict]) -> tuple[list[str], list[str]]:
+    """
+    Return (sheets, components) sorted lists for the manifest index.
+    sheets     — unique sheetName values
+    components — unique component values collected from every entry
+    """
+    sheets: set[str] = set()
+    components: set[str] = set()
+
+    for section in raw:
+        sheet = section.get("sheetName", "")
+        if sheet:
+            sheets.add(sheet)
+        for entry in section.get("data", []):
+            comp = entry.get("component")
+            if comp:
+                if isinstance(comp, list):
+                    components.update(c for c in comp if isinstance(c, str) and c.strip())
+                elif isinstance(comp, str) and comp.strip():
+                    components.add(comp)
+
+    return sorted(sheets), sorted(components)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -215,8 +277,8 @@ def check_integrity_by_path(file_path: str) -> dict:
         return result
 
     errors, warnings = _validate_data(data, Path(file_path).stem)
-    result["errors"]   = errors
-    result["warnings"] = warnings
+    result["errors"]       = errors
+    result["warnings"]     = warnings
     result["record_count"] = len(data) if isinstance(data, list) else 0
 
     if errors:
@@ -259,19 +321,19 @@ def build_registry(root: str = MATERIAL_DB_ROOT,
     Manifest structure
     ------------------
     {
-      "_meta": { "schema_version": 1, "built_at": "...", "root": [...], "total": N, "ok": N, "failed": N },
-      "INDIA/Maharashtra/PWD/PWD_SOR": {
-          "db_key":   "INDIA/Maharashtra/PWD/PWD_SOR",
-          "path":     ["material_database", "INDIA", "Maharashtra", "PWD", "PWD_SOR.json"],
-          "country":  "INDIA",
-          "region":   "Maharashtra",
-          "status":   "OK" | "FAILED",
-          "record_count": 15,
-          "sheets":   ["Foundation", "Sub-Structure", ...],   ← category list
-          "types":    ["Excavation", "Pile", ...],            ← type list
-          "errors":   [],
-          "warnings": [...],
-          "file_meta": { "size_bytes": ..., "last_modified": ..., "md5": ... }
+      "_meta": { "schema_version": 2, "built_at": "...", "root": [...], "total": N, "ok": N, "failed": N },
+      "INDIA/Bihar/Darbhanga-2025": {
+          "db_key":       "INDIA/Bihar/Darbhanga-2025",
+          "path":         ["material_database", "INDIA", "Bihar", "Darbhanga-2025.json"],
+          "country":      "INDIA",
+          "region":       "Bihar",
+          "status":       "OK" | "FAILED",
+          "record_count": 4,
+          "sheets":       ["Foundation", "Sub Structure", ...],   ← unique sheetName values
+          "components":   ["Excavation", "Pier", "Pile", ...],    ← unique component values
+          "errors":       [],
+          "warnings":     [...],
+          "file_meta":    { "size_bytes": ..., "last_modified": ..., "md5": ... }
       },
       ...
     }
@@ -291,14 +353,12 @@ def build_registry(root: str = MATERIAL_DB_ROOT,
 
         report = check_integrity_by_path(jf_str)
 
-        # Collect sheet / type index for the search engine
-        sheets, types = [], []
+        sheets, components = [], []
         if report["status"] == "OK" and report["record_count"] > 0:
             try:
                 with open(jf_str, "r", encoding="utf-8") as f:
                     raw = json.load(f)
-                sheets = sorted({r.get("sheetName", "") for r in raw if r.get("sheetName")})
-                types  = sorted({r.get("type", "")      for r in raw if r.get("type")})
+                sheets, components = _collect_indexes(raw)
             except Exception:
                 pass
 
@@ -312,8 +372,8 @@ def build_registry(root: str = MATERIAL_DB_ROOT,
             "region":       info["region"],
             "status":       report["status"],
             "record_count": report["record_count"],
-            "sheets":       sheets,   # unique sheetName values  → categories
-            "types":        types,    # unique type values        → sub-categories
+            "sheets":       sheets,       # unique sheetName values → categories
+            "components":   components,   # unique component values → sub-categories
             "errors":       report["errors"],
             "warnings":     report["warnings"],
             "file_meta":    report["file_meta"],
@@ -335,7 +395,7 @@ def build_registry(root: str = MATERIAL_DB_ROOT,
     with open(manifest_path, "w", encoding="utf-8") as f:
         json.dump(manifest, f, indent=2)
 
-    print(f"[material_catalog] Registry written → {manifest_path}")
+    print(f"[material_catalog] Registry written -> {manifest_path}")
     print(f"[material_catalog] Scanned {len(json_files)} file(s): "
           f"{ok_count} OK, {failed_count} FAILED")
     return manifest
@@ -383,10 +443,18 @@ def get_path(db_key: str, manifest_path: str = CATALOG_MANIFEST_PATH) -> str:
     return abs_path
 
 
-def list_databases(country: str = None, region: str = None) -> list[dict]:
+def list_databases(
+    country: str = None,
+    region: str = None,
+    sheet: str = None,
+    component: str = None,
+) -> list[dict]:
     """
-    Return all registered databases, optionally filtered by country / region.
-    Each entry includes db_key, path, country, region, status, sheets, types.
+    Return all registered databases, optionally filtered by:
+      country   — exact match (case-insensitive)
+      region    — exact match (case-insensitive)
+      sheet     — sheetName must be present in the db's sheets index
+      component — component must be present in the db's components index
     """
     registry = get_registry()
     result = []
@@ -395,6 +463,12 @@ def list_databases(country: str = None, region: str = None) -> list[dict]:
             continue
         if region and entry.get("region", "").upper() != region.upper():
             continue
+        if sheet:
+            if not any(sheet.lower() == s.lower() for s in entry.get("sheets", [])):
+                continue
+        if component:
+            if not any(component.lower() == c.lower() for c in entry.get("components", [])):
+                continue
         result.append(entry)
     return result
 
@@ -422,6 +496,97 @@ def load(db_key: str, strict: bool = True) -> list[dict]:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+#  PUBLIC - ADVANCED SEARCH
+# ─────────────────────────────────────────────────────────────────────────────
+
+def search(
+    query: str = "",
+    *,
+    country: str = None,
+    region: str = None,
+    db_key_filter: str = None,
+    sheet: str = None,
+    component: str = None,
+    limit: int = 200,
+) -> list[dict]:
+    """
+    Search across all registered databases. Returns a flat list of matching
+    entries, each augmented with source metadata:
+      _db_key, _sheet, _country, _region
+
+    Parameters
+    ----------
+    query        : case-insensitive substring match on entry name
+    country      : restrict to databases from this country
+    region       : restrict to databases from this region
+    db_key_filter: restrict to a single db_key
+    sheet        : restrict to entries in this sheetName (case-insensitive)
+    component    : restrict to entries whose component matches (case-insensitive,
+                   works for both str and list component values)
+    limit        : max results returned (default 200)
+    """
+    registry = get_registry()
+    query_lower     = query.lower()
+    sheet_lower     = sheet.lower()     if sheet     else None
+    component_lower = component.lower() if component else None
+    results: list[dict] = []
+
+    for db_key, meta in registry.items():
+        if db_key_filter and db_key != db_key_filter:
+            continue
+        if country and meta.get("country", "").upper() != country.upper():
+            continue
+        if region and meta.get("region", "").upper() != region.upper():
+            continue
+        if meta.get("status") != "OK":
+            continue
+
+        # Use manifest index to skip databases that can't match sheet/component
+        if sheet_lower:
+            if not any(sheet_lower == s.lower() for s in meta.get("sheets", [])):
+                continue
+        if component_lower:
+            if not any(component_lower == c.lower() for c in meta.get("components", [])):
+                continue
+
+        # Load and search entries
+        try:
+            abs_path = get_path(db_key)
+            with open(abs_path, "r", encoding="utf-8") as f:
+                sections = json.load(f)
+        except Exception:
+            continue
+
+        for section in sections:
+            sheet_name = section.get("sheetName", "")
+            if sheet_lower and sheet_lower != sheet_name.lower():
+                continue
+
+            for entry in section.get("data", []):
+                # Component filter
+                if component_lower:
+                    if not _component_matches(entry.get("component"), component_lower):
+                        continue
+
+                # Name query
+                if query_lower and query_lower not in entry.get("name", "").lower():
+                    continue
+
+                results.append({
+                    **entry,
+                    "_db_key":  db_key,
+                    "_sheet":   sheet_name,
+                    "_country": meta.get("country", ""),
+                    "_region":  meta.get("region", ""),
+                })
+
+                if len(results) >= limit:
+                    return results
+
+    return results
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 #  CLI  - python material_catalog.py
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -440,22 +605,22 @@ if __name__ == "__main__":
           f"( OK: {meta.get('ok')}  FAILED: {meta.get('failed')} )")
 
     print("\n" + "─" * 64)
-    print(f"  {'DB KEY':<20} {'REGION':<20} {'STATUS':<8} {'RECORDS'}")
+    print(f"  {'DB KEY':<30} {'REGION':<16} {'STATUS':<8} {'RECORDS':<8} COMPONENTS")
     print("─" * 64)
 
     for key, entry in manifest.items():
         if key == "_meta":
             continue
         status_icon = "✓" if entry["status"] == "OK" else "✗"
-        print(f"  {key:<20} "
-              f"{entry.get('region','?'):<20} "
+        comp_preview = ", ".join(entry.get("components", [])[:4])
+        if len(entry.get("components", [])) > 4:
+            comp_preview += ", …"
+        print(f"  {key:<30} "
+              f"{entry.get('region','?'):<16} "
               f"{status_icon} {entry['status']:<6} "
-              f"{entry['record_count']}")
-        if entry["errors"]:
-            for e in entry["errors"]:
-                print(f"      ✗ {e}")
-        if entry["warnings"]:
-            for w in entry["warnings"]:
-                print(f"      ⚠ {w}")
-
-
+              f"{entry['record_count']:<8} "
+              f"{comp_preview}")
+        for e in entry.get("errors", []):
+            print(f"      ✗ {e}")
+        for w in entry.get("warnings", []):
+            print(f"      ⚠ {w}")

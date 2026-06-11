@@ -47,7 +47,7 @@ from ...utils.form_builder.form_builder import _PLACEHOLDER
 from ...utils.unit_resolver import get_unit_info as _get_unit_info_impl
 from ...utils.doc_link import doc_inline, doc_label
 from ..registry.material_catalog import list_databases
-from ..registry.search_engine import MaterialSearchEngine, AdvancedSearchEngine
+from ..registry.search_engine import MaterialSearchEngine, AdvancedSearchEngine, _component_matches
 
 import os
 import uuid as _uuid_mod
@@ -447,7 +447,8 @@ def _list_sor_options(country: str = None) -> list[dict]:
     return result
 
 
-def _list_sor_types(db_keys: list = None) -> list[str]:
+def _list_sor_sheet_components(db_keys: list = None) -> list[tuple[str, str]]:
+    """Return sorted [(component, sheetName), ...] pairs from loaded databases."""
     try:
         available = [
             e["db_key"]
@@ -457,13 +458,7 @@ def _list_sor_types(db_keys: list = None) -> list[str]:
         if not available:
             return []
         engine = MaterialSearchEngine(db_keys=db_keys)
-        return sorted(
-            {
-                item.get("type", "").strip()
-                for item in engine._iter_items()
-                if item.get("type", "").strip()
-            }
-        )
+        return engine.list_sheet_components()
     except Exception:
         return []
 
@@ -580,7 +575,7 @@ def convert_sor_item_to_material(dict_b: dict) -> dict:
     }
 
 
-def _load_material_suggestions(db_keys: list = None, comp_name: str = None) -> dict:
+def _load_material_suggestions(db_keys: list = None, comp_name: str = None, sheet_name: str = None) -> dict:
     if db_keys is not None:
         regular_keys = [k for k in db_keys if not k.startswith("custom::")]
         custom_names = [
@@ -614,17 +609,15 @@ def _load_material_suggestions(db_keys: list = None, comp_name: str = None) -> d
             engine = MaterialSearchEngine(db_keys=regular_keys)
 
             if comp_lower:
-                for item in engine._iter_items():
+                for item in engine._iter_items(category=sheet_name, component=comp_lower):
                     if not _validate_item(item):
                         print(
                             f"[MaterialDialog] Skipping item with missing schema keys: {item.get('name', '<unnamed>')}"
                         )
                         continue
-                    t = item.get("type", "").lower()
-                    if t == comp_lower or comp_lower in t or t in comp_lower:
-                        name = item.get("name", "").strip()
-                        if name:
-                            result[name] = item
+                    name = item.get("name", "").strip()
+                    if name:
+                        result[name] = item
                 if not result:
                     for item in engine._iter_items():
                         if not _validate_item(item):
@@ -633,7 +626,7 @@ def _load_material_suggestions(db_keys: list = None, comp_name: str = None) -> d
                         if name:
                             result[name] = item
             else:
-                for item in engine._iter_items():
+                for item in engine._iter_items(category=sheet_name):
                     if not _validate_item(item):
                         print(
                             f"[MaterialDialog] Skipping item with missing schema keys: {item.get('name', '<unnamed>')}"
@@ -660,8 +653,7 @@ def _load_material_suggestions(db_keys: list = None, comp_name: str = None) -> d
                     if not name:
                         continue
                     if comp_lower:
-                        t = item.get("type", "").lower()
-                        if not (t == comp_lower or comp_lower in t or t in comp_lower):
+                        if not _component_matches(item.get("component"), comp_lower):
                             continue
                     result[name] = item
         except Exception as e:
@@ -1343,13 +1335,19 @@ class MaterialDialog(QDialog):
 
         db_keys = [self._sor_db_key]
 
+        comp_filter  = None
+        sheet_filter = None
         if self.type_filter_cb is not None:
-            type_filter = self.type_filter_cb.currentData()
+            filter_data = self.type_filter_cb.currentData()
+            if isinstance(filter_data, dict):
+                comp_filter  = filter_data.get("component")
+                sheet_filter = filter_data.get("sheet")
+            # None means "All components" — no filter
         else:
-            type_filter = self._comp_name
+            comp_filter = self._comp_name
 
         self._suggestions = _load_material_suggestions(
-            db_keys=db_keys, comp_name=type_filter
+            db_keys=db_keys, comp_name=comp_filter, sheet_name=sheet_filter
         )
 
         if self._suggestions:
@@ -1476,33 +1474,22 @@ class MaterialDialog(QDialog):
         if self._sor_db_key and self._sor_db_key != self._NO_SUGGESTIONS_CODE:
             db_keys = [self._sor_db_key]
 
-        types = _list_sor_types(db_keys=db_keys)
+        pairs = _list_sor_sheet_components(db_keys=db_keys)
 
         self.type_filter_cb.blockSignals(True)
         self.type_filter_cb.clear()
-        self.type_filter_cb.addItem("All types", None)
-        for t in types:
-            self.type_filter_cb.addItem(t, t)
+        self.type_filter_cb.addItem("All components", None)
+        for comp, sheet in pairs:
+            self.type_filter_cb.addItem(f"{comp}  |  {sheet}", {"component": comp, "sheet": sheet})
 
         best_idx = 0
         if preselect:
             pre_lower = preselect.strip().lower()
-            best_score = -1
             for i in range(1, self.type_filter_cb.count()):
-                t = (self.type_filter_cb.itemData(i) or "").lower()
-                if t == pre_lower:
+                d = self.type_filter_cb.itemData(i) or {}
+                if d.get("component", "").lower() == pre_lower:
                     best_idx = i
-                    break  # exact match - nothing better
-                elif pre_lower in t:
-                    score = 2 + len(t)  # comp fits into type; prefer shorter
-                    if score > best_score:
-                        best_score = score
-                        best_idx = i
-                elif t in pre_lower:
-                    score = 1 + len(t)  # type fits into comp; prefer longer
-                    if score > best_score:
-                        best_score = score
-                        best_idx = i
+                    break
 
         self.type_filter_cb.setCurrentIndex(best_idx)
         self.type_filter_cb.blockSignals(False)
@@ -1515,8 +1502,12 @@ class MaterialDialog(QDialog):
             return
         if self.type_filter_cb is not None:
             self.type_filter_cb.setEnabled(True)
-            current_type = self.type_filter_cb.currentData()
-            self._populate_type_filter(preselect=current_type or self._comp_name)
+            current_data = self.type_filter_cb.currentData()
+            if isinstance(current_data, dict):
+                preselect_str = current_data.get("component") or self._comp_name
+            else:
+                preselect_str = self._comp_name
+            self._populate_type_filter(preselect=preselect_str)
         self._restore_suggestions()
 
     def _on_type_filter_changed(self):

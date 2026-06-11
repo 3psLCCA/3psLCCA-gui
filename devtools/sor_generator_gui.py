@@ -60,6 +60,7 @@ _ORANGE   = "#fab387"
 _RED      = "#f38ba8"
 _BLUE     = "#89b4fa"
 _MAUVE    = "#cba6f7"
+_TEAL     = "#94e2d5"
 _BORDER   = "#333"
 
 _BTN_STYLE = (
@@ -309,8 +310,10 @@ class SorGeneratorDialog(QDialog):
         root.addWidget(title)
 
         desc = QLabel(
-            "Converts a CID#-formatted SOR Excel file into the MumbaiSOR.json schema.\n"
-            "Sheet names are mapped automatically; type comes from the CID#Component column.\n"
+            "Converts a CID#/CAT#-formatted SOR Excel file into the MumbaiSOR.json schema.\n"
+            "CAT# sheet prefixes and hyphens are normalised automatically (e.g. CAT#Sub-Structure → Sub Structure).\n"
+            "Multi-component syntax supported: {Pier}, {Pier Cap} stores an array on the entry.\n"
+            "CID#Description column is optional — included when present. "
             "After writing, an integrity check runs and the registry can be rebuilt."
         )
         desc.setWordWrap(True)
@@ -379,11 +382,12 @@ class SorGeneratorDialog(QDialog):
         # ── Preview table ─────────────────────────────────────────────────────
         root.addWidget(self._row_label("Sections preview"))
 
-        self._table = QTableWidget(0, 3)
-        self._table.setHorizontalHeaderLabels(["Sheet", "Type / Component", "Entries"])
+        self._table = QTableWidget(0, 4)
+        self._table.setHorizontalHeaderLabels(["Sheet", "Components found", "Entries", "w/ Desc"])
         self._table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
         self._table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         self._table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        self._table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeToContents)
         self._table.verticalHeader().setVisible(False)
         self._table.setEditTriggers(QTableWidget.NoEditTriggers)
         self._table.setSelectionBehavior(QTableWidget.SelectRows)
@@ -605,7 +609,7 @@ class SorGeneratorDialog(QDialog):
             line = line.strip()
             if not line:
                 continue
-            if "[warn]" in line.lower() or "warn" in line.lower():
+            if "[warn]" in line.lower():
                 self._log_line(line, color=_YELLOW)
             elif "[skip]" in line.lower():
                 self._log_line(line, color=_ORANGE)
@@ -615,18 +619,22 @@ class SorGeneratorDialog(QDialog):
                 self._log_line(line)
 
         if not sor:
-            self._log_line("No sections generated - check the file has CID# headers.", color=_RED)
+            self._log_line("No sections generated - check the file has CID# or CAT# headers.", color=_RED)
             return
 
         self._sor = sor
         self._populate_table(sor)
 
         total_entries = sum(len(s["data"]) for s in sor)
+        total_with_desc = sum(
+            1 for s in sor for e in s["data"] if e.get("description") is not None
+        )
+        desc_note = f"  |  {total_with_desc} w/ description" if total_with_desc else ""
         self._stats_lbl.setText(
-            f"{len(sor)} section(s)  |  {total_entries} entries total"
+            f"{len(sor)} sheet(s)  |  {total_entries} entries total{desc_note}"
         )
         self._generate_btn.setEnabled(bool(self._output_edit.text().strip()))
-        self._log_line(f"Done - {len(sor)} sections, {total_entries} entries.", color=_GREEN)
+        self._log_line(f"Done - {len(sor)} sheet(s), {total_entries} entries.", color=_GREEN)
 
     def _on_parse_error(self, msg: str):
         self._parse_btn.setText("Parse Excel")
@@ -650,14 +658,31 @@ class SorGeneratorDialog(QDialog):
             self._table.insertRow(row)
 
             sheet_name = section["sheetName"]
-            type_name  = section["type"]
-            count      = len(section["data"])
+            data       = section["data"]
+            count      = len(data)
+            desc_count = sum(1 for e in data if e.get("description") is not None)
             bg_hex     = sheet_colors.get(sheet_name, _BG2)
 
+            # Collect unique component values preserving first-seen order
+            seen: dict[str, None] = {}
+            for e in data:
+                comp = e.get("component", "Uncategorised")
+                if isinstance(comp, list):
+                    for c in comp:
+                        seen[c] = None
+                else:
+                    seen[comp] = None
+            components_str = ", ".join(seen.keys())
+            has_multi = any(isinstance(e.get("component"), list) for e in data)
+
+            desc_text  = str(desc_count) if desc_count else "-"
+            desc_color = _TEAL if desc_count else _DIM
+
             for col, (text, fg) in enumerate([
-                (sheet_name, _TEXT),
-                (type_name,  _TEXT),
-                (str(count), _BLUE if count > 0 else _DIM),
+                (sheet_name,     _TEXT),
+                (components_str, _MAUVE if has_multi else _TEXT),
+                (str(count),     _BLUE if count > 0 else _DIM),
+                (desc_text,      desc_color),
             ]):
                 item = self._cell(text, fg)
                 item.setBackground(QColor(bg_hex))
