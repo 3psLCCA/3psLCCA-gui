@@ -227,7 +227,7 @@ RICKE_FIELDS: list[FieldDef | Section] = [
         "USD Conversion Rate",
         "Conversion rate for international scientific model outputs (base is USD 2015).",
         "float",
-        options=(1e-6, 1e6, DECIMAL_PLACES),
+        options=(1e-6, 1e6, 4),
         unit="(Currency/USD)",
         warn=(
             0.0001,

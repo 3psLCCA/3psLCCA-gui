@@ -209,6 +209,19 @@ class TrashTabWidget(QWidget):
 
                 self.controller.save_chunk_data(chunk_id, data)
 
+                # When restoring, clear is_deleted from the component registry
+                if not should_trash:
+                    try:
+                        registry = self.controller.engine.fetch_chunk("str_component_registry") or {}
+                        comp_meta = registry.get(chunk_id, {}).get(comp_name, {})
+                        if comp_meta.get("is_deleted", False):
+                            comp_meta["is_deleted"] = False
+                            self.controller.engine.stage_update(
+                                chunk_name="str_component_registry", data=registry
+                            )
+                    except Exception:
+                        pass
+
                 table = self._trash_tables.get((chunk_id, comp_name))
                 item_data = data[comp_name][data_index]
 

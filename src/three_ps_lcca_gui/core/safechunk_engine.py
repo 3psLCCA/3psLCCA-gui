@@ -408,6 +408,9 @@ class SafeChunkEngine:
             # ── Claim lock ────────────────────────────────────────────────────
             self._write_lock_file()
 
+            # ── Cache close_count for first-run detection ─────────────────────
+            self.close_count = existing_version.get("close_count", 0)
+
             # ── Mark session unclean immediately ──────────────────────────────
             # If we crash before detach(), clean_close stays False on disk
             self._write_version(existing_version, clean_close=False)
@@ -595,6 +598,8 @@ class SafeChunkEngine:
             "clean_close": clean_close,
             "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
         }
+        if clean_close:
+            data["close_count"] = base.get("close_count", 0) + 1
         try:
             self._write_admin(self.version_path, data)
         except Exception as e:

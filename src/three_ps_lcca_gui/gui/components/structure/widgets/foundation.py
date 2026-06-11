@@ -8,7 +8,6 @@ class FoundationWidget(StructureManagerWidget):
             self,
             controller=controller,
             chunk_name="str_foundation",
-            default_components=["Excavation", "Pile", "Pile Cap"],
         )
 
 

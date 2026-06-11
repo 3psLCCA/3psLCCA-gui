@@ -769,12 +769,14 @@ class MaterialDialog(QDialog):
         recyclability_only: bool = False,
         country: str = None,
         sor_db_key: str = None,
+        search_cat: dict = None,
     ):
         super().__init__(parent)
         self.is_edit = data is not None
         self.emissions_only = emissions_only
         self.recyclability_only = recyclability_only
         self._comp_name = comp_name
+        self._search_cat = search_cat  # {"component": ..., "sheet": ...} or None
         self._sor_item = None
         self._sor_filled_name = None  # name that triggered the last autofill
         self._sor_filling = False
@@ -868,7 +870,7 @@ class MaterialDialog(QDialog):
             self.type_filter_cb.wheelEvent = lambda event: event.ignore()
             sub_row.addWidget(self.type_filter_cb, stretch=1)
             root.addLayout(sub_row)
-            self._populate_type_filter(preselect=comp_name)
+            self._populate_type_filter(search_cat=self._search_cat or {"component": comp_name})
             self.type_filter_cb.currentIndexChanged.connect(
                 self._on_type_filter_changed
             )
@@ -1469,7 +1471,15 @@ class MaterialDialog(QDialog):
         self.carbon_chk.setEnabled(True)
         self._update_cf()
 
-    def _populate_type_filter(self, preselect: str = None):
+    def _populate_type_filter(self, search_cat: dict = None, preselect_str: str = None):
+        """
+        Populate the type filter combo.
+
+        search_cat  — {"component": ..., "sheet": ...} from the component registry.
+                      Exact match on both fields first; falls back to component-only
+                      match; falls back to index 0 (All components) if nothing found.
+        preselect_str — plain component name string used when switching databases.
+        """
         db_keys = None
         if self._sor_db_key and self._sor_db_key != self._NO_SUGGESTIONS_CODE:
             db_keys = [self._sor_db_key]
@@ -1482,14 +1492,31 @@ class MaterialDialog(QDialog):
         for comp, sheet in pairs:
             self.type_filter_cb.addItem(f"{comp}  |  {sheet}", {"component": comp, "sheet": sheet})
 
-        best_idx = 0
-        if preselect:
-            pre_lower = preselect.strip().lower()
+        # Determine what to look for
+        want_comp  = None
+        want_sheet = None
+        if search_cat and isinstance(search_cat, dict):
+            want_comp  = (search_cat.get("component") or "").strip().lower()
+            want_sheet = (search_cat.get("sheet")     or "").strip().lower()
+        elif preselect_str:
+            want_comp = preselect_str.strip().lower()
+
+        best_idx        = 0
+        comp_only_match = 0
+
+        if want_comp:
             for i in range(1, self.type_filter_cb.count()):
                 d = self.type_filter_cb.itemData(i) or {}
-                if d.get("component", "").lower() == pre_lower:
-                    best_idx = i
-                    break
+                c = d.get("component", "").lower()
+                s = d.get("sheet",     "").lower()
+                if c == want_comp:
+                    if want_sheet and s == want_sheet:
+                        best_idx = i
+                        break           # exact match — nothing better
+                    elif not comp_only_match:
+                        comp_only_match = i  # remember first comp-only hit
+            if best_idx == 0:
+                best_idx = comp_only_match  # use comp-only if no exact; 0 = All components
 
         self.type_filter_cb.setCurrentIndex(best_idx)
         self.type_filter_cb.blockSignals(False)
@@ -1507,7 +1534,7 @@ class MaterialDialog(QDialog):
                 preselect_str = current_data.get("component") or self._comp_name
             else:
                 preselect_str = self._comp_name
-            self._populate_type_filter(preselect=preselect_str)
+            self._populate_type_filter(preselect_str=preselect_str)
         self._restore_suggestions()
 
     def _on_type_filter_changed(self):

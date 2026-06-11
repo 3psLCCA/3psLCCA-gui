@@ -23,6 +23,7 @@ _CHUNKS_TO_WARM = [
     "str_sub_structure",
     "str_super_structure",
     "str_misc",
+    "str_component_registry",
     "transport_data",
     "machinery_emissions_data",
     "social_cost_data",
@@ -100,6 +101,8 @@ class ProjectManager:
                         new_id, is_new=True, display_name=display_name
                     )
                     if success:
+                        import copy
+                        from three_ps_lcca_gui.gui.components.structure.widgets.defaults import STRUCTURE_DEFAULTS
                         engine = target.controller.engine
                         engine.stage_update(
                             {
@@ -111,6 +114,7 @@ class ProjectManager:
                             "general_info",
                         )
                         engine.stage_update({"project_country": country}, "bridge_data")
+                        engine.stage_update(copy.deepcopy(STRUCTURE_DEFAULTS), "str_component_registry")
                         # Force flush so chunks exist before widgets load
                         engine.force_sync()
                         target.project_id = target.controller.active_project_id

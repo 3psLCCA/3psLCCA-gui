@@ -33,17 +33,19 @@ from ...utils.common_requested_data import get_chunk
 
 class StructureManagerWidget(QWidget):
     total_changed = Signal()  # emitted whenever the computed total changes
-    def __init__(self, controller, chunk_name, default_components):
+    def __init__(self, controller, chunk_name):
         super().__init__()
         self.controller = controller
         self.chunk_name = chunk_name
-        self.default_components = default_components
         self.sections = {}
         self.data = {}
+        self._page_registry: dict = {}
 
         self._frozen = False
         self._add_material_btns = []
         self._del_comp_btns = []
+        self._del_comp_btn_map: dict = {}
+        self._section_search_cats: dict = {}
 
         self.main_layout = QVBoxLayout(self)
 
@@ -78,27 +80,71 @@ class StructureManagerWidget(QWidget):
         btn_layout.addStretch()
         self.main_layout.addLayout(btn_layout)
 
+    def _get_registry(self) -> dict:
+        return self.controller.engine.fetch_chunk("str_component_registry") or {}
+
+    def _save_registry(self, registry: dict):
+        self.controller.engine.stage_update(
+            chunk_name="str_component_registry", data=registry
+        )
+
+    def _ensure_page_registry(self, registry: dict) -> dict:
+        """Return page registry, seeding from STRUCTURE_DEFAULTS if absent (migration)."""
+        if self.chunk_name in registry:
+            return registry[self.chunk_name]
+
+        from .defaults import STRUCTURE_DEFAULTS, PAGE_DEFAULT_SHEET
+        import copy
+        page_defaults = STRUCTURE_DEFAULTS.get(self.chunk_name, {})
+        default_sheet = PAGE_DEFAULT_SHEET.get(self.chunk_name, "Miscellaneous")
+        data = self.controller.engine.fetch_chunk(self.chunk_name) or {}
+
+        page_reg: dict = {}
+        # Absorb existing chunk components first (preserves user data)
+        for comp in data:
+            if isinstance(data[comp], list):
+                sc = page_defaults.get(comp, {}).get(
+                    "search_cat", {"component": comp, "sheet": default_sheet}
+                )
+                page_reg[comp] = {"search_cat": sc, "is_deleted": False}
+        # Add any defaults not already in chunk
+        for comp, meta in page_defaults.items():
+            if comp not in page_reg:
+                page_reg[comp] = copy.deepcopy(meta)
+
+        registry[self.chunk_name] = page_reg
+        self._save_registry(registry)
+        return page_reg
+
     def on_refresh(self):
         try:
             if not self.controller or not getattr(self.controller, "engine", None):
                 return
 
+            registry = self._get_registry()
+            self._page_registry = self._ensure_page_registry(registry)
             data = self.controller.engine.fetch_chunk(self.chunk_name) or {}
 
-            if not data and self.default_components:
-                for comp in self.default_components:
-                    data[comp] = []
-                self.controller.engine.stage_update(
-                    chunk_name=self.chunk_name, data=data
-                )
-                self.controller.chunk_updated.emit(self.chunk_name)
+            # Auto-heal: if a component has active materials but is still marked
+            # is_deleted (e.g. restored from trash outside the normal path), clear it.
+            healed = False
+            for comp_name, meta in self._page_registry.items():
+                if meta.get("is_deleted", False):
+                    active = [
+                        i for i in data.get(comp_name, [])
+                        if not i.get("state", {}).get("in_trash", False)
+                    ]
+                    if active:
+                        meta["is_deleted"] = False
+                        healed = True
+            if healed:
+                self._save_registry(registry)
 
             info = self.controller.engine.fetch_chunk("general_info") or {}
             self._currency = str(info.get("project_currency", ""))
             self.data = data
             self.refresh_ui()
         except Exception as e:
-
             print(f"[ERROR] on_refresh crashed: {e}")
             traceback.print_exc()
 
@@ -112,10 +158,17 @@ class StructureManagerWidget(QWidget):
         self.sections = {}
         self._add_material_btns = []
         self._del_comp_btns = []
+        self._del_comp_btn_map = {}
+        self._section_search_cats = {}
         currency = getattr(self, "_currency", "")
 
-        for comp_name, items in self.data.items():
-            self.create_section(comp_name)
+        for comp_name, meta in self._page_registry.items():
+            if meta.get("is_deleted", False):
+                continue  # explicitly deleted by user via "Delete Component"
+            items = self.data.get(comp_name, [])
+            active = [i for i in items if not i.get("state", {}).get("in_trash", False)]
+            search_cat = meta.get("search_cat")
+            self.create_section(comp_name, has_items=bool(active), search_cat=search_cat)
             table = self.sections.get(comp_name)
             if table:
                 table.set_currency(currency)
@@ -155,8 +208,10 @@ class StructureManagerWidget(QWidget):
         self.count_lbl.hide()
         self.total_changed.emit()
 
-    def create_section(self, name):
-        group = QGroupBox(name)
+    def create_section(self, name, has_items=False, search_cat=None):
+        self._section_search_cats[name] = search_cat
+
+        group = QGroupBox(name.replace("&", "&&"))
         g_layout = QVBoxLayout(group)
 
         table = StructureTableWidget(self, name)
@@ -169,14 +224,21 @@ class StructureManagerWidget(QWidget):
         freeze_widgets(self._frozen, add_row_btn)
         self._add_material_btns.append(add_row_btn)
 
-        del_btn = QPushButton("Delete Component")
+        rename_btn = QPushButton("Rename")
+        rename_btn.clicked.connect(lambda checked=False, n=name: self.rename_component(n))
+        freeze_widgets(self._frozen, rename_btn)
+
+        del_label = "Clear All" if has_items else "Delete Component"
+        del_btn = QPushButton(del_label)
         del_btn.setObjectName("deleteButton")
         del_btn.setStyleSheet(btn_danger())
         del_btn.clicked.connect(lambda checked=False, n=name: self.delete_component(n))
         freeze_widgets(self._frozen, del_btn)
         self._del_comp_btns.append(del_btn)
+        self._del_comp_btn_map[name] = del_btn
 
         btn_bar.addWidget(add_row_btn, 1)
+        btn_bar.addWidget(rename_btn)
         btn_bar.addWidget(del_btn)
 
         g_layout.addWidget(table)
@@ -227,10 +289,24 @@ class StructureManagerWidget(QWidget):
 
         original_index = len(current_data[comp_name]) - 1
         self.data = current_data
+        # Also ensure the component exists in page registry
+        if comp_name not in self._page_registry:
+            registry = self._get_registry()
+            from .defaults import PAGE_DEFAULT_SHEET
+            default_sheet = PAGE_DEFAULT_SHEET.get(self.chunk_name, "Miscellaneous")
+            registry.setdefault(self.chunk_name, {})[comp_name] = {
+                "search_cat": {"component": comp_name, "sheet": default_sheet},
+                "is_deleted": False,
+            }
+            self._page_registry = registry[self.chunk_name]
+            self._save_registry(registry)
         table = getattr(self, "sections", {}).get(comp_name)
         if table:
             table.insert_row_at_position(new_entry, original_index)
             self._update_summary()
+            btn = self._del_comp_btn_map.get(comp_name)
+            if btn:
+                btn.setText("Clear All")
         else:
             self.on_refresh()
 
@@ -266,6 +342,7 @@ class StructureManagerWidget(QWidget):
             self,
             country=self._get_project_country(),
             sor_db_key=self._get_project_sor_db(),
+            search_cat=self._section_search_cats.get(comp_name),
         )
 
         def _on_material_added(values):
@@ -452,6 +529,14 @@ class StructureManagerWidget(QWidget):
         self.data = data
 
         self.controller.engine.stage_update(chunk_name=self.chunk_name, data=data)
+        # If restoring a material whose component was deleted, un-delete the component
+        if not should_trash:
+            registry = self._get_registry()
+            comp_meta = registry.get(self.chunk_name, {}).get(comp_name, {})
+            if comp_meta.get("is_deleted", False):
+                comp_meta["is_deleted"] = False
+                self._page_registry = registry[self.chunk_name]
+                self._save_registry(registry)
         self.controller.chunk_updated.emit(self.chunk_name)
         self.save_current_state()
 
@@ -460,9 +545,25 @@ class StructureManagerWidget(QWidget):
 
         def _do_refresh():
             table = self.sections.get(comp_name)
-            if table:
-                table.remove_row_by_index(data_index)
-            self._update_summary()
+            if should_trash:
+                if table:
+                    table.remove_row_by_index(data_index)
+                self._update_summary()
+            else:
+                if table:
+                    # Section already visible — insert the restored row
+                    currency = getattr(self, "_currency", "")
+                    table.set_currency(currency)
+                    table.add_row(item, data_index)
+                    table.update_height()
+                    self._update_summary()
+                    btn = self._del_comp_btn_map.get(comp_name)
+                    if btn:
+                        btn.setText("Clear All")
+                else:
+                    # Section was hidden (all items were trashed) — rebuild
+                    self.on_refresh()
+                    return
             main_view = self.window().findChild(QWidget, "StructureTabView")
             if main_view:
                 main_view.update_trash_count()
@@ -478,20 +579,71 @@ class StructureManagerWidget(QWidget):
         name = dialog.textValue()
         if ok and name.strip():
             clean_name = name.strip()
-            current_data = self.controller.engine.fetch_chunk(self.chunk_name) or {}
-            if any(k.lower() == clean_name.lower() for k in current_data):
+            active_comps = {
+                k.lower() for k, v in self._page_registry.items()
+                if not v.get("is_deleted", False)
+            }
+            if clean_name.lower() in active_comps:
                 QMessageBox.warning(
-                    self,
-                    "Duplicate Component",
+                    self, "Duplicate Component",
                     f'A component named "{clean_name}" already exists.',
                 )
                 return
+            from .defaults import PAGE_DEFAULT_SHEET
+            default_sheet = PAGE_DEFAULT_SHEET.get(self.chunk_name, "Miscellaneous")
+            # Update registry
+            registry = self._get_registry()
+            registry.setdefault(self.chunk_name, {})[clean_name] = {
+                "search_cat": {"component": clean_name, "sheet": default_sheet},
+                "is_deleted": False,
+            }
+            self._page_registry = registry[self.chunk_name]
+            self._save_registry(registry)
+            # Update chunk
+            current_data = self.controller.engine.fetch_chunk(self.chunk_name) or {}
             current_data[clean_name] = []
-            self.controller.engine.stage_update(
-                chunk_name=self.chunk_name, data=current_data
-            )
-            self.create_section(clean_name)
+            self.controller.engine.stage_update(chunk_name=self.chunk_name, data=current_data)
+            sc = registry[self.chunk_name][clean_name]["search_cat"]
+            self.create_section(clean_name, has_items=False, search_cat=sc)
             self.save_current_state()
+
+    def rename_component(self, old_name):
+        dialog = QInputDialog(self)
+        dialog.setWindowTitle("Rename Component")
+        dialog.setLabelText("New name:")
+        dialog.setTextValue(old_name)
+        dialog.setOkButtonText("Rename")
+        if not dialog.exec():
+            return
+        new_name = dialog.textValue().strip()
+        if not new_name or new_name == old_name:
+            return
+        active_comps = {
+            k.lower() for k, v in self._page_registry.items()
+            if k != old_name and not v.get("is_deleted", False)
+        }
+        if new_name.lower() in active_comps:
+            QMessageBox.warning(
+                self, "Duplicate Component",
+                f'A component named "{new_name}" already exists.',
+            )
+            return
+        # Update chunk: rename key, preserve items
+        current_data = self.controller.engine.fetch_chunk(self.chunk_name) or {}
+        current_data[new_name] = current_data.pop(old_name, [])
+        self.controller.engine.stage_update(chunk_name=self.chunk_name, data=current_data)
+        # Update registry: rename key, update search_cat component name
+        registry = self._get_registry()
+        page_reg = registry.setdefault(self.chunk_name, {})
+        meta = page_reg.pop(old_name, {"search_cat": {}, "is_deleted": False})
+        if isinstance(meta.get("search_cat"), dict):
+            meta["search_cat"]["component"] = new_name
+        page_reg[new_name] = meta
+        self._page_registry = page_reg
+        self._save_registry(registry)
+        self.controller.chunk_updated.emit(self.chunk_name)
+        self.save_current_state()
+        self.on_refresh()
 
     def delete_component(self, name):
         current_data = self.controller.engine.fetch_chunk(self.chunk_name) or {}
@@ -500,25 +652,37 @@ class StructureManagerWidget(QWidget):
             1 for i in items if not i.get("state", {}).get("in_trash", False)
         )
 
-        msg = f'Delete component "{name}"?'
         if active_count:
-            msg += f"\n\n{active_count} material(s) will be moved to trash."
-
-        box = _make_msgbox(self, QMessageBox.Warning, "Delete Component", msg)
-        if box.exec() != QMessageBox.Yes:
-            return
-
-        for item in items:
-            item.setdefault("state", {})["in_trash"] = True
-        self.controller.engine.stage_update(chunk_name=self.chunk_name, data=current_data)
-        self.controller.chunk_updated.emit(self.chunk_name)
-        self.save_current_state()
-        self.data = current_data
-        self.refresh_ui()
-
-        main_view = self.window().findChild(QWidget, "StructureTabView")
-        if main_view:
-            main_view.update_trash_count()
+            # "Clear All" — move materials to trash, component stays (is_deleted=False)
+            msg = f'Move all {active_count} item(s) in "{name}" to trash?'
+            box = _make_msgbox(self, QMessageBox.Warning, "Clear All", msg)
+            if box.exec() != QMessageBox.Yes:
+                return
+            for item in items:
+                item.setdefault("state", {})["in_trash"] = True
+            self.controller.engine.stage_update(chunk_name=self.chunk_name, data=current_data)
+            # is_deleted stays False — section remains visible with empty table
+            self.controller.chunk_updated.emit(self.chunk_name)
+            self.save_current_state()
+            self.data = current_data
+            self.refresh_ui()
+            main_view = self.window().findChild(QWidget, "StructureTabView")
+            if main_view:
+                main_view.update_trash_count()
+        else:
+            # "Delete Component" — no active items, mark deleted and hide section
+            msg = f'Delete component "{name}"?\n\nIt will be hidden but can be recovered by restoring its materials from the trash.'
+            box = _make_msgbox(self, QMessageBox.Warning, "Delete Component", msg)
+            if box.exec() != QMessageBox.Yes:
+                return
+            registry = self._get_registry()
+            registry.setdefault(self.chunk_name, {}).setdefault(name, {})["is_deleted"] = True
+            self._page_registry = registry[self.chunk_name]
+            self._save_registry(registry)
+            self.controller.chunk_updated.emit(self.chunk_name)
+            self.save_current_state()
+            self.data = current_data
+            self.refresh_ui()
 
     def freeze(self, frozen: bool = True):
         self._frozen = frozen
