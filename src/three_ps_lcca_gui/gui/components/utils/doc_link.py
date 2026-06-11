@@ -21,11 +21,13 @@ Usage
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
+import re
+
+from PySide6.QtCore import Qt, Slot
 from PySide6.QtWidgets import QLabel
 
 from .doc_handler import open_doc
-from three_ps_lcca_gui.gui.themes import get_token
+from three_ps_lcca_gui.gui.themes import get_token, theme_manager
 
 
 def doc_inline(slug_parts: list[str], text: str = "ⓘ") -> str:
@@ -52,6 +54,28 @@ def doc_inline(slug_parts: list[str], text: str = "ⓘ") -> str:
     )
 
 
+class _DocLabel(QLabel):
+    """QLabel that re-renders its doc-link HTML whenever the theme changes."""
+
+    def __init__(self, html: str, word_wrap: bool = True):
+        super().__init__()
+        self._html = html
+        self.setTextFormat(Qt.RichText)
+        self.setWordWrap(word_wrap)
+        self.setOpenExternalLinks(False)
+        self.linkActivated.connect(lambda href: open_doc(href.split("/"), self.window()))
+        theme_manager().theme_changed.connect(self._refresh)
+        self._refresh()
+
+    @Slot()
+    def _refresh(self):
+        self.setText(re.sub(
+            r'(<a [^>]*style="[^"]*color:)[^;]*(;)',
+            lambda m: m.group(1) + get_token("primary") + m.group(2),
+            f'<p style="margin:0;padding:0;">{self._html}</p>',
+        ))
+
+
 def doc_label(html: str, word_wrap: bool = True) -> QLabel:
     """
     Create a QLabel with rich text and all doc links pre-wired to open_doc.
@@ -68,9 +92,4 @@ def doc_label(html: str, word_wrap: bool = True) -> QLabel:
     QLabel
         Ready to add to any layout.
     """
-    label = QLabel(f'<p style="margin:0;padding:0;">{html}</p>')
-    label.setTextFormat(Qt.RichText)
-    label.setWordWrap(word_wrap)
-    label.setOpenExternalLinks(False)
-    label.linkActivated.connect(lambda href: open_doc(href.split("/"), label.window()))
-    return label
+    return _DocLabel(html, word_wrap)
