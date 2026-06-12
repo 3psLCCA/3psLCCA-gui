@@ -24,6 +24,10 @@ from PySide6.QtGui import QFont
 from PySide6.QtCore import Qt, QSize, QThread, QTimer, Signal
 
 from three_ps_lcca_gui.gui.themes import get_token, theme_manager
+try:
+    from three_ps_lcca_gui.gui._CONFIG import COMPARISON_MODE
+except ImportError:
+    COMPARISON_MODE = True
 from three_ps_lcca_gui.gui.styles import font as _f, btn_primary, btn_ghost
 from three_ps_lcca_gui.gui.theme import (
     SP1,
@@ -1164,13 +1168,14 @@ class OutputsPage(ScrollableForm):
         # prov_btn.clicked.connect(self._generate_provenance_report)
         # tl_h.addWidget(prov_btn)
 
-        comp_btn = QPushButton("Add to Comparison ↗")
-        comp_btn.setFixedHeight(BTN_MD)
-        comp_btn.setFont(_f(FS_BASE, FW_MEDIUM))
-        comp_btn.setStyleSheet(btn_ghost())
-        comp_btn.setToolTip("Close project and add to the comparison workspace")
-        comp_btn.clicked.connect(self._on_compare_clicked)
-        tl_h.addWidget(comp_btn)
+        if COMPARISON_MODE:
+            comp_btn = QPushButton("Add to Comparison ↗")
+            comp_btn.setFixedHeight(BTN_MD)
+            comp_btn.setFont(_f(FS_BASE, FW_MEDIUM))
+            comp_btn.setStyleSheet(btn_ghost())
+            comp_btn.setToolTip("Close project and add to the comparison workspace")
+            comp_btn.clicked.connect(self._on_compare_clicked)
+            tl_h.addWidget(comp_btn)
 
         tl_h.addStretch()
         self._status_layout.addWidget(toolbar_row)
@@ -1305,7 +1310,7 @@ class OutputsPage(ScrollableForm):
         self._last_all_data = all_data
         self._last_lcc_breakdown = lcc_breakdown
         
-        if getattr(self, "_save_cache_on_finish", True):
+        if COMPARISON_MODE and getattr(self, "_save_cache_on_finish", True):
             self._write_comparison_cache(results, all_data, lcc_breakdown)
             
         self._show_calculation_success(results)
@@ -1321,7 +1326,8 @@ class OutputsPage(ScrollableForm):
         self._has_results = False
         self._show_idle()
         self._save_state("idle", {})
-        self._destroy_comparison_cache()
+        if COMPARISON_MODE:
+            self._destroy_comparison_cache()
 
     def freeze(self, frozen: bool):
         self.btn_calculate.setEnabled(not frozen)

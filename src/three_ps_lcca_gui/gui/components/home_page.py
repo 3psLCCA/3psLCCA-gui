@@ -16,6 +16,10 @@ import getpass
 from datetime import datetime
 
 from three_ps_lcca_gui.gui.version import VERSION
+try:
+    from three_ps_lcca_gui.gui._CONFIG import COMPARISON_MODE
+except ImportError:
+    COMPARISON_MODE = True
 from PySide6.QtCore import Qt, QSize, QPoint, QPointF, QRect, QRectF, QTimer, Signal, QStandardPaths, QObject, QEvent
 from PySide6.QtGui import QFont, QColor, QPainter, QBrush, QPen, QPalette, QPolygonF, QPixmap
 from PySide6.QtSvg import QSvgRenderer
@@ -954,12 +958,12 @@ class HomePage(QWidget):
         open_btn.clicked.connect(self._load_shared_project)
         layout.addWidget(open_btn)
 
-        # ── Compare ───────────────────────────────────────────────────────
-        compare_btn = _NavButton(_NavButton.COMPARE, "Compare")
-        compare_btn.setToolTip("Compare Projects")
-        compare_btn.clicked.connect(self._switch_to_compare)
-        self._nav_compare = compare_btn
-        layout.addWidget(compare_btn)
+        if COMPARISON_MODE:
+            compare_btn = _NavButton(_NavButton.COMPARE, "Compare")
+            compare_btn.setToolTip("Compare Projects")
+            compare_btn.clicked.connect(self._switch_to_compare)
+            self._nav_compare = compare_btn
+            layout.addWidget(compare_btn)
 
         layout.addStretch()
 
@@ -1052,10 +1056,12 @@ class HomePage(QWidget):
     def _switch_to_home(self):
         self._stack.setCurrentIndex(0)
         self._nav_home.set_selected(True)
-        self._nav_compare.set_selected(False)
+        if COMPARISON_MODE:
+            self._nav_compare.set_selected(False)
 
     def switch_to_compare(self, preselect_pid: str = None):
-        """Public method to navigate to the comparison tab, optionally pre-selecting a project."""
+        if not COMPARISON_MODE:
+            return
         self._stack.setCurrentIndex(1)
         self._nav_home.set_selected(False)
         self._nav_compare.set_selected(True)
@@ -1161,7 +1167,7 @@ class HomePage(QWidget):
             ("Recent", "recent"),
             ("All", "name"),
             ("Starred", "pinned"),
-            ("Compare", "compare"),
+            *([("Compare", "compare")] if COMPARISON_MODE else []),
         ]:
             btn = QPushButton(label)
             btn.setFixedHeight(BTN_SM)
@@ -1536,7 +1542,7 @@ class HomePage(QWidget):
         self.grid_list.clear()
         sort_key = self._current_sort()
         projects = list(self._all_projects)
-        if sort_key == "compare":
+        if sort_key == "compare" and COMPARISON_MODE:
             projects = [p for p in projects
                         if p.get("user_meta", {}).get("fit_for_comparison")]
             projects.sort(key=lambda p: (p.get("display_name") or "").lower())

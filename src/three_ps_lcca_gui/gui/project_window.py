@@ -59,6 +59,10 @@ from PySide6.QtWidgets import QDialog, QFormLayout, QVBoxLayout, QLabel, QPushBu
 from three_ps_lcca_gui.gui.components.rollback_dialog import RollbackDialog
 from three_ps_lcca_gui.gui.components.blob_manager import BlobManagerDialog
 from three_ps_lcca_gui.gui._CONFIG import DEV_MODE, FLUSH_MODE
+try:
+    from three_ps_lcca_gui.gui._CONFIG import COMPARISON_MODE
+except ImportError:
+    COMPARISON_MODE = True
 if FLUSH_MODE:
     from three_ps_lcca_gui.gui.flush import flush_project_window
 if DEV_MODE:
@@ -598,7 +602,8 @@ class ProjectWindow(QMainWindow):
         self.outputs_page.calculation_completed.connect(
             self._on_calculation_done)
         self.outputs_page.validate_requested.connect(self._run_calculate)
-        self.outputs_page.compare_requested.connect(self._on_compare_requested)
+        if COMPARISON_MODE:
+            self.outputs_page.compare_requested.connect(self._on_compare_requested)
 
         # Page widgets are built lazily on first sidebar click via _get_or_create_widget
         self.widget_map = {"Results": self.outputs_page}
@@ -729,7 +734,7 @@ class ProjectWindow(QMainWindow):
             is_locked_on_disk = False
             try:
                 info = SafeChunkEngine.get_project_info(self.project_id)
-                if info and info.get("user_meta", {}).get("fit_for_comparison"):
+                if COMPARISON_MODE and info and info.get("user_meta", {}).get("fit_for_comparison"):
                     is_locked_on_disk = True
             except:
                 pass
@@ -881,6 +886,8 @@ class ProjectWindow(QMainWindow):
             self.sidebar.setCurrentItem(items[0])
 
     def _on_compare_requested(self, project_id: str):
+        if not COMPARISON_MODE:
+            return
         if self.controller.engine and self.controller.engine.is_active():
             self.controller.close_project()
         self.project_id = None
