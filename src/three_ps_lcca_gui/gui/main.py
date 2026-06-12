@@ -93,22 +93,35 @@ class _TableHeaderWordWrapFilter(QObject):
         if event.type() == QEvent.Polish and isinstance(obj, (QTableWidget, QTableView)):
             hdr = obj.horizontalHeader()
             if not isinstance(hdr, (GroupedHeaderView, WordWrapHeaderView)):
-                count = hdr.count()
-                modes  = [hdr.sectionResizeMode(i) for i in range(count)]
-                sizes  = [hdr.sectionSize(i) for i in range(count)]
-                hidden = [hdr.isSectionHidden(i) for i in range(count)]
-                stretch_last = hdr.stretchLastSection()
-                min_size = hdr.minimumSectionSize()
-                new_hdr = WordWrapHeaderView(Qt.Horizontal, parent=obj)
-                obj.setHorizontalHeader(new_hdr)
-                new_hdr.setStretchLastSection(stretch_last)
-                new_hdr.setMinimumSectionSize(min_size)
-                for i in range(count):
-                    new_hdr.setSectionResizeMode(i, modes[i])
-                    new_hdr.resizeSection(i, sizes[i])
-                    if hidden[i]:
-                        new_hdr.hideSection(i)
+                # Defer header swap: calling setHorizontalHeader() synchronously
+                # during Polish (which fires mid-reparent inside addWidget) causes
+                # a segfault because the widget tree is in an inconsistent state.
+                QTimer.singleShot(0, lambda o=obj: self._install_word_wrap_header(o))
         return super().eventFilter(obj, event)
+
+    @staticmethod
+    def _install_word_wrap_header(obj):
+        try:
+            hdr = obj.horizontalHeader()
+        except RuntimeError:
+            return
+        if isinstance(hdr, (GroupedHeaderView, WordWrapHeaderView)):
+            return
+        count = hdr.count()
+        modes        = [hdr.sectionResizeMode(i) for i in range(count)]
+        sizes        = [hdr.sectionSize(i) for i in range(count)]
+        hidden       = [hdr.isSectionHidden(i) for i in range(count)]
+        stretch_last = hdr.stretchLastSection()
+        min_size     = hdr.minimumSectionSize()
+        new_hdr = WordWrapHeaderView(Qt.Horizontal, parent=obj)
+        obj.setHorizontalHeader(new_hdr)
+        new_hdr.setStretchLastSection(stretch_last)
+        new_hdr.setMinimumSectionSize(min_size)
+        for i in range(count):
+            new_hdr.setSectionResizeMode(i, modes[i])
+            new_hdr.resizeSection(i, sizes[i])
+            if hidden[i]:
+                new_hdr.hideSection(i)
 
 
 class DisableSpinBoxScroll(QObject):

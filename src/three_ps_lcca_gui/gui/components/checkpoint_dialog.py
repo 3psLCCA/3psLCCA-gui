@@ -148,7 +148,6 @@ class CheckpointManagerDialog(QDialog):
 
         # Table
         self.table = QTableWidget()
-        round_table_viewport(self.table)
         self.table.setColumnCount(4)
         self.table.setHorizontalHeaderLabels(["Label", "Date & Time", "Notes", "File"])
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
@@ -160,8 +159,12 @@ class CheckpointManagerDialog(QDialog):
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.table.setAlternatingRowColors(True)
         self.table.verticalHeader().setVisible(False)
-        self.table.selectionModel().selectionChanged.connect(self._on_selection_changed)
         layout.addWidget(self.table)
+        # Apply rounded viewport and connect selection signal after the table is
+        # parented via addWidget; doing so before causes a segfault when Qt
+        # traverses the transparent-background chain on an unparented viewport.
+        round_table_viewport(self.table)
+        self.table.selectionModel().selectionChanged.connect(self._on_selection_changed)
 
         layout.addSpacing(4)
 
