@@ -59,19 +59,39 @@ def _diversion_emissions(data: dict) -> str:
         ) or ""
 
     elif mode == "Enter Directly":
-        val = float(em_data.get("total_direct_emissions", 0.0))
+        from pylatex.utils import escape_latex
+        direct = em_data.get("direct_entry", {})
+        val = float(direct.get("total_direct_emissions", 0.0))
+        source = (direct.get("source") or "").strip()
+        comments = (direct.get("comments") or "").strip()
+
+        source_sent = rf" This estimate is based on {escape_latex(source)}." if source else " Source not mentioned."
+        comments_sent = rf" {escape_latex(comments)}" if comments else ""
+
+        paragraph = (
+            rf"The total traffic diversion emissions, entered directly, amount to "
+            rf"\textbf{{{val:,.{DECIMAL_PLACES_FOR_LATEX}f}}}~kgCO\textsubscript{{2}}e/day."
+            rf"{source_sent}{comments_sent}"
+        )
+
+        rows = [
+            ("Total Daily Diversion Emissions", rf"\textbf{{{val:,.{DECIMAL_PLACES_FOR_LATEX}f}}}~kgCO\textsubscript{{2}}e/day"),
+            ("Source", escape_latex(source) if source else "Not mentioned"),
+        ]
+        if comments:
+            rows.append(("Comments", escape_latex(comments)))
+
+        detail = "\n".join(
+            rf"  \noindent\textbf{{{escape_latex(label)}:}}\quad {value} \par\smallskip"
+            for label, value in rows
+        )
+
         diversion_latex = (
-            r"\begin{table}[h!]" + "\n"
-            r"\centering" + "\n"
-            r"\begin{tabular}{lr}" + "\n"
-            r"\hline" + "\n"
-            r"Calculation Mode & Enter Directly \\" + "\n"
-            f"Total Daily Diversion Emissions & {val:,.{DECIMAL_PLACES_FOR_LATEX}f} kgCO2e/day \\\\" + "\n"
-            r"\hline" + "\n"
-            r"\end{tabular}" + "\n"
-            r"\caption{Traffic Diversion Emissions (Direct Entry)}" + "\n"
-            r"\label{tab:diversion_emissions_direct}" + "\n"
-            r"\end{table}"
+            "\n\\medskip\n"
+            + rf"\noindent {paragraph}"
+            + "\n\n\\medskip\n"
+            + detail
+            + "\n\\medskip\n"
         )
 
     if not diversion_latex:

@@ -1,5 +1,7 @@
 import pandas as pd
+from pylatex.utils import escape_latex
 from ...gui.components.traffic_data.main import TRAFFIC_FIELDS, _BY_CODE
+from ...gui.components.utils.common_requested_data import get_currency
 from ..common_code import fields_to_latex
 from ..SETTINGS import DECIMAL_PLACES_FOR_LATEX
 
@@ -14,6 +16,56 @@ def _traffic_fields(data: dict) -> str:
         display_data,
         "Traffic and Road Data",
         "tab:traffic_and_road_data",
+    )
+
+
+def _global_traffic_fields(data: dict) -> str:
+    currency = escape_latex(get_currency())
+    global_entry = data.get("global_entry", {})
+    cost = global_entry.get("road_user_cost_per_day")
+    source = (global_entry.get("source") or "").strip()
+    comments = (global_entry.get("comments") or "").strip()
+
+    cost_str = (
+        f"{float(cost):,.{DECIMAL_PLACES_FOR_LATEX}f}"
+        if cost is not None
+        else r"\textemdash"
+    )
+
+    source_sent = (
+        rf" This estimate is based on {escape_latex(source)}."
+        if source else " Source not mentioned."
+    )
+    comments_sent = (
+        rf" {escape_latex(comments)}"
+        if comments else ""
+    )
+
+    paragraph = (
+        rf"For this project, the road user cost incurred during the construction phase "
+        rf"has been assessed on a per-day basis. The total road user cost per day, "
+        rf"accounting for delays, detours, and associated user inconveniences, is "
+        rf"\textbf{{{cost_str}}}~{currency}/day.{source_sent}{comments_sent}"
+    )
+
+    rows = [
+        ("Road User Cost per Day", rf"\textbf{{{cost_str}}}~{currency}/day"),
+        ("Source", escape_latex(source) if source else "Not mentioned"),
+    ]
+    if comments:
+        rows.append(("Comments", escape_latex(comments)))
+
+    detail = "\n".join(
+        rf"  \noindent\textbf{{{escape_latex(label)}:}}\quad {value} \par\smallskip"
+        for label, value in rows
+    )
+
+    return (
+        "\n\\medskip\n"
+        + rf"\noindent {paragraph}"
+        + "\n\n\\medskip\n"
+        + detail
+        + "\n\\medskip\n"
     )
 
 

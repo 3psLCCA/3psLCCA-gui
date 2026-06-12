@@ -61,6 +61,7 @@ from ..maintenance_data_latex import maintenance_data_to_latex
 from ..structure_work_data_latex import structure_work_data_to_latex
 from ..traffic_and_road_data_latex.get_all_data import (
     diversion_emissions_to_latex,
+    global_traffic_fields_to_latex,
     peak_hour_distribution_to_latex,
     traffic_fields_to_latex,
     vehicle_data_to_latex,
@@ -78,6 +79,7 @@ from .latex_helpers import (
     front_matter,
     section,
     subsection,
+    subsubsection,
     title_page,
     wide_block,
 )
@@ -136,22 +138,59 @@ REPORT_SCHEMA = [
                     {
                         "title": "Traffic and road data",
                         "key": KEY_SHOW_ROAD_TRAFFIC,
-                        "render": lambda ctrl, config, paths, logo: _part(ctrl, "Traffic and Road Data", traffic_fields_to_latex)
+                        "render": lambda ctrl, config, paths, logo: (
+                            _subsubsection_with_intro(
+                                subsubsection("Traffic and Road Data"),
+                                r"\noindent Table~\ref{tab:traffic_and_road_data} presents the traffic and road parameters recorded for this project, "
+                                r"including road classification, speed limits, and associated data used in the life cycle cost assessment.",
+                                ctrl, "Traffic and Road Data", traffic_fields_to_latex,
+                            ) if _traffic_mode() != "GLOBAL" else (
+                                subsubsection("Traffic and Road Data") + "\n"
+                                + _part(ctrl, "Traffic and Road Data", global_traffic_fields_to_latex)
+                            )
+                        )
                     },
                     {
                         "title": "Average daily traffic",
                         "key": KEY_SHOW_AVG_TRAFFIC,
-                        "render": lambda ctrl, config, paths, logo: _part(ctrl, "Vehicle Traffic Data", vehicle_data_to_latex)
+                        "india_only": True,
+                        "render": lambda ctrl, config, paths, logo: (
+                            "" if _traffic_mode() == "GLOBAL"
+                            else _subsubsection_with_intro(
+                                subsubsection("Average Daily Traffic"),
+                                r"\noindent Table~\ref{tab:vehicle_data} presents the average daily traffic composition across different vehicle categories, "
+                                r"which forms the basis for estimating road user costs and diversion emissions during the construction phase.",
+                                ctrl, "Vehicle Traffic Data", vehicle_data_to_latex,
+                            )
+                        )
                     },
                     {
                         "title": "Traffic diversion emissions",
                         "key": KEY_SHOW_VEHICLE_EMISSION,
-                        "render": lambda ctrl, config, paths, logo: _part(ctrl, "Traffic Diversion Emissions", diversion_emissions_to_latex)
+                        "india_only": True,
+                        "render": lambda ctrl, config, paths, logo: (
+                            "" if _traffic_mode() == "GLOBAL"
+                            else _subsubsection_with_intro(
+                                subsubsection("Traffic Diversion Emissions"),
+                                r"\noindent Table~\ref{tab:diversion_emissions} summarises the carbon emissions attributable to traffic diversion "
+                                r"during the construction phase, accounting for the additional travel distance and vehicle composition on the diversion route.",
+                                ctrl, "Traffic Diversion Emissions", diversion_emissions_to_latex,
+                            )
+                        )
                     },
                     {
                         "title": "Peak hour distribution",
                         "key": KEY_SHOW_PEAK_HOUR,
-                        "render": lambda ctrl, config, paths, logo: _part(ctrl, "Peak Hour Distribution", peak_hour_distribution_to_latex)
+                        "india_only": True,
+                        "render": lambda ctrl, config, paths, logo: (
+                            "" if _traffic_mode() == "GLOBAL"
+                            else _subsubsection_with_intro(
+                                subsubsection("Peak Hour Distribution"),
+                                r"\noindent Table~\ref{tab:peak_hour_distribution} presents the peak hour traffic distribution used to assess "
+                                r"congestion-related impacts and road user costs during the construction phase.",
+                                ctrl, "Peak Hour Distribution", peak_hour_distribution_to_latex,
+                            )
+                        )
                     },
                 ]
             },
@@ -163,22 +202,43 @@ REPORT_SCHEMA = [
                     {
                         "title": "Social cost of carbon",
                         "key": KEY_SHOW_SOCIAL_CARBON,
-                        "render": lambda ctrl, config, paths, logo: _part(ctrl, "Social Cost Data", social_cost_data_to_latex)
+                        "render": lambda ctrl, config, paths, logo: _subsubsection_with_intro(
+                            subsubsection("Social Cost of Carbon"),
+                            r"\noindent The social cost of carbon (SCC) quantifies the monetary value of environmental damage caused by each unit of CO\textsubscript{2}e emitted. "
+                            r"The following section presents the SCC values and parameters adopted in this assessment.",
+                            ctrl, "Social Cost Data", social_cost_data_to_latex,
+                        )
                     },
                     {
                         "title": "Material emission factors",
                         "key": KEY_SHOW_MATERIAL_EMISSION,
-                        "render": lambda ctrl, config, paths, logo: _part(ctrl, "Material Emissions", material_emissions_to_latex, wide=True, size=r"\footnotesize")
+                        "render": lambda ctrl, config, paths, logo: _subsubsection_with_intro(
+                            subsubsection("Material Emission Factors"),
+                            r"\noindent Table~\ref{tab:material_emissions_included} lists the materials included in the carbon emissions calculation along with their respective "
+                            r"emission factors, quantities, and total CO\textsubscript{2}e contributions. "
+                            r"Materials excluded from the assessment are detailed in Table~\ref{tab:material_emissions_excluded}.",
+                            ctrl, "Material Emissions", material_emissions_to_latex, wide=True, size=r"\footnotesize",
+                        )
                     },
                     {
                         "title": "Transport emissions",
                         "key": KEY_SHOW_TRANSPORT_EMISSION,
-                        "render": lambda ctrl, config, paths, logo: _part(ctrl, "Transport Emissions", transport_emissions_to_latex, wide=True, size=r"\footnotesize")
+                        "render": lambda ctrl, config, paths, logo: _subsubsection_with_intro(
+                            subsubsection("Transport Emissions"),
+                            r"\noindent Table~\ref{tab:transport_emissions_summary} presents the estimated carbon emissions from transporting materials "
+                            r"to and from the project site, calculated based on vehicle type, load capacity, and travel distance.",
+                            ctrl, "Transport Emissions", transport_emissions_to_latex, wide=True, size=r"\footnotesize",
+                        )
                     },
                     {
                         "title": "On-site emissions",
                         "key": KEY_SHOW_ONSITE_EMISSION,
-                        "render": lambda ctrl, config, paths, logo: _part(ctrl, "Machinery and Equipment Emissions", machinery_emissions_to_latex, wide=True, size=r"\footnotesize")
+                        "render": lambda ctrl, config, paths, logo: _subsubsection_with_intro(
+                            subsubsection("Machinery and Equipment Emissions"),
+                            r"\noindent The following section presents the carbon emissions from machinery and equipment operated on-site during the construction phase, "
+                            r"calculated based on fuel and electricity consumption, operational hours, and corresponding emission factors.",
+                            ctrl, "Machinery and Equipment Emissions", machinery_emissions_to_latex, wide=True, size=r"\footnotesize",
+                        )
                     },
                 ]
             },
@@ -192,7 +252,7 @@ REPORT_SCHEMA = [
     {
         "title": "LCCA results",
         "key": KEY_SHOW_LCCA_RESULTS,
-        "render": lambda ctrl, config, paths, logo: clearpage() + "\n" + section("LCCA results") + "\n" + subsection("Life cycle cost results") + "\n" + _results_part(ctrl) + "\n" + _result_figures(paths)
+        "render": lambda ctrl, config, paths, logo: _lcca_results_section(ctrl, paths)
     },
     {
         "title": "Summary and conclusions",
@@ -216,11 +276,22 @@ REPORT_SCHEMA = [
             {
                 "title": "Appendix C: Miscellaneous data",
                 "key": KEY_SHOW_APPENDIX_C,
-                "render": lambda ctrl, config, paths, logo: _appendix_c_wpi(ctrl)
+                "india_only": True,
+                "render": lambda ctrl, config, paths, logo: (
+                    "" if _traffic_mode() == "GLOBAL" else _appendix_c_wpi(ctrl)
+                )
             },
         ]
     },
 ]
+
+
+def _traffic_mode() -> str:
+    try:
+        from three_ps_lcca_gui.gui.components.utils.common_requested_data import get_traffic_and_road_data
+        return get_traffic_and_road_data().get("mode", "")
+    except Exception:
+        return ""
 
 
 def _project_name(controller=None) -> str:
@@ -266,6 +337,21 @@ def _part(controller, title: str, exporter: Callable, wide: bool = False, size: 
     if wide:
         latex = wide_block(latex, size=size)
     return latex
+
+
+def _subsubsection_with_intro(
+    heading: str,
+    intro: str,
+    controller,
+    title: str,
+    exporter: Callable,
+    wide: bool = False,
+    size: str = r"\scriptsize",
+) -> str:
+    content = _part(controller, title, exporter, wide=wide, size=size)
+    if content and content.strip():
+        return heading + "\n" + intro + "\n\n" + content
+    return ""
 
 
 def _sum_result_numbers(value, key: str = "") -> float:
@@ -417,27 +503,80 @@ def _results_part(controller) -> str:
     return wide_block(latex, size=r"\footnotesize")
 
 
-def _plot_figure(plot_paths: dict | None, key: str, caption: str) -> str:
+_FIGURE_META = [
+    (KEY_PLOT_PILLAR_DONUT,          "LCC components results",                                              "fig:pillar_donut"),
+    (KEY_PLOT_STAGE_BARS,            "Distribution of 3PS and 3 stages of LCC",                            "fig:stage_bars"),
+    (KEY_PLOT_SUSTAINABILITY_MATRIX, "Distribution of 3PS and sustainability pillars of LCC",              "fig:sustainability_matrix"),
+    (KEY_PLOT_PILLAR_BARS,           "Distribution of various components of road user cost during construction", "fig:pillar_bars"),
+]
+
+
+def _plot_figure(plot_paths: dict | None, key: str, caption: str, label: str = "") -> str:
     filename = (plot_paths or {}).get(key)
     if not filename:
         return ""
     filename = str(filename).replace("\\", "/")
+    caption_line = r"\caption{" + escape_latex(caption) + r"}"
+    if label:
+        caption_line += r"\label{" + label + r"}"
     return "\n".join([
         r"\begin{figure}[H]",
         r"\centering",
         r"\includegraphics[width=0.88\textwidth]{" + filename + r"}",
-        r"\caption{" + escape_latex(caption) + r"}",
+        caption_line,
         r"\end{figure}",
     ])
 
 
 def _result_figures(plot_paths: dict | None) -> str:
-    return "\n\n".join(part for part in [
-        _plot_figure(plot_paths, KEY_PLOT_PILLAR_DONUT, "LCC components results"),
-        _plot_figure(plot_paths, KEY_PLOT_STAGE_BARS, "Distribution of 3PS and 3 stages of LCC"),
-        _plot_figure(plot_paths, KEY_PLOT_SUSTAINABILITY_MATRIX, "Distribution of 3PS and sustainability pillars of LCC"),
-        _plot_figure(plot_paths, KEY_PLOT_PILLAR_BARS, "Distribution of various components of road user cost during construction"),
-    ] if part and part.strip())
+    return "\n\n".join(
+        part for part in [
+            _plot_figure(plot_paths, key, caption, label)
+            for key, caption, label in _FIGURE_META
+        ] if part and part.strip()
+    )
+
+
+def _lcca_results_section(controller, plot_paths: dict | None) -> str:
+    results_table = _results_part(controller)
+
+    # Determine which figures will actually be rendered
+    active_figs = [
+        (key, caption, label)
+        for key, caption, label in _FIGURE_META
+        if (plot_paths or {}).get(key)
+    ]
+    figures = _result_figures(plot_paths)
+
+    table_intro = (
+        r"\noindent Table~\ref{tab:lcca_results} presents a comprehensive summary of the life cycle cost analysis "
+        r"results, expressed as present values. The costs are organised by life cycle stage --- "
+        r"Initial Stage, Use Stage, Reconstruction, and End-of-Life --- and further broken down "
+        r"by sustainability pillar: Economic, Environmental, and Social."
+    )
+
+    parts = [
+        clearpage(),
+        section("LCCA results"),
+        subsection("Life cycle cost results"),
+        table_intro,
+        results_table,
+    ]
+
+    if active_figs and figures.strip():
+        fig_refs = ", ".join(
+            rf"Figure~\ref{{{label}}}" for _, _, label in active_figs
+        )
+        fig_intro = (
+            rf"\noindent The life cycle cost results are further illustrated through the following figures. "
+            rf"{fig_refs} present the distribution of costs across the three sustainability pillars "
+            rf"(Economic, Environmental, and Social) and the four life cycle stages, "
+            rf"providing a visual overview of the relative contributions to the total life cycle cost."
+        )
+        parts.append(fig_intro)
+        parts.append(figures)
+
+    return "\n\n".join(p for p in parts if p and p.strip())
 
 
 def _appendix_c_wpi(controller) -> str:

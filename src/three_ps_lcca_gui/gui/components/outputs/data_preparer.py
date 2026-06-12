@@ -398,11 +398,11 @@ class DataPreparer:
                 )
             else:
                 total_vehicular_carbon_emission = float(
-                    _global_diversion.get("total_direct_emissions", 0.0)
+                    _global_diversion.get("direct_entry", {}).get("total_direct_emissions", 0.0)
                 )
 
             total_daily_ruc = float(
-                data.get("traffic_and_road_data").get("road_user_cost_per_day")
+                data.get("traffic_and_road_data", {}).get("global_entry", {}).get("road_user_cost_per_day", 0.0)
             )
             daily_road_user_cost_with_vehicular_emissions = DailyRoadUserCost(
                 total_daily_ruc=total_daily_ruc,

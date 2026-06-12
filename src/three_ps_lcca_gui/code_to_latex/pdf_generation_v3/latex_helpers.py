@@ -143,6 +143,10 @@ def subsection(title: str) -> str:
     return r"\subsection{" + escape_latex(title) + r"}"
 
 
+def subsubsection(title: str) -> str:
+    return r"\subsubsection{" + escape_latex(title) + r"}"
+
+
 def paragraph(text: str) -> str:
     return r"\par\medskip " + escape_latex(text) + r"\par\medskip"
 

@@ -3,7 +3,7 @@ from pylatex.utils import escape_latex
 from .SETTINGS import LATEX_FONT_SIZE
 from ..gui.components.utils.common_requested_data import (
     get_project_name, get_currency, get_bridge_data, get_analysis_period,
-    get_general_info,
+    get_general_info, get_traffic_and_road_data,
 )
 from .bridge_data_latex         import bridge_data_to_latex
 from .financial_data_latex      import financial_data_to_latex
@@ -11,6 +11,7 @@ from .maintenance_data_latex    import maintenance_data_to_latex
 from .structure_work_data_latex import structure_work_data_to_latex
 from .traffic_and_road_data_latex.get_all_data import (
     traffic_fields_to_latex,
+    global_traffic_fields_to_latex,
     vehicle_data_to_latex,
     diversion_emissions_to_latex,
     peak_hour_distribution_to_latex,
@@ -178,19 +179,25 @@ def final_report_to_latex(controller=None) -> str:
     parts.append(_clearpage())
 
     # ── Section 3: Traffic and Road Data ─────────────────────────────────────
-    parts += _build_section("traffic", [
-        traffic_fields_to_latex,
-        vehicle_data_to_latex,
-        diversion_emissions_to_latex,
-        peak_hour_distribution_to_latex,
-        wpi_tables_to_latex,
-    ], controller, subsections=[
-        "Road and Traffic Parameters",
-        "Vehicle Traffic Data",
-        "Traffic Diversion Emissions",
-        "Peak Hour Distribution",
-        "Wholesale Price Index (WPI) Adjustment Factors",
-    ])
+    _traffic_mode = get_traffic_and_road_data().get("mode", "")
+    if _traffic_mode == "GLOBAL":
+        parts += _build_section("traffic", [
+            global_traffic_fields_to_latex,
+        ], controller)
+    else:
+        parts += _build_section("traffic", [
+            traffic_fields_to_latex,
+            vehicle_data_to_latex,
+            diversion_emissions_to_latex,
+            peak_hour_distribution_to_latex,
+            wpi_tables_to_latex,
+        ], controller, subsections=[
+            "Road and Traffic Parameters",
+            "Vehicle Traffic Data",
+            "Traffic Diversion Emissions",
+            "Peak Hour Distribution",
+            "Wholesale Price Index (WPI) Adjustment Factors",
+        ])
 
     parts.append(_clearpage())
 

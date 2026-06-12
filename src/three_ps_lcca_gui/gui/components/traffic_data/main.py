@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, QSize, QTimer
 from three_ps_lcca_gui.gui.themes import get_token, theme_manager
+from ..utils.common_requested_data import get_currency
 
 from ..base_widget import ScrollableForm
 from ..utils.form_builder.form_definitions import FieldDef, Section, ValidationStatus
@@ -331,7 +332,19 @@ OUTSIDE_INDIA_FIELDS = [
         "",
         "float",
         (0.0, 1e15, 2),
-        unit="(/ day)",
+        unit="(Currency / day)",
+    ),
+    FieldDef(
+        "source",
+        "Source",
+        "Reference or basis for this Road User Cost value (e.g. project report, government guideline, study, or agency publication).",
+        "text",
+    ),
+    FieldDef(
+        "comments",
+        "Comments",
+        "Any additional notes, assumptions, or justification for the selected Road User Cost value.",
+        "textarea",
     ),
 ]
 
@@ -586,6 +599,12 @@ class TrafficData(ScrollableForm):
     def showEvent(self, event):
         super().showEvent(event)
         self._sync_mode_from_country()
+        self._sync_currency_suffix()
+
+    def _sync_currency_suffix(self):
+        if hasattr(self, "road_user_cost_per_day"):
+            currency = get_currency()
+            self.road_user_cost_per_day.setSuffix(f" ({currency} / day)")
 
     # ── Severity auto-adjust ──────────────────────────────────────────────────
 
@@ -964,6 +983,12 @@ class TrafficData(ScrollableForm):
 
         data["peak_hour_distribution"] = self._peak_table.collect_to_dict()
 
+        data["global_entry"] = {
+            "road_user_cost_per_day": data.pop("road_user_cost_per_day", 0.0),
+            "source": data.pop("source", ""),
+            "comments": data.pop("comments", ""),
+        }
+
         # WPI - store selected profile id + snapshot of data + custom profiles
         current_profile = self._wpi_selector.current_profile()
         selected_data = self._wpi_table.collect_to_data()
@@ -1012,6 +1037,14 @@ class TrafficData(ScrollableForm):
             load_data = dict(data)
             code = load_data.get("alternate_road_carriageway", "")
             load_data["alternate_road_carriageway"] = _BY_CODE.get(code, _NONE_LANE)
+
+            # Flatten global_entry so super().load_data_dict can populate widgets
+            global_entry = data.get("global_entry", {})
+            load_data.update({
+                "road_user_cost_per_day": global_entry.get("road_user_cost_per_day", 0.0),
+                "source": global_entry.get("source", ""),
+                "comments": global_entry.get("comments", ""),
+            })
 
             self.mode.blockSignals(True)
             super().load_data_dict(load_data)

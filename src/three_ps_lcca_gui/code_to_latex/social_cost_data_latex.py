@@ -58,7 +58,7 @@ def _custom_para(data: dict) -> str:
     except (TypeError, ValueError):
         value_str = "---"
     source_raw = (custom.get("source") or "").strip()
-    source_str = escape_latex(source_raw) if source_raw else "No source information provided"
+    source_str = escape_latex(source_raw) if source_raw else "Source not mentioned"
     comments_raw = (custom.get("comments") or "").strip()
     comments_part = f" {escape_latex(comments_raw)}" if comments_raw else ""
     return (

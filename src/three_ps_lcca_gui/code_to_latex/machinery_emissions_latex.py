@@ -53,6 +53,7 @@ def _detailed_to_latex(data: dict) -> str:
 def _lumpsum_to_latex(data: dict) -> str:
     ls = data.get("lumpsum", {})
     rows = []
+    total = 0.0
     for label, cons_key, days_key, ef_key in [
         ("Electricity", "elec_consumption_per_day", "elec_days", "elec_ef"),
         ("Fuel",        "fuel_consumption_per_day", "fuel_days", "fuel_ef"),
@@ -61,6 +62,7 @@ def _lumpsum_to_latex(data: dict) -> str:
         days = _fmt(ls.get(days_key, 0))
         ef   = _fmt(ls.get(ef_key, 0))
         emission = (cons or 0) * (days or 0) * (ef or 0)
+        total += emission
         rows.append({
             "Source":                        label,
             "Consumption / Day":             cons,
@@ -69,8 +71,15 @@ def _lumpsum_to_latex(data: dict) -> str:
             "Emissions (kgCO₂e)":           emission,
         })
 
+    paragraph = (
+        rf"Machinery and equipment emissions have been entered as a lump sum. "
+        rf"The total on-site carbon emissions amount to "
+        rf"\textbf{{{total:.{DECIMAL_PLACES_FOR_LATEX}f}}}~kgCO\textsubscript{{2}}e, "
+        rf"comprising contributions from electricity consumption and fuel usage as detailed below."
+    )
+
     df = pd.DataFrame(rows)
-    return (
+    table = (
         df.style.hide(axis="index")
         .format(_FMT, subset=["Consumption / Day", "Days",
                                "Emission Factor (kgCO₂e/unit)", "Emissions (kgCO₂e)"],
@@ -83,6 +92,8 @@ def _lumpsum_to_latex(data: dict) -> str:
             position="h!",
         )
     ) or ""
+
+    return "\n\\medskip\n" + rf"\noindent {paragraph}" + "\n\n" + table
 
 
 def machinery_emissions_to_latex(controller=None) -> str:

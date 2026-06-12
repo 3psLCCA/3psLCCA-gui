@@ -1035,6 +1035,7 @@ class MachineryEmissions(ScrollableForm):
             else:
                 lumpsum[key] = default
 
+
         return {
             "mode": self._current_mode(),
             "default_days": (

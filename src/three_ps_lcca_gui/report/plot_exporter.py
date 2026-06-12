@@ -12,6 +12,7 @@ them by basename alone (it runs from that same directory).
 """
 
 import concurrent.futures
+import contextlib
 import os
 import tempfile
 
@@ -494,6 +495,11 @@ def generate_plots(results: dict, output_dir: str, currency: str = "INR") -> dic
             if not guard():
                 return key, None
             fig = builder()
+            # Force white background regardless of theme
+            fig.patch.set_facecolor("white")
+            fig.patch.set_alpha(1.0)
+            for ax in fig.get_axes():
+                ax.set_facecolor("none")
             fd, path = _make_temp(key, output_dir)
             _save(fig, fd, path)
             return key, os.path.basename(path)
@@ -501,9 +507,24 @@ def generate_plots(results: dict, output_dir: str, currency: str = "INR") -> dic
             print(f"[plot_exporter] {key} failed: {e}")
             return key, None
 
-    with concurrent.futures.ThreadPoolExecutor() as executor:
-        for key, basename in executor.map(_run_job, _jobs):
-            if basename:
-                out[key] = basename
+    # Temporarily override theme tokens so plotters render with print-safe
+    # dark text regardless of whether the app is in dark mode.
+    from ..gui import themes as _themes
+    _PRINT_TOKENS = {"text": "#1a1a1a", "surface_mid": "#cccccc",
+                     "text_secondary": "#555555", "text_disabled": "#888888"}
+    _themes._ensure_tokens()
+    _saved = {k: _themes._active_tokens.get(k) for k in _PRINT_TOKENS}
+    _themes._active_tokens.update(_PRINT_TOKENS)
+    try:
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            for key, basename in executor.map(_run_job, _jobs):
+                if basename:
+                    out[key] = basename
+    finally:
+        for k, v in _saved.items():
+            if v is None:
+                _themes._active_tokens.pop(k, None)
+            else:
+                _themes._active_tokens[k] = v
 
     return out

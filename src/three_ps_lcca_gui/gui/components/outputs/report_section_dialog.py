@@ -188,7 +188,7 @@ class SectionTreeWidget(QTreeWidget):
     def build_from_sections(self):
         """Populate tree widget directly from the data-driven REPORT_SCHEMA."""
         self.clear()
-        
+
         from PySide6.QtGui import QFont as _QFont, QColor as _QColor
         font_section = _QFont("Ubuntu", FS_BASE); font_section.setWeight(_QFont.Weight.DemiBold)
         font_sub    = _QFont("Ubuntu", FS_BASE)
@@ -196,22 +196,43 @@ class SectionTreeWidget(QTreeWidget):
         col_section = _QColor(get_token("text"))
         col_sub     = _QColor(get_token("text"))
         col_table   = _QColor(get_token("text_secondary"))
+        col_disabled = _QColor(get_token("text_secondary"))
+
+        try:
+            from three_ps_lcca_gui.gui.components.utils.common_requested_data import get_traffic_and_road_data
+            _is_global = get_traffic_and_road_data().get("mode") == "GLOBAL"
+        except Exception:
+            _is_global = False
 
         def _add_item(schema_item, parent_widget):
-            tree_item = QTreeWidgetItem(parent_widget, [schema_item["title"]])
-            tree_item.setFlags(tree_item.flags() | Qt.ItemIsUserCheckable)
-            tree_item.setCheckState(0, Qt.Checked)
-            
-            # Formatting based on depth
-            if isinstance(parent_widget, QTreeWidget):
-                tree_item.setFont(0, font_section)
-                tree_item.setForeground(0, col_section)
-            elif parent_widget.parent() and isinstance(parent_widget.parent(), QTreeWidget):
-                tree_item.setFont(0, font_sub)
-                tree_item.setForeground(0, col_sub)
+            india_only = schema_item.get("india_only", False)
+            disabled = _is_global and india_only
+
+            label = schema_item["title"]
+            if disabled:
+                label = f"{label}  (India mode only)"
+            tree_item = QTreeWidgetItem(parent_widget, [label])
+
+            if disabled:
+                tree_item.setFlags(Qt.ItemIsEnabled)  # visible but not checkable
+                tree_item.setCheckState(0, Qt.Unchecked)
+                tree_item.setForeground(0, col_disabled)
+                font_dis = _QFont("Ubuntu", FS_SM)
+                tree_item.setFont(0, font_dis)
             else:
-                tree_item.setFont(0, font_table)
-                tree_item.setForeground(0, col_table)
+                tree_item.setFlags(tree_item.flags() | Qt.ItemIsUserCheckable)
+                tree_item.setCheckState(0, Qt.Checked)
+
+                # Formatting based on depth
+                if isinstance(parent_widget, QTreeWidget):
+                    tree_item.setFont(0, font_section)
+                    tree_item.setForeground(0, col_section)
+                elif parent_widget.parent() and isinstance(parent_widget.parent(), QTreeWidget):
+                    tree_item.setFont(0, font_sub)
+                    tree_item.setForeground(0, col_sub)
+                else:
+                    tree_item.setFont(0, font_table)
+                    tree_item.setForeground(0, col_table)
 
             # Map the config key
             key = schema_item.get("key")

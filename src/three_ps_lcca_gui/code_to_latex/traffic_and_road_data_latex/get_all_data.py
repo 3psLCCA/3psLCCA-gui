@@ -2,7 +2,7 @@ from ...gui.components.utils.common_requested_data import get_traffic_and_road_d
 from .wpi_tables_latex import _get_wpi_base, _get_wpi_selected, _get_wpi_ratio, _wpi_combined_table
 from .vehicle_data_latex import _vehicle_data
 from .diversion_emissions_latex import _diversion_emissions
-from .all_fields_latex import _traffic_fields, _peak_hour_distribution
+from .all_fields_latex import _traffic_fields, _global_traffic_fields, _peak_hour_distribution
 
 
 def _wpi_tables(data: dict) -> str:
@@ -16,6 +16,10 @@ def _wpi_tables(data: dict) -> str:
 
 
 # ── Individual devmode entries (each fetches once for its own use) ─────────────
+
+def global_traffic_fields_to_latex(controller=None) -> str:
+    return _global_traffic_fields(get_traffic_and_road_data())
+
 
 def traffic_fields_to_latex(controller=None) -> str:
     return _traffic_fields(get_traffic_and_road_data())

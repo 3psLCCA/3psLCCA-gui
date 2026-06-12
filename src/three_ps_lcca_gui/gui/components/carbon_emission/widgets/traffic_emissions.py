@@ -64,6 +64,18 @@ DIRECT_FIELDS = [
         (0.0, 1e12, DECIMAL_PLACES_CUSTOM),
         unit="(kgCO₂e/day)",
     ),
+    FieldDef(
+        "source",
+        "Source",
+        "Reference or basis used to determine the diversion emissions value (e.g. emissions study, project report, government guideline, or agency publication).",
+        "text",
+    ),
+    FieldDef(
+        "comments",
+        "Comments",
+        "Any additional notes, assumptions, calculations, or justification supporting the selected diversion emissions value.",
+        "textarea",
+    ),
 ]
 
 # ── Emissions Table ───────────────────────────────────────────────────────────
@@ -356,7 +368,8 @@ class TrafficEmissions(ScrollableForm):
         _temp = self.form
         self.form = direct_layout
         build_form(self, DIRECT_FIELDS)
-        self._field_map.pop("total_direct_emissions", None)  # handled in collect_data
+        for _k in ("total_direct_emissions", "source", "comments"):
+            self._field_map.pop(_k, None)  # handled in collect_data
         self.form = _temp
 
         self._stack.addWidget(direct_widget)  # index 1
@@ -482,11 +495,15 @@ class TrafficEmissions(ScrollableForm):
             "mode": self.mode.currentText(),
             "emission_factors": self._emissions_table.collect_factors(),
             "total_calculated_emissions": self._emissions_table.total_emissions(),
-            "total_direct_emissions": (
-                self.total_direct_emissions.value()
-                if hasattr(self, "total_direct_emissions")
-                else 0.0
-            ),
+            "direct_entry": {
+                "total_direct_emissions": (
+                    self.total_direct_emissions.value()
+                    if hasattr(self, "total_direct_emissions")
+                    else 0.0
+                ),
+                "source": self.source.text().strip() if hasattr(self, "source") else "",
+                "comments": self.comments.toPlainText().strip() if hasattr(self, "comments") else "",
+            },
             "remarks": self._remarks.to_html(),
         }
 
@@ -527,12 +544,24 @@ class TrafficEmissions(ScrollableForm):
 
             self._emissions_table.load_factors(data.get("emission_factors", {}))
 
+            direct = data.get("direct_entry", {})
+
             if hasattr(self, "total_direct_emissions"):
                 self.total_direct_emissions.blockSignals(True)
                 self.total_direct_emissions.setValue(
-                    float(data.get("total_direct_emissions", 0.0))
+                    float(direct.get("total_direct_emissions", 0.0))
                 )
                 self.total_direct_emissions.blockSignals(False)
+
+            if hasattr(self, "source"):
+                self.source.blockSignals(True)
+                self.source.setText(direct.get("source", ""))
+                self.source.blockSignals(False)
+
+            if hasattr(self, "comments"):
+                self.comments.blockSignals(True)
+                self.comments.setPlainText(direct.get("comments", ""))
+                self.comments.blockSignals(False)
 
             self._remarks.from_html(data.get("remarks", ""))
         finally:
@@ -549,7 +578,7 @@ class TrafficEmissions(ScrollableForm):
                     "the reroute distance or vehicle counts may be zero; check the detour distance and vehicle data in the Traffic Data section"
                 )
         else:
-            if data.get("total_direct_emissions", 0.0) == 0.0:
+            if data.get("direct_entry", {}).get("total_direct_emissions", 0.0) == 0.0:
                 warnings.append(
                     "Total direct diversion emissions is 0 kgCO₂e/day - "
                     "enter the estimated per-day carbon emission for traffic rerouting in the field above"
