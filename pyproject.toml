@@ -11,14 +11,20 @@ include-package-data = true
 [tool.setuptools.package-data]
 three_ps_lcca_gui = [
     "gui/components/utils/units.json",
-    "gui/assets/*",
+    "gui/assets/logo/*",
+    "gui/assets/logo/special/*",
+    "gui/assets/themes/*",
+    "gui/assets/themes/Ubuntu_font/*",
+    "gui/themes/*",
+    "gui/themes/dark/*",
+    "gui/themes/light/*",
     "data/wpi_db.json",
     "gui/components/structure/registry/material_catalog.json",
     "gui/components/structure/registry/material_database/*",
     "gui/components/utils/doc_handler/assets/*",
     "gui/components/utils/doc_handler/site/*",
-    "gui/themes/*",
-    "report/3psLCCAReportTitlePage.tex"
+    "report/3psLCCAReportTitlePage.tex",
+    "code_to_latex/pdf_generation_v3/images/*"
 ]
 
 [tool.setuptools.packages.find]
@@ -28,7 +34,7 @@ exclude = ["*.debug", "*.tests", "*.egg-info"]
 
 [project]
 name = "three_ps_lcca_gui"
-version = "1.0.0"
+version = "1.0.2"
 dependencies = [
     "platformdirs",
     "PySide6",
@@ -42,7 +48,7 @@ dependencies = [
     "pylatex",
     "pywebview",
 ]
-requires-python = ">= 3.10"
+requires-python = ">= 3.10,<3.13"
 
 description = "A Python package for performing life cycle cost analysis (LCCA) on three primary steel design options: hot-rolled, cold-formed, and built-up steel sections. This package provides tools and functions to evaluate the economic performance of these steel design options over their entire life cycle, including initial costs, maintenance costs, and end-of-life costs. It is designed to assist engineers and decision-makers in selecting the most cost-effective steel design option for their projects."
 

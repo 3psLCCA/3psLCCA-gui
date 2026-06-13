@@ -1,5 +1,5 @@
 {% set name = "three-ps-lcca-gui" %}
-{% set version = "1.0.0" %}
+{% set version = "1.0.2" %}
 {% set git_url = "https://github.com/swas02/3psLCCA-gui.git" %}
 {% set branch = "main" %}
 
@@ -16,16 +16,11 @@ source:
 
 build:
   number: 0
-  noarch: python
+  noarch: false
   script:  "{{ PYTHON }} -m pip install --no-deps --ignore-installed --force-reinstall . -vv"
   entry_points:
     - threePSLCCA = three_ps_lcca_gui.gui.main:main
 
-channel:
-  - conda-forge
-  - defaults
-  - osdag
-  - zehen-249
 
 requirements:
   build:
@@ -38,6 +33,7 @@ requirements:
     - python>=3.10,<3.13
   run:
     - python>=3.10,<3.13
+    - pip
     - pyside6<6.10
     - psutil
     - Pillow
@@ -47,7 +43,7 @@ requirements:
     - openpyxl
     - PyYAML
     - pylatex
-    - three-ps-lcca-core
+    - zehen-249::three-ps-lcca-core
     - osdag::osdag_latex_env
     - platformdirs
 
