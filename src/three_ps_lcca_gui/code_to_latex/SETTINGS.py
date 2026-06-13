@@ -38,3 +38,7 @@ REQUIRED_LATEX_PACKAGES = {
     "hyperref":   ["hidelinks", "hypertexnames=false"],
     "bookmark":   None,
 }
+
+# Optional light column backgrounds for generated tables.
+LATEX_TABLE_COLUMN_BG_ENABLED = False
+LATEX_TABLE_COLUMN_BG_COLORS = ("gray!4", "blue!3")

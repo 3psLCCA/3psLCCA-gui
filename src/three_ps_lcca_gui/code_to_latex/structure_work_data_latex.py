@@ -11,7 +11,14 @@ _EMDASH     = NoEscape(r"\textemdash")
 _MIDRULE    = NoEscape(r"\midrule")
 _BOTTOMRULE = NoEscape(r"\bottomrule")
 _N_COLS     = 6
-_COL_SPEC   = "p{4cm}rp{1.2cm}rp{2.5cm}r"
+_COL_SPEC = (
+    r"p{4.4cm}"
+    r">{\raggedleft\arraybackslash}p{1.8cm}"
+    r"p{1.0cm}"
+    r">{\raggedleft\arraybackslash}p{2.0cm}"
+    r"p{2.8cm}"
+    r">{\raggedleft\arraybackslash}p{1.9cm}"
+)
 
 _SOURCE_MARK = {
     "db":             "",
@@ -204,6 +211,12 @@ def _mat_cell(name: str, source: str):
     return NoEscape(escape_latex(name) + mark)
 
 
+def _padded_text(value):
+    if not value:
+        return _EMDASH
+    return NoEscape(r"\hspace{0.35em}" + escape_latex(str(value)))
+
+
 def _structure_table(chunk: dict, caption: str, label: str, currency: str) -> str:
     headers = ["Material", "Quantity", "Unit", "Rate/Unit", "Rate Source", f"Total ({currency})"]
 
@@ -256,7 +269,7 @@ def _structure_table(chunk: dict, caption: str, label: str, currency: str) -> st
                 _fmt(qty),
                 UNIT_DISPLAY.get(v.get("unit", ""), v.get("unit")) or _EMDASH,
                 _fmt(rate),
-                v.get("rate_source") or _EMDASH,
+                _padded_text(v.get("rate_source")),
                 _fmt(total),
             ])
 

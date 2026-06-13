@@ -77,6 +77,7 @@ from .latex_helpers import (
     build_report_v3_document,
     clearpage,
     front_matter,
+    apply_table_column_backgrounds,
     section,
     subsection,
     subsubsection,
@@ -336,7 +337,7 @@ def _part(controller, title: str, exporter: Callable, wide: bool = False, size: 
     latex = latex.replace(r"\begin{table}[htbp]", r"\begin{table}[H]")
     if wide:
         latex = wide_block(latex, size=size)
-    return latex
+    return apply_table_column_backgrounds(latex)
 
 
 def _subsubsection_with_intro(
@@ -500,7 +501,7 @@ def _results_part(controller) -> str:
     if not cache:
         return r"\textit{No calculated LCCA results available.}"
     latex = results_to_latex(_ResultCacheController(controller, cache))
-    return wide_block(latex, size=r"\footnotesize")
+    return apply_table_column_backgrounds(wide_block(latex, size=r"\footnotesize"))
 
 
 _FIGURE_META = [

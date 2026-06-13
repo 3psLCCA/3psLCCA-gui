@@ -13,7 +13,15 @@ from .structure_work_data_latex import (
 _EMDASH = r"\textemdash"
 
 _INC_COLS    = 7
-_INC_SPEC    = "p{3.5cm}rp{1cm}rrp{1.5cm}r"
+_INC_SPEC    = (
+    r"p{4.0cm}"
+    r">{\raggedleft\arraybackslash}p{1.5cm}"
+    r"p{0.8cm}"
+    r">{\raggedleft\arraybackslash}p{2.1cm}"
+    r">{\raggedleft\arraybackslash}p{1.8cm}"
+    r"p{1.7cm}"
+    r">{\raggedleft\arraybackslash}p{1.8cm}"
+)
 _INC_HEADERS = [
     "Material", "Quantity", "Unit",
     "Conversion Factor", "Emission Factor",
