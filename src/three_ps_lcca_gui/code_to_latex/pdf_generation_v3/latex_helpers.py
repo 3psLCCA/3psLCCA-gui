@@ -37,34 +37,12 @@ V3_PREAMBLE = [
     r"\setstretch{1.15}",              # comfortable reading spacing
     r"\setlength{\parskip}{6pt}",      # space between paragraphs
     r"\setlength{\parindent}{0pt}",    # no first-line indent (modern style)
-
-    # ── Tables ────────────────────────────────────────────────────────────────
-    r"\usepackage{booktabs}",
-    r"\usepackage{array}",
-    r"\usepackage{longtable}",
-    r"\usepackage{tabularx}",
-    r"\usepackage{multirow}",
-    r"\usepackage{makecell}",          # \thead, per-cell formatting
-
-    # ── Graphics & floats ─────────────────────────────────────────────────────
-    r"\usepackage{graphicx}",
-    r"\usepackage{float}",
-    r"\usepackage{pdflscape}",
-    r"\usepackage{adjustbox}",
     
 
     # ── Captions ──────────────────────────────────────────────────────────────
     r"\usepackage{caption}",
     r"\captionsetup{font=small, labelfont=bf, labelsep=period, skip=4pt}",
 
-    # ── Math ──────────────────────────────────────────────────────────────────
-    r"\usepackage{amsmath}",
-
-    # ── Colour & lists ────────────────────────────────────────────────────────
-    r"\usepackage{xcolor}",
-    r"\usepackage{colortbl}",
-    r"\usepackage{enumitem}",
-    r"\setlist{noitemsep, topsep=4pt, partopsep=0pt}",
 
     # ── Headers / footers ─────────────────────────────────────────────────────
     r"\fancyhf{}",

@@ -37,7 +37,22 @@ REQUIRED_LATEX_PACKAGES = {
     "etoolbox":   None,
     "hyperref":   ["hidelinks", "hypertexnames=false"],
     "bookmark":   None,
-}
+    "booktabs": None,
+    "array": None,
+    "longtable": None,
+    "tabularx": None,
+    "multirow": None,
+    "makecell": None,
+    "graphicx": None,
+    "float": None,
+    "pdflscape": None,
+    "adjustbox": None,
+    "caption": None,
+    "amsmath": None,
+    "xcolor": None,
+    "colortbl": None,
+    "enumitem": None,
+    }
 
 # Optional light column backgrounds for generated tables.
 LATEX_TABLE_COLUMN_BG_ENABLED = False
