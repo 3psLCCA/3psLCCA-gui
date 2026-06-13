@@ -1,15 +1,21 @@
 # open ..miniconda3\..\Lib\site-packages\constructor\nsis folder 
-# open main.nsi.tmpl file comment these lines 197-199 and 203-204 this will remove the default welcome and header images from the installer.
-
-# yaml-language-server: $schema=https://schemas.conda.org/constructor/v0/construct.schema.json
+# open main.nsi.tmpl file comment these lines 
+# !define MUI_HEADERIMAGE
+# !define MUI_HEADERIMAGE_BITMAP {{ headerimage }}
+# !define MUI_HEADERIMAGE_UNBITMAP {{ headerimage }}
+# !define MUI_WELCOMEFINISHPAGE_BITMAP {{ welcomeimage }}
+# !define MUI_UNWELCOMEFINISHPAGE_BITMAP {{ welcomeimage }}
+#  this will remove the default welcome and header images from the installer.
 
 name: "threePSLCCA"
 version: "1.0.2"
+company: 3PSLCCA
 uninstall_name: ${NAME}
 installer_type: exe # [win]
 installer_type: sh  # [linux]
 
-icon_image: logo-3psLCCA.ico
+icon_image: logo-3psLCCA.ico # [win]
+icon_image: logo-3psLCCA.png # [linux]
 welcome_text: |
   Welcome to the 3PS LCCA GUI Installer.
   This will install 3PS LCCA with all required runtime components.
@@ -21,7 +27,8 @@ extra_files:
   - launch_lcca-gui.vbs  # [win]
   - post_install.sh   # [linux]
   - Uninstall-lcca-gui.sh  # [linux]
-  - logo-3psLCCA.ico
+  - logo-3psLCCA.ico    # [win]
+  - logo-3psLCCA.png    # [linux]
   - create_shortcuts.ps1  # [win]
   - remove_shortcuts.ps1  # [win]
 
@@ -29,6 +36,7 @@ extra_files:
 
 channels:
   - conda-forge
+  - osdag
   - zehen-249
 
 specs:
@@ -55,4 +63,4 @@ post_install_desc: |
 
 conclusion_text: |
   3PS LCCA has been successfully installed.
-  You can launch 3PS LCCA from the start menu or desktop shortcut. To uninstall 3PS LCCA, please go to the Control Panel and remove it from the list of installed programs. If you have any issues, please contact https://osdag.fossee.in. 
+  You can launch 3PS LCCA from the start menu or desktop shortcut. To uninstall 3PS LCCA, please go to the Control Panel and remove it from the list of installed programs.

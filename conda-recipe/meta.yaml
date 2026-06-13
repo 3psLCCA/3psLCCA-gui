@@ -15,11 +15,17 @@ source:
   path: ..
 
 build:
-  number: 0
-  noarch: false
+  number: 3
+  noarch: python
   script:  "{{ PYTHON }} -m pip install --no-deps --ignore-installed --force-reinstall . -vv"
   entry_points:
     - threePSLCCA = three_ps_lcca_gui.gui.main:main
+
+  
+channels:
+  - conda-forge
+  - osdag
+  - zehen-249
 
 
 requirements:
@@ -46,6 +52,8 @@ requirements:
     - zehen-249::three-ps-lcca-core
     - osdag::osdag_latex_env
     - platformdirs
+    - beautifulsoup4
+    - odfpy
 
 about:
   summary: >-

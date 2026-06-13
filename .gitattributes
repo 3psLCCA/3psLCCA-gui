@@ -1,0 +1,15 @@
+# Preserve LF for shell scripts and other Unix files
+*.sh text eol=lf
+*.bash text eol=lf
+*.py text eol=lf
+*.md text eol=lf
+
+# Windows batch files use CRLF
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Binaries
+*.exe binary
+*.dll binary
+*.so binary
