@@ -9,7 +9,7 @@ uninstall_name: ${NAME}
 installer_type: exe # [win]
 installer_type: sh  # [linux]
 
-icon_image: icon.ico
+icon_image: logo-3psLCCA.ico
 welcome_text: |
   Welcome to the 3PS LCCA GUI Installer.
   This will install 3PS LCCA with all required runtime components.
@@ -21,7 +21,7 @@ extra_files:
   - launch_lcca-gui.vbs  # [win]
   - post_install.sh   # [linux]
   - Uninstall-lcca-gui.sh  # [linux]
-  - icon.ico
+  - logo-3psLCCA.ico
   - create_shortcuts.ps1  # [win]
   - remove_shortcuts.ps1  # [win]
 

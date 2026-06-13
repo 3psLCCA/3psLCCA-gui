@@ -7,7 +7,7 @@ $Version = "1.0.2"
 $AppExe = Join-Path $InstallDir "Scripts\threePSLCCA.exe"
 $Launcher = Join-Path $InstallDir "launch_lcca-gui.vbs"
 $UninstallExe = Join-Path $InstallDir "Uninstall-$AppName.exe"
-$IconFile = Join-Path $InstallDir "icon.ico"
+$IconFile = Join-Path $InstallDir "logo-3psLCCA.ico"
 
 # If user is admin?
 $currentUser = [Security.Principal.WindowsIdentity]::GetCurrent()

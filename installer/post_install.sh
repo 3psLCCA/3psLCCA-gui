@@ -7,7 +7,7 @@ INSTALL_DIR="$PREFIX"
 
 launch_shortcut="$HOME/.local/share/applications/$APP_NAME.desktop"
 uninstall_shortcut="$HOME/.local/share/applications/Uninstall-$APP_NAME.desktop"
-ICON_FILE="$INSTALL_DIR/icon.ico"
+ICON_FILE="$INSTALL_DIR/logo-3psLCCA.ico"
 LAUNCHER="$INSTALL_DIR/bin/$APP_NAME"
 UNINSTALLER="$INSTALL_DIR/Uninstall-lcca-gui.sh"
 
