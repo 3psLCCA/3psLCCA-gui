@@ -4,6 +4,7 @@ channels:
   - osdag
   - zehen-249
   - nodefaults
+  
 dependencies:
   - python>=3.10,<3.13
   - pyside6<6.10
@@ -15,7 +16,9 @@ dependencies:
   - openpyxl
   - PyYAML
   - pylatex
-  - three-ps-lcca-core
+  - zehen-249::three-ps-lcca-core
   - osdag::osdag_latex_env
   - platformdirs
   - beautifulsoup4
+  - pip:
+    - pywebview

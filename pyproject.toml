@@ -11,20 +11,15 @@ include-package-data = true
 [tool.setuptools.package-data]
 three_ps_lcca_gui = [
     "gui/components/utils/units.json",
-    "gui/assets/logo/*",
-    "gui/assets/logo/special/*",
-    "gui/assets/themes/*",
-    "gui/assets/themes/Ubuntu_font/*",
-    "gui/themes/*",
-    "gui/themes/dark/*",
-    "gui/themes/light/*",
+    "gui/assets/**",
+    "gui/themes/**",
     "data/wpi_db.json",
     "gui/components/structure/registry/material_catalog.json",
     "gui/components/structure/registry/material_database/**",
     "gui/components/carbon_emission/cscc-database-2018-master/**",
     "gui/components/utils/doc_handler/doc_build/**",
     "report/3psLCCAReportTitlePage.tex",
-    "code_to_latex/pdf_generation_v3/images/*"
+    "code_to_latex/pdf_generation_v3/images/**"
 ]
 
 [tool.setuptools.packages.find]
@@ -47,6 +42,8 @@ dependencies = [
     "PyYAML",
     "pylatex",
     "pywebview",
+    "odfpy",
+    "beautifulsoup4"
 ]
 requires-python = ">= 3.10,<3.13"
 
