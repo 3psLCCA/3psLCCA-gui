@@ -44,6 +44,34 @@ V3_PREAMBLE = [
     r"\captionsetup{font=small, labelfont=bf, labelsep=period, skip=4pt}",
 
 
+    # ── Tables ────────────────────────────────────────────────────────────────
+    r"\usepackage{booktabs}",
+    r"\usepackage{array}",
+    r"\usepackage{longtable}",
+    r"\usepackage{tabularx}",
+    r"\usepackage{multirow}",
+    r"\usepackage{makecell}",          # \thead, per-cell formatting
+
+    # ── Graphics & floats ─────────────────────────────────────────────────────
+    r"\usepackage{graphicx}",
+    r"\usepackage{float}",
+    r"\usepackage{pdflscape}",
+    r"\usepackage{adjustbox}",
+    
+
+    # ── Captions ──────────────────────────────────────────────────────────────
+    r"\usepackage{caption}",
+    r"\captionsetup{font=small, labelfont=bf, labelsep=period, skip=4pt}",
+
+    # ── Math ──────────────────────────────────────────────────────────────────
+    r"\usepackage{amsmath}",
+
+    # ── Colour & lists ────────────────────────────────────────────────────────
+    r"\usepackage{xcolor}",
+    r"\usepackage{colortbl}",
+    r"\usepackage{enumitem}",
+    r"\setlist{noitemsep, topsep=4pt, partopsep=0pt}",
+
     # ── Headers / footers ─────────────────────────────────────────────────────
     r"\fancyhf{}",
     r"\renewcommand{\headrulewidth}{0.4pt}",
