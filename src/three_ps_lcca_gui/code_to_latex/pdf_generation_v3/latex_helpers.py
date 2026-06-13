@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import re
+
 from pylatex.utils import escape_latex
 
 from ..SETTINGS import LATEX_FONT_SIZE, REQUIRED_LATEX_PACKAGES
+from ..SETTINGS import LATEX_FONT_SIZE, REQUIRED_LATEX_PACKAGES, LATEX_TABLE_COLUMN_BG_ENABLED, LATEX_TABLE_COLUMN_BG_COLORS
+
 from datetime import date
 
 
@@ -33,6 +37,34 @@ V3_PREAMBLE = [
     r"\setstretch{1.15}",              # comfortable reading spacing
     r"\setlength{\parskip}{6pt}",      # space between paragraphs
     r"\setlength{\parindent}{0pt}",    # no first-line indent (modern style)
+
+    # ── Tables ────────────────────────────────────────────────────────────────
+    r"\usepackage{booktabs}",
+    r"\usepackage{array}",
+    r"\usepackage{longtable}",
+    r"\usepackage{tabularx}",
+    r"\usepackage{multirow}",
+    r"\usepackage{makecell}",          # \thead, per-cell formatting
+
+    # ── Graphics & floats ─────────────────────────────────────────────────────
+    r"\usepackage{graphicx}",
+    r"\usepackage{float}",
+    r"\usepackage{pdflscape}",
+    r"\usepackage{adjustbox}",
+    
+
+    # ── Captions ──────────────────────────────────────────────────────────────
+    r"\usepackage{caption}",
+    r"\captionsetup{font=small, labelfont=bf, labelsep=period, skip=4pt}",
+
+    # ── Math ──────────────────────────────────────────────────────────────────
+    r"\usepackage{amsmath}",
+
+    # ── Colour & lists ────────────────────────────────────────────────────────
+    r"\usepackage{xcolor}",
+    r"\usepackage{colortbl}",
+    r"\usepackage{enumitem}",
+    r"\setlist{noitemsep, topsep=4pt, partopsep=0pt}",
 
     # ── Headers / footers ─────────────────────────────────────────────────────
     r"\fancyhf{}",
@@ -73,6 +105,65 @@ V3_PREAMBLE = [
     r"\AtBeginEnvironment{tabular}{\footnotesize}",
     r"\sloppy",
 ]
+
+
+def apply_table_column_backgrounds(latex: str) -> str:
+    if not LATEX_TABLE_COLUMN_BG_ENABLED or not latex:
+        return latex
+
+    def _shade_spec(spec: str) -> str:
+        colors = LATEX_TABLE_COLUMN_BG_COLORS
+        column_pattern = r"(?P<modifier>>\{[^{}]*\})?(?P<column>[lcr]|p\{[^{}]+\})"
+        if "".join(spec.split()) == "lll":
+            return spec
+        if len(list(re.finditer(column_pattern, spec))) <= 2:
+            return spec
+        idx = 0
+
+        def repl(match):
+            nonlocal idx
+            modifier = match.group("modifier") or ""
+            column = match.group("column")
+            color = colors[idx % len(colors)]
+            idx += 1
+            marker = r"\columncolor{" + color + r"}"
+            if modifier:
+                return modifier.replace(r">{", r">{" + marker, 1) + column
+            return r">{" + marker + r"}" + column
+
+        return re.sub(column_pattern, repl, spec)
+
+    def _replace_begin_specs(text: str, env: str) -> str:
+        pattern = r"\begin{" + env + r"}{"
+        pos = 0
+        out = []
+        while True:
+            start = text.find(pattern, pos)
+            if start == -1:
+                out.append(text[pos:])
+                return "".join(out)
+            spec_start = start + len(pattern)
+            depth = 1
+            i = spec_start
+            while i < len(text) and depth:
+                if text[i] == "{":
+                    depth += 1
+                elif text[i] == "}":
+                    depth -= 1
+                i += 1
+            if depth:
+                out.append(text[pos:])
+                return "".join(out)
+            spec = text[spec_start:i - 1]
+            out.append(text[pos:spec_start])
+            out.append(_shade_spec(spec))
+            out.append("}")
+            pos = i
+
+    return _replace_begin_specs(_replace_begin_specs(latex, "longtable"), "tabular")
+
+
+
 
 
 def build_report_v3_document(body: str) -> str:
@@ -227,7 +318,7 @@ def wide_block(latex: str, size: str = r"\scriptsize") -> str:
         r"\begingroup",
         size,
         r"\centering",
-        r"\setlength{\tabcolsep}{2pt}",
+        r"\setlength{\tabcolsep}{4pt}",
         r"\setlength{\LTleft}{\fill}",
         r"\setlength{\LTright}{\fill}",
         latex,

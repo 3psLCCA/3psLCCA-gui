@@ -44,7 +44,16 @@ def _detailed_to_latex(data: dict) -> str:
             caption="Machinery and Equipment Emissions (Detailed)",
             label="tab:machinery_equipment_emissions",
             hrules=True,
-            column_format=r"p{3cm}p{1.8cm}>{\raggedleft\arraybackslash}p{1.3cm}>{\raggedleft\arraybackslash}p{1.1cm}>{\raggedleft\arraybackslash}p{1.1cm}>{\raggedleft\arraybackslash}p{1.8cm}>{\raggedleft\arraybackslash}p{1.3cm}>{\raggedleft\arraybackslash}p{1.8cm}",
+            column_format=(
+                r">{\raggedright\arraybackslash}p{2.8cm}"
+                r">{\raggedright\arraybackslash}p{1.6cm}"
+                r">{\raggedleft\arraybackslash}p{1.2cm}"
+                r">{\raggedleft\arraybackslash}p{1.1cm}"
+                r">{\raggedleft\arraybackslash}p{1.1cm}"
+                r">{\raggedleft\arraybackslash}p{1.7cm}"
+                r">{\raggedleft\arraybackslash}p{1.8cm}"
+                r">{\raggedleft\arraybackslash}p{2.1cm}"
+            ),
             environment="longtable",
         )
     ) or ""

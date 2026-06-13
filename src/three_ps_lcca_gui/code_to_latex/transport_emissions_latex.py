@@ -47,10 +47,10 @@ def _summary_table_to_latex(entries: list) -> str:
             label="tab:transport_emissions_summary",
             hrules=True,
             column_format=(
-                r"p{1.8cm} p{2.5cm} p{2.5cm}"
-                r">{\raggedleft\arraybackslash}p{1.5cm}"
-                r">{\raggedleft\arraybackslash}p{1.3cm}"
-                r">{\raggedleft\arraybackslash}p{1.3cm}"
+                r"p{1.8cm}p{2.4cm}p{2.4cm}"
+                r">{\raggedleft\arraybackslash}p{1.4cm}"
+                r">{\raggedleft\arraybackslash}p{1.2cm}"
+                r">{\raggedleft\arraybackslash}p{1.2cm}"
                 r">{\raggedleft\arraybackslash}p{0.8cm}"
                 r">{\raggedleft\arraybackslash}p{2.2cm}"
             ),
@@ -153,7 +153,14 @@ def _vehicle_table_to_latex(entry: dict, mat_index: dict, table_no: int) -> str:
             caption=caption,
             label=f"tab:transport_emissions_{table_no}",
             hrules=True,
-            column_format="p{3.5cm}p{2cm}rrrrp{3cm}",
+            column_format=(
+                r"p{3.3cm}p{1.9cm}"
+                r">{\raggedleft\arraybackslash}p{1.8cm}"
+                r">{\raggedleft\arraybackslash}p{1.8cm}"
+                r">{\raggedleft\arraybackslash}p{0.9cm}"
+                r">{\raggedleft\arraybackslash}p{2.1cm}"
+                r"p{2.6cm}"
+            ),
             environment="longtable",
         )
     ) or ""
