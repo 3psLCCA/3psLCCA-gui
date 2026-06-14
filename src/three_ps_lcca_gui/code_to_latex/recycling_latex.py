@@ -9,14 +9,15 @@ from .structure_work_data_latex import (
     collect_for_recycling,
     longtable_sections,
 )
+from .common_code import latex_layout
 
 _EMDASH = r"\textemdash"
 
 _INC_COLS = 6
-_INC_SPEC = "p{3.5cm}rrrp{1cm}r"
+_INC_SPEC = latex_layout("recycling_included")
 
 _EXC_COLS    = 2
-_EXC_SPEC    = "p{7cm}p{5cm}"
+_EXC_SPEC    = latex_layout("recycling_excluded")
 _EXC_HEADERS = ["Material", "Reason"]
 
 

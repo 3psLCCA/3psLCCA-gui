@@ -13,7 +13,7 @@ REQUIRED_LATEX_PACKAGES = {
     "inputenc":   ["utf8"],       # base LaTeX
     "fontenc":    ["T1"],         # base LaTeX
     "mathptmx":   None,           # psnfss
-    "microtype":  None,
+    "microtype":  ["protrusion=true", "expansion=false"],
     "geometry":   ["a4paper", "top=2.5cm", "bottom=2.5cm", "left=2.5cm", "right=2.5cm"],
     "setspace":   None,
     "booktabs":   None,
@@ -52,6 +52,8 @@ REQUIRED_LATEX_PACKAGES = {
     "xcolor": None,
     "colortbl": None,
     "enumitem": None,
+    "tikz": None,
+    "tcolorbox": ["most"],
     }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -116,3 +118,15 @@ def verify_packages() -> dict:
 # Optional light column backgrounds for generated tables.
 LATEX_TABLE_COLUMN_BG_ENABLED = False
 LATEX_TABLE_COLUMN_BG_COLORS = ("gray!4", "blue!3")
+
+LATEX_TABLE_LAYOUTS = {
+    "field_table": r">{\raggedright\arraybackslash}p{0.40\linewidth}>{\raggedleft\arraybackslash}p{0.40\linewidth}",
+    "structure_work": r">{\raggedright\arraybackslash}p{0.34\linewidth}>{\raggedleft\arraybackslash}p{0.09\linewidth}>{\centering\arraybackslash}p{0.09\linewidth}>{\raggedleft\arraybackslash}p{0.10\linewidth}>{\centering\arraybackslash}p{0.14\linewidth}>{\raggedleft\arraybackslash}p{0.10\linewidth}",
+    "material_emissions": r">{\raggedright\arraybackslash}p{0.23\linewidth}>{\raggedleft\arraybackslash}p{0.09\linewidth}>{\centering\arraybackslash}p{0.07\linewidth}>{\raggedleft\arraybackslash}p{0.12\linewidth}>{\raggedleft\arraybackslash}p{0.12\linewidth}>{\centering\arraybackslash}p{0.11\linewidth}>{\raggedleft\arraybackslash}p{0.10\linewidth}",
+    "material_emissions_excluded": r">{\raggedright\arraybackslash}p{0.47\linewidth}>{\raggedleft\arraybackslash}p{0.47\linewidth}",
+    "recycling_included": r">{\raggedright\arraybackslash}p{0.25\linewidth}>{\raggedleft\arraybackslash}p{0.12\linewidth}>{\raggedleft\arraybackslash}p{0.14\linewidth}>{\centering\arraybackslash}p{0.08\linewidth}>{\raggedleft\arraybackslash}p{0.13\linewidth}>{\raggedleft\arraybackslash}p{0.13\linewidth}",
+    "recycling_excluded": r">{\raggedright\arraybackslash}p{0.47\linewidth}>{\raggedleft\arraybackslash}p{0.47\linewidth}",
+    "transport_summary": r">{\raggedright\arraybackslash}p{0.09\linewidth}>{\raggedright\arraybackslash}p{0.11\linewidth}>{\raggedright\arraybackslash}p{0.10\linewidth}>{\raggedleft\arraybackslash}p{0.10\linewidth}>{\raggedleft\arraybackslash}p{0.09\linewidth}>{\raggedleft\arraybackslash}p{0.09\linewidth}>{\raggedleft\arraybackslash}p{0.06\linewidth}>{\raggedleft\arraybackslash}p{0.14\linewidth}",
+    "transport_emissions": r">{\raggedright\arraybackslash}p{0.27\linewidth}>{\raggedright\arraybackslash}p{0.12\linewidth}>{\raggedleft\arraybackslash}p{0.13\linewidth}>{\raggedleft\arraybackslash}p{0.12\linewidth}>{\raggedleft\arraybackslash}p{0.07\linewidth}>{\raggedleft\arraybackslash}p{0.14\linewidth}",
+    "machinery_emissions": r"p{0.22\linewidth}p{0.14\linewidth}p{0.12\linewidth}p{0.10\linewidth}p{0.10\linewidth}p{0.14\linewidth}p{0.10\linewidth}p{0.12\linewidth}",
+}

@@ -1,13 +1,17 @@
 from pylatex import Table, Tabular, MultiColumn, NoEscape
-from pylatex.utils import bold
+from pylatex.utils import bold, escape_latex
 from ..gui.components.utils.form_builder.form_definitions import Section, FieldDef
 from .html_to_latex import format_remarks_latex
 
 
+def latex_layout(name: str) -> str:
+    from .SETTINGS import LATEX_TABLE_LAYOUTS
+    return LATEX_TABLE_LAYOUTS[name]
+
 def fields_to_latex(fields: list, data: dict, caption: str, label: str, unit_overrides: dict = None) -> str:
     """Build a pylatex table from a list of Section/FieldDef entries and a data dict.
 
-    Columns: Title | Value | Unit
+    Columns: Title | Value and Unit
     Args:
         fields:         FIELDS list (mix of Section and FieldDef)
         data:           chunk dict {key: value}
@@ -15,7 +19,7 @@ def fields_to_latex(fields: list, data: dict, caption: str, label: str, unit_ove
         label:          LaTeX label string, e.g. "tab:bridge_data"
         unit_overrides: optional {field_key: unit_string} to replace FieldDef.unit at render time
     """
-    tabular = Tabular("lll")
+    tabular = Tabular(NoEscape(latex_layout("field_table")))
     tabular.append(NoEscape(r"\toprule"))
 
     first_section = True
@@ -24,7 +28,7 @@ def fields_to_latex(fields: list, data: dict, caption: str, label: str, unit_ove
             if not first_section:
                 tabular.append(NoEscape(r"\midrule"))
             first_section = False
-            tabular.append(NoEscape(MultiColumn(3, align="l", data=bold(entry.title)).dumps() + r" \\"))
+            tabular.append(NoEscape(MultiColumn(2, align="l", data=bold(entry.title)).dumps() + r" \\"))
             tabular.append(NoEscape(r"\midrule"))
         elif isinstance(entry, FieldDef):
             raw = data.get(entry.key, "")
@@ -33,11 +37,14 @@ def fields_to_latex(fields: list, data: dict, caption: str, label: str, unit_ove
             elif isinstance(raw, NoEscape):
                 value = raw
             elif isinstance(raw, (int, float)):
-                value = MultiColumn(1, align="r", data=str(raw))
+                value = str(raw)
             else:
                 value = str(raw)
             unit = (unit_overrides or {}).get(entry.key, entry.unit) or ""
-            tabular.add_row(entry.title, value, unit)
+            if unit:
+                unit = unit if "\\" in unit else escape_latex(unit)
+                value = NoEscape(f"{escape_latex(str(value))} {unit}")
+            tabular.add_row(entry.title, value)
 
     tabular.append(NoEscape(r"\bottomrule"))
 
@@ -52,3 +59,5 @@ def fields_to_latex(fields: list, data: dict, caption: str, label: str, unit_ove
     if remarks:
         out += "\n\n" + remarks
     return out
+
+

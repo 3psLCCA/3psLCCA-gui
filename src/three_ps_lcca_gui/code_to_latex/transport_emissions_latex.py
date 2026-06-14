@@ -1,9 +1,10 @@
 import math
 import pandas as pd
 from ..gui.components.utils.common_requested_data import get_chunk, get_transport_data
-from ..gui.components.utils.definitions import STRUCTURE_CHUNKS, UNIT_DIMENSION, UNIT_DISPLAY
+from ..gui.components.utils.definitions import STRUCTURE_CHUNKS
 from .SETTINGS import DECIMAL_PLACES_FOR_LATEX
 from .html_to_latex import format_remarks_latex
+from .common_code import latex_layout
 
 _FMT    = f"{{:.{DECIMAL_PLACES_FOR_LATEX}f}}"
 _EMDASH = r"\textemdash"
@@ -20,16 +21,15 @@ def _summary_table_to_latex(entries: list) -> str:
         ef           = float(v.get("emission_factor", 0) or 0)
         distance     = float(r.get("distance_km",   0) or 0)
         origin       = r.get("origin", "") or ""
-        dest         = r.get("destination", "") or ""
         vehicle_name = v.get("name", "").strip()
         rows.append({
-            "Delivery":             f"Delivery {table_no}" + (f": {vehicle_name}" if vehicle_name else ""),
-            "Vehicle":              vehicle_name or _EMDASH,
+            "Delivery":             f"Delivery~{table_no}",
+            "Vehicle":              vehicle_name or r"\makebox[\linewidth][c]{\textemdash}",
             "From-To":              origin,
             "Distance (km)":        distance,
             "Capacity (t)":         capacity,
             "Gross Wt (t)":         gross_weight,
-            "EF":                   ef,
+            "Emission Factor":      ef,
             "Total Emissions (kgCO₂e)": total_emission,
         })
 
@@ -37,26 +37,22 @@ def _summary_table_to_latex(entries: list) -> str:
         return ""
 
     df = pd.DataFrame(rows)
-    numeric_cols = ["Distance (km)", "Capacity (t)", "Gross Wt (t)", "EF",
+    numeric_cols = ["Distance (km)", "Capacity (t)", "Gross Wt (t)", "Emission Factor",
                     "Total Emissions (kgCO₂e)"]
-    return (
+    return ((
         df.style.hide(axis="index")
         .format(_FMT, subset=numeric_cols, na_rep=_EMDASH)
         .to_latex(
             caption="Transport Emissions — Summary by Vehicle",
             label="tab:transport_emissions_summary",
             hrules=True,
-            column_format=(
-                r"p{1.8cm}p{2.4cm}p{2.4cm}"
-                r">{\raggedleft\arraybackslash}p{1.4cm}"
-                r">{\raggedleft\arraybackslash}p{1.2cm}"
-                r">{\raggedleft\arraybackslash}p{1.2cm}"
-                r">{\raggedleft\arraybackslash}p{0.8cm}"
-                r">{\raggedleft\arraybackslash}p{2.2cm}"
-            ),
+            column_format=latex_layout("transport_summary"),
             environment="longtable",
         )
-    ) or ""
+    ) or "").replace(
+        "Delivery & Vehicle & From-To & Distance (km) & Capacity (t) & Gross Wt (t) & Emission Factor & Total Emissions (kgCO₂e)",
+        r"\textbf{Delivery} & \textbf{Vehicle} & \textbf{From-To} & \textbf{Distance (km)} & \textbf{Capacity (t)} & \textbf{Gross Wt (t)} & \textbf{Emission Factor} & \textbf{Total Emissions (kgCO₂e)}",
+    )
 
 
 def _build_material_index() -> dict:
@@ -96,7 +92,7 @@ def _vehicle_table_to_latex(entry: dict, mat_index: dict, table_no: int) -> str:
             rows.append({"Material": "Unknown", "Category": "",
                          "kg Conversion Factor": None,
                          "Quantity (kg)": None, "Trips": None,
-                         "Emissions (kgCO₂e)": 0.0, "Notes": "Material removed from structure"})
+                         "Emissions (kgCO₂e)": 0.0})
             continue
 
         record = mat_index[mat_uuid]
@@ -106,7 +102,7 @@ def _vehicle_table_to_latex(entry: dict, mat_index: dict, table_no: int) -> str:
             v = item.get("values", {})
             rows.append({"Material": v.get("material_name", ""), "Category": record["category"],
                          "kg Conversion Factor": None, "Quantity (kg)": None, "Trips": None,
-                         "Emissions (kgCO₂e)": 0.0, "Notes": "In trash"})
+                         "Emissions (kgCO₂e)": 0.0})
             continue
 
         v        = item.get("values", {})
@@ -118,16 +114,6 @@ def _vehicle_table_to_latex(entry: dict, mat_index: dict, table_no: int) -> str:
         emission = (gross_weight + empty_weight) * trips * distance * ef
         total_emission += emission
 
-        notes = []
-        if quantity <= 0:
-            notes.append("Zero quantity")
-        if qty_kg <= 0 < quantity:
-            notes.append("Zero kg — check factor")
-        if trips > 1000:
-            notes.append(f"{trips} trips — unusually high")
-        if UNIT_DIMENSION.get(str(unit).lower()) != "Mass" and abs(kg_factor - 1.0) < 1e-6:
-            notes.append(f"1:1 factor for {UNIT_DISPLAY.get(unit, unit)} — verify")
-
         rows.append({
             "Material":              v.get("material_name", ""),
             "Category":              record["category"],
@@ -135,7 +121,6 @@ def _vehicle_table_to_latex(entry: dict, mat_index: dict, table_no: int) -> str:
             "Quantity (kg)":         qty_kg,
             "Trips":                 float(trips),
             "Emissions (kgCO₂e)":  emission,
-            "Notes":                 " | ".join(notes),
         })
 
     df = pd.DataFrame(rows)
@@ -145,7 +130,7 @@ def _vehicle_table_to_latex(entry: dict, mat_index: dict, table_no: int) -> str:
     name_part = f": {vehicle_name}" if vehicle_name else ""
     caption = f"Delivery {table_no}{name_part} — From {route_str}"
 
-    return (
+    return ((
         df.style.hide(axis="index")
         .format(_FMT, subset=["kg Conversion Factor", "Quantity (kg)", "Trips", "Emissions (kgCO₂e)"],
                 na_rep=_EMDASH)
@@ -153,17 +138,13 @@ def _vehicle_table_to_latex(entry: dict, mat_index: dict, table_no: int) -> str:
             caption=caption,
             label=f"tab:transport_emissions_{table_no}",
             hrules=True,
-            column_format=(
-                r"p{3.3cm}p{1.9cm}"
-                r">{\raggedleft\arraybackslash}p{1.8cm}"
-                r">{\raggedleft\arraybackslash}p{1.8cm}"
-                r">{\raggedleft\arraybackslash}p{0.9cm}"
-                r">{\raggedleft\arraybackslash}p{2.1cm}"
-                r"p{2.6cm}"
-            ),
+            column_format=latex_layout("transport_emissions"),
             environment="longtable",
         )
-    ) or ""
+    ) or "").replace(
+        "Material & Category & kg Conversion Factor & Quantity (kg) & Trips & Emissions (kgCO₂e)",
+        r"\textbf{Material} & \textbf{Category} & \textbf{(kg) Conversion Factor} & \textbf{Quantity (kg)} & \textbf{Trips} & \textbf{Emissions (kgCO₂e)}",
+    )
 
 
 def transport_emissions_to_latex(controller=None) -> str:
