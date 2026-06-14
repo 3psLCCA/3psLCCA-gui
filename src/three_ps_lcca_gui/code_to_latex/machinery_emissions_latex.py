@@ -35,7 +35,7 @@ def _detailed_to_latex(data: dict) -> str:
         })
 
     df = pd.DataFrame(rows)
-    return (
+    return ((
         df.style.hide(axis="index")
         .format(_FMT, subset=["Fuel / Power Rating", "Avg Hrs / Day", "No. of Days",
                                "Emission Factor (kgCO₂e/unit)", "Consumption",
@@ -56,7 +56,10 @@ def _detailed_to_latex(data: dict) -> str:
             ),
             environment="longtable",
         )
-    ) or ""
+    ) or "").replace(
+        "Equipment Name & Energy Source & Fuel / Power Rating & Avg Hrs / Day & No. of Days & Emission Factor (kgCO₂e/unit) & Consumption & Emissions (kgCO₂e)",
+        r"\textbf{Equipment Name} & \textbf{Energy Source} & \textbf{Fuel / Power Rating} & \textbf{Avg Hrs / Day} & \textbf{No. of Days} & \textbf{Emission Factor (kgCO₂e/unit)} & \textbf{Consumption} & \textbf{Emissions (kgCO₂e)}",
+    )
 
 
 def _lumpsum_to_latex(data: dict) -> str:

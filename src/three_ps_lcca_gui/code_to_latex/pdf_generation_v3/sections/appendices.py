@@ -64,25 +64,25 @@ def _appendix_a_content() -> str:
     return _clean_headings(_strip_v3_incompatible_latex(content))
 
 
-def _caption_star_to_numbered(match: re.Match) -> str:
-    caption = match.group(1).strip()
-    caption = re.sub(r"^Table\s+B-?0?\d+\s*", "", caption).strip()
-    return r"\caption{" + caption + r"}"
 
 
 def _appendix_b_content() -> str:
     content = APPENDIX_B_LATEX.replace(r"\appendix", "")
     content = _clean_headings(_strip_v3_incompatible_latex(content))
+    content = content.replace(
+        r"|p{0.18\linewidth}|p{0.72\linewidth}|",
+        r"|>{\fontsize{9pt}{11pt}\selectfont}p{0.18\linewidth}|>{\fontsize{9pt}{11pt}\selectfont}p{0.72\linewidth}|",
+    )
+    content = re.sub(
+        r"\\caption\*\{\\textit\{Table B-\d+\s+([^{}]+?)\}\}",
+        r"\\caption{\1}",
+        content,
+    )
     content = re.sub(
         r"\\begin\{align\*\}(.*?)\\end\{align\*\}",
         lambda match: r"\[\begin{array}{rl}" + match.group(1) + r"\end{array}\]",
         content,
         flags=re.S,
-    )
-    content = re.sub(
-        r"\\caption\*\{\\textit\{([^{}]+)\}\}",
-        _caption_star_to_numbered,
-        content,
     )
     return content
 

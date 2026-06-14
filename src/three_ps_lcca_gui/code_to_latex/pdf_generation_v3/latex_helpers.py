@@ -26,6 +26,7 @@ V3_PREAMBLE = [
     r"\documentclass[12pt,a4paper]{article}",
     "",
     *(_generate_package_imports()),
+    r"\usetikzlibrary{calc}",
     "",
     # ── Captions setup ────────────────────────────────────────────────────────
     r"\captionsetup{font=small, labelfont=bf, labelsep=period, skip=4pt}",
@@ -45,10 +46,11 @@ V3_PREAMBLE = [
 
     # ── Headers / footers ─────────────────────────────────────────────────────
     r"\fancyhf{}",
+    r"\providecommand{\ReportHeaderLogo}{}",
     r"\renewcommand{\headrulewidth}{0.4pt}",
     r"\renewcommand{\footrulewidth}{0.4pt}",
     r"\fancyhead[L]{\small\nouppercase{\leftmark}}",
-    r"\fancyhead[R]{\small 3PS LCCA}",
+    r"\fancyhead[R]{\IfFileExists{\ReportHeaderLogo}{\includegraphics[height=0.42cm]{\ReportHeaderLogo}}{\small 3PS LCCA}}",
     r"\fancyfoot[C]{\small Page~\thepage~of~\pageref*{LastPage}}",
     r"\AtBeginDocument{\pagestyle{fancy}}",
 
@@ -80,6 +82,8 @@ V3_PREAMBLE = [
     r"\AtBeginEnvironment{tabular}{\footnotesize}",
     r"\sloppy",
 ]
+
+
 
 
 def apply_table_column_backgrounds(latex: str) -> str:
@@ -141,10 +145,11 @@ def apply_table_column_backgrounds(latex: str) -> str:
 
 
 
-def build_report_v3_document(body: str) -> str:
+def build_report_v3_document(body: str, logo_path: str = "") -> str:
     """Wrap report body in the V3 LaTeX document shell."""
     return "\n".join([
         *V3_PREAMBLE,
+        r"\renewcommand{\ReportHeaderLogo}{" + logo_path + r"}",
         r"\begin{document}",
         LATEX_FONT_SIZE,
         body,
@@ -230,6 +235,8 @@ def appendix_counter(letter: str) -> str:
         r"\setcounter{section}{" + str(section_number) + r"}",
         r"\setcounter{table}{0}",
         r"\setcounter{figure}{0}",
+        r"\renewcommand{\thetable}{" + letter.upper() + r"-\arabic{table}}",
+        r"\renewcommand{\thefigure}{" + letter.upper() + r"-\arabic{figure}}",
     ])
     return "\n".join(lines)
 

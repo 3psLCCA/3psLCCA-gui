@@ -6,19 +6,14 @@ from pylatex.utils import bold, italic, escape_latex
 from ..gui.components.utils.common_requested_data import get_chunk, get_currency
 from ..gui.components.utils.definitions import STRUCTURE_CHUNKS, UNIT_DISPLAY
 from .SETTINGS import DECIMAL_PLACES_FOR_LATEX
+from .common_code import latex_layout
 
 _EMDASH     = NoEscape(r"\textemdash")
+_CENTER_DASH = NoEscape(r"\multicolumn{1}{c}{\textemdash}")
 _MIDRULE    = NoEscape(r"\midrule")
 _BOTTOMRULE = NoEscape(r"\bottomrule")
 _N_COLS     = 6
-_COL_SPEC = (
-    r"p{4.4cm}"
-    r">{\raggedleft\arraybackslash}p{1.8cm}"
-    r"p{1.0cm}"
-    r">{\raggedleft\arraybackslash}p{2.0cm}"
-    r"p{2.8cm}"
-    r">{\raggedleft\arraybackslash}p{1.9cm}"
-)
+_COL_SPEC = latex_layout("structure_work")
 
 _SOURCE_MARK = {
     "db":             "",
@@ -43,12 +38,13 @@ def longtable_sections(col_spec: str, n_cols: int, caption: str, label: str,
     sections: list of (header_text, [[cell, ...], ...])
     """
     table = LongTable(col_spec)
+    header_row = [NoEscape(r"\textbf{" + str(h) + "}") if isinstance(h, NoEscape) else bold(h) for h in headers]
 
     table.append(NoEscape(
         rf"\caption{{{escape_latex(caption)}}} \label{{{label}}} \\"
     ))
     table.append(NoEscape(r"\toprule"))
-    table.add_row(headers)
+    table.add_row(header_row)
     table.append(NoEscape(r"\midrule"))
     table.append(NoEscape(r"\endhead"))
 
@@ -200,20 +196,20 @@ def _legend(currency: str) -> NoEscape:
 
 def _fmt(val):
     if val is None:
-        return _EMDASH
+        return _CENTER_DASH
     return f"{val:.{DECIMAL_PLACES_FOR_LATEX}f}"
 
 
 def _mat_cell(name: str, source: str):
     mark = _SOURCE_MARK.get(source, "")
     if not name:
-        return _EMDASH
+        return _CENTER_DASH
     return NoEscape(escape_latex(name) + mark)
 
 
 def _padded_text(value):
     if not value:
-        return _EMDASH
+        return _CENTER_DASH
     return NoEscape(r"\hspace{0.35em}" + escape_latex(str(value)))
 
 
@@ -267,7 +263,7 @@ def _structure_table(chunk: dict, caption: str, label: str, currency: str) -> st
             table.add_row([
                 _mat_cell(v.get("material_name", ""), source),
                 _fmt(qty),
-                UNIT_DISPLAY.get(v.get("unit", ""), v.get("unit")) or _EMDASH,
+                UNIT_DISPLAY.get(v.get("unit", ""), v.get("unit")) or _CENTER_DASH,
                 _fmt(rate),
                 _padded_text(v.get("rate_source")),
                 _fmt(total),

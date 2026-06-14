@@ -9,28 +9,21 @@ from .structure_work_data_latex import (
     collect_for_emissions,
     longtable_sections,
 )
+from .common_code import latex_layout
 
 _EMDASH = r"\textemdash"
 
 _INC_COLS    = 7
-_INC_SPEC    = (
-    r"p{4.0cm}"
-    r">{\raggedleft\arraybackslash}p{1.5cm}"
-    r"p{0.8cm}"
-    r">{\raggedleft\arraybackslash}p{2.1cm}"
-    r">{\raggedleft\arraybackslash}p{1.8cm}"
-    r"p{1.7cm}"
-    r">{\raggedleft\arraybackslash}p{1.8cm}"
-)
+_INC_SPEC    = latex_layout("material_emissions")
 _INC_HEADERS = [
     "Material", "Quantity", "Unit",
     "Conversion Factor", "Emission Factor",
-    NoEscape(r"EF Unit"),
+    NoEscape(r"Emission Factor Unit"),
     NoEscape(r"Total (kgCO\textsubscript{2}e)"),
 ]
 
 _EXC_COLS    = 2
-_EXC_SPEC    = "p{7cm}p{5cm}"
+_EXC_SPEC    = latex_layout("material_emissions_excluded")
 _EXC_HEADERS = ["Material", "Exclusion Reason"]
 
 
@@ -39,6 +32,10 @@ def _fmt(val) -> str:
         return f"{float(val):,.{DECIMAL_PLACES_FOR_LATEX}f}"
     except (TypeError, ValueError):
         return _EMDASH
+
+
+def _fmt_ef_unit(unit: str) -> str:
+    return (unit or "").replace("CO2e", "CO₂e").replace("m2", "m²").replace("m3", "m³")
 
 
 def _get_included_table(included: dict) -> str:
@@ -54,7 +51,7 @@ def _get_included_table(included: dict) -> str:
                 escape_latex(r["unit"]),
                 _fmt(r["cf"]),
                 _fmt(r["ef"]),
-                escape_latex(r["ef_unit"]),
+                escape_latex(_fmt_ef_unit(r["ef_unit"])),
                 _fmt(r["total"]),
             ]
             for r in rows

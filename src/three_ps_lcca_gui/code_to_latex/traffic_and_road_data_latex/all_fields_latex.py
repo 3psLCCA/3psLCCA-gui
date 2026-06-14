@@ -82,12 +82,12 @@ def _peak_hour_distribution(data: dict) -> str:
         })
 
     df = pd.DataFrame(rows)
-    return (
+    return ((
         df.style
         .hide(axis="index")
         .format(
             {r"Traffic Proportion (\%)": f"{{:.{DECIMAL_PLACES_FOR_LATEX}f}}"},
-            na_rep=r"\textemdash",
+            na_rep=r"\multicolumn{1}{c}{\textemdash}",
         )
         .to_latex(
             caption="Peak Hour Traffic Distribution",
@@ -97,4 +97,4 @@ def _peak_hour_distribution(data: dict) -> str:
             position="h!",
             position_float="centering",
         )
-    ) or ""
+    ) or "").replace("Hour & Traffic Proportion (\\%)", r"\textbf{Hour} & \textbf{Traffic Proportion (\%)}")

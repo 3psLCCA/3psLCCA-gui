@@ -83,7 +83,10 @@ from .latex_helpers import (
     subsubsection,
     title_page,
     wide_block,
+    appendix_counter,
 )
+
+from .sections.title_page import title_page_to_latex
 from .sections.appendices import appendices_to_latex
 from .sections.introduction import introduction_to_latex
 from ..social_cost_data_latex import social_cost_data_to_latex
@@ -94,7 +97,7 @@ REPORT_SCHEMA = [
     {
         "title": "Title page",
         "key": KEY_SHOW_TITLE_PAGE,
-        "render": lambda ctrl, config, paths, logo: title_page(_project_name(ctrl), logo_path=logo)
+        "render": lambda ctrl, config, paths, logo: title_page_to_latex(ctrl, app_logo_path=logo)
     },
     {
         "title": "Table of contents",
@@ -454,24 +457,16 @@ def _fit_appendix_b_tables(latex: str) -> str:
     prefix = latex[:marker_pos]
     appendix_b = latex[marker_pos:]
     appendix_b = appendix_b.replace(
-        r"{\fontsize{9pt}{11pt}\selectfont",
-        r"{\fontsize{7pt}{8.5pt}\selectfont",
-    )
-    appendix_b = appendix_b.replace(
-        r"\everymath{\fontsize{9pt}{11pt}\selectfont}",
-        r"\everymath{\fontsize{7pt}{8.5pt}\selectfont}",
-    )
-    appendix_b = appendix_b.replace(
-        r"\everydisplay{\fontsize{9pt}{11pt}\selectfont}",
-        r"\everydisplay{\fontsize{7pt}{8.5pt}\selectfont}",
-    )
-    appendix_b = appendix_b.replace(
         r"\setlength{\tabcolsep}{3pt}",
         r"\setlength{\tabcolsep}{1.5pt}",
     )
     appendix_b = appendix_b.replace(
         r"\begin{tabular}{|p{0.18\linewidth}|p{0.72\linewidth}|}",
         r"\begin{tabular}{|p{0.15\linewidth}|p{0.79\linewidth}|}",
+    )
+    appendix_b = appendix_b.replace(
+        r"\begin{tabular}{|>{\fontsize{9pt}{11pt}\selectfont}p{0.18\linewidth}|>{\fontsize{9pt}{11pt}\selectfont}p{0.72\linewidth}|}",
+        r"\begin{tabular}{|>{\fontsize{9pt}{11pt}\selectfont}p{0.15\linewidth}|>{\fontsize{9pt}{11pt}\selectfont}p{0.79\linewidth}|}",
     )
     appendix_b = appendix_b.replace(r"\makebox[\linewidth][c]{$", r"$")
     appendix_b = appendix_b.replace(r"$} \\ \hline", r"$ \\ \hline")
@@ -589,6 +584,7 @@ def _appendix_c_wpi(controller) -> str:
     return "\n\n".join([
         r"\clearpage",
         r"\begin{landscape}",
+        appendix_counter("C"),
         r"\section*{Appendix C: Miscellaneous data}",
         r"\addcontentsline{toc}{section}{Appendix C: Miscellaneous data}",
         r"\begingroup",
@@ -646,7 +642,8 @@ def lcca_report_body(controller=None, plot_paths: dict | None = None, config: di
 
 def build_structured_code_to_latex_report_document(controller=None,plot_paths: dict | None = None,config: dict | None = None,logo_path: str = "",) -> str:
     return build_report_v3_document(
-        lcca_report_body(controller, plot_paths, config=config, logo_path=logo_path)
+        lcca_report_body(controller, plot_paths, config=config, logo_path=logo_path),
+        logo_path=logo_path,
     )
 
 
@@ -776,9 +773,7 @@ def compile_lcca_report_pdf(
                 logo_path=logo_path,
             )
             tex_path.write_text(tex_content, encoding="utf-8")
-            # Only write .tex to final output dir if ALLOW_TEX is True
-            if ALLOW_TEX:
-                final_tex_path.write_text(tex_content, encoding="utf-8")
+            final_tex_path.write_text(tex_content, encoding="utf-8")
 
             if not shutil.which(_PDFLATEX) and not os.path.exists(_PDFLATEX):
                 raise RuntimeError(
@@ -805,7 +800,7 @@ def compile_lcca_report_pdf(
                         error_lines = [l for l in lines if l.startswith("!") or "Error" in l or "error" in l]
                         log_snippet = "\n".join(error_lines[-30:]) if error_lines else "\n".join(lines[-40:])
                     
-                    tex_msg = f"\n\nThe .tex file has been saved to:\n  {final_tex_path}" if ALLOW_TEX else ""
+                    tex_msg = f"\n\nThe .tex file has been saved to:\n  {final_tex_path}"
                     
                     # On failure, check for missing packages to provide a better error message
                     missing_pkg_msg = _check_and_report_missing_packages()
@@ -828,7 +823,7 @@ def compile_lcca_report_pdf(
             if pdf_path.resolve() != final_pdf_path.resolve():
                 shutil.copy2(pdf_path, final_pdf_path)
 
-            return (final_tex_path if ALLOW_TEX else None), final_pdf_path
+            return final_tex_path, final_pdf_path
 
         except Exception as e:
             last_error = e

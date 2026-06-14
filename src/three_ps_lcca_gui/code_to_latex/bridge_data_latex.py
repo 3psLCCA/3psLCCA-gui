@@ -2,6 +2,7 @@ from ..gui.components.bridge_data.main import BRIDGE_FIELDS
 from ..gui.project_controller import ProjectController
 from .common_code import fields_to_latex
 
+
 CHUNK = "bridge_data"
 
 
