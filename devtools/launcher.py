@@ -207,6 +207,25 @@ def _get_tools() -> list[dict]:
     except ImportError as e:
         tools.append(_error_card("Doc Builder", str(e)))
 
+    # ── LaTeX Bundle Check ────────────────────────────────────────────────
+    try:
+        from latex_env_check_gui import LatexEnvCheckDialog
+        tools.append({
+            "key":    "latex_env_check",
+            "icon":   "🧪",
+            "name":   "LaTeX Bundle Check",
+            "desc":   (
+                "Verify that every package in REQUIRED_LATEX_PACKAGES is present "
+                "in the bundled osdag_latex_env texmf-dist.\n"
+                "Shows a green/red list instantly (filesystem check, no pdflatex run). "
+                "Run this before generating a PDF report to catch missing packages early."
+            ),
+            "accent": _PEACH,
+            "open":   lambda parent: _open_dialog(LatexEnvCheckDialog, parent),
+        })
+    except ImportError as e:
+        tools.append(_error_card("LaTeX Bundle Check", str(e)))
+
     # ── File Integrity Checker ─────────────────────────────────────────────
     try:
         from integrity_tool_gui import IntegrityToolDialog

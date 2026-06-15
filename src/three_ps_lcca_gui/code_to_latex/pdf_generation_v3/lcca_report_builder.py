@@ -768,7 +768,7 @@ def compile_lcca_report_pdf(
                 print(f"[structured_code_to_latex_report] chart generation failed: {exc}")
 
             logo_file = Path(__file__).resolve().parents[2] / "gui" / "assets" / "logo" / "3pslcca_header.png"
-            logo_path = os.path.relpath(logo_file, work_dir).replace("\\", "/")
+            logo_path = logo_file.as_posix()
             tex_content = build_structured_code_to_latex_report_document(
                 controller,
                 plot_paths,

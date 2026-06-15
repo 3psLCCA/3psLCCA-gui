@@ -63,8 +63,6 @@ V3_PREAMBLE = [
     r"\renewcommand{\contentsname}{Table of Contents}",
     r"\renewcommand{\listtablename}{List of Tables}",
     r"\renewcommand{\listfigurename}{List of Figures}",
-    r"\renewcommand{\cftsecleader}{\cftdotfill{\cftdotsep}}",
-    r"\renewcommand{\cftsubsecleader}{\cftdotfill{\cftdotsep}}",
 
     # ── Unicode shorthands ────────────────────────────────────────────────────
     r"\DeclareUnicodeCharacter{20B9}{Rs.}",

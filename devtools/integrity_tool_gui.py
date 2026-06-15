@@ -22,6 +22,7 @@ import hashlib
 import json
 import os
 import sys
+from pathlib import Path
 
 from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtGui import QColor, QFont
@@ -111,7 +112,10 @@ def _abs(rel: str) -> str:
 
 def _rel(abs_path: str) -> str:
     """Make a path relative to the project root, forward slashes."""
-    return os.path.relpath(abs_path, _PROJECT_ROOT).replace("\\", "/")
+    try:
+        return Path(abs_path).relative_to(_PROJECT_ROOT).as_posix()
+    except ValueError:
+        return Path(abs_path).as_posix()
 
 
 def _read_integrity() -> dict:
