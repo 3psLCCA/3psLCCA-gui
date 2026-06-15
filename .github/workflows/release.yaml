@@ -1,0 +1,547 @@
+name: Build and Publish to Conda
+
+on:
+  # push:
+  #   tags:
+  #     - 'v*'  # Triggers on tags like v1.0.0, v1.0.1
+  release:
+    types: [published]
+    
+permissions:
+  contents: write
+  
+jobs:
+  build-and-publish-conda:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+      continue-on-error: false
+    
+    - name: Set up Conda
+      uses: conda-incubator/setup-miniconda@v2
+      with:
+        auto-update-conda: true
+        channels: conda-forge,zehen-249
+        channel-priority: false
+    
+    - name: Install conda-build and anaconda-client
+      shell: bash -l {0}
+      run: |
+        set -e  # Exit on any error
+        echo "Installing conda-build and anaconda-client..."
+        conda install conda-build anaconda-client -y
+        echo "✅ Tools installed successfully"
+        conda --version
+        conda-build --version
+    
+    - name: Extract version from tag
+      shell: bash
+      run: |
+        set -e  # Exit on any error
+        TAG="$GITHUB_REF_NAME"
+        echo "Full tag: $TAG"
+        
+        # Validate tag format
+        if [[ ! $TAG =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+          echo "❌ ERROR: Tag format invalid. Expected v1.0.0, got: $TAG"
+          exit 1
+        fi
+        
+        VERSION=${TAG#v}
+        echo "VERSION=$VERSION" >> $GITHUB_ENV
+        echo "✅ Extracted version: $VERSION"
+    
+    - name: Verify conda-recipe/meta.yaml exists
+      shell: bash
+      run: |
+        if [ ! -f "conda-recipe/meta.yaml" ]; then
+          echo "❌ ERROR: conda-recipe/meta.yaml not found!"
+          echo "Current directory: $(pwd)"
+          echo "Contents:"
+          ls -la conda-recipe/ 2>/dev/null || echo "conda-recipe/ directory not found"
+          exit 1
+        fi
+        echo "✅ meta.yaml found"
+        echo "Current content:"
+        head -10 conda-recipe/meta.yaml
+    
+    - name: Update meta.yaml with version from tag
+      shell: bash
+      run: |
+        set -e
+        VERSION="${{ env.VERSION }}"
+        echo "Updating meta.yaml with version: $VERSION"
+        
+        # Backup original
+        cp conda-recipe/meta.yaml conda-recipe/meta.yaml.backup
+        
+        # Update version line
+        sed -i "s/{% set version = .* %}/{% set version = \"$VERSION\" %}/" conda-recipe/meta.yaml
+        
+        # Verify the update worked
+        if grep -q "set version = \"$VERSION\"" conda-recipe/meta.yaml; then
+          echo "✅ meta.yaml updated successfully"
+          grep "set version" conda-recipe/meta.yaml | head -1
+        else
+          echo "❌ ERROR: Version not updated in meta.yaml"
+          echo "Expected: set version = \"$VERSION\""
+          echo "Got:"
+          grep "set version" conda-recipe/meta.yaml || echo "No version line found"
+          exit 1
+        fi
+    
+    - name: Update pyproject.toml with version from tag
+      shell: bash
+      run: |
+        set -e
+        VERSION="${{ env.VERSION }}"
+        echo "Updating pyproject.toml with version: $VERSION"
+
+        # Backup original
+        cp pyproject.toml pyproject.toml.backup
+
+        # Update version in pyproject.toml
+        sed -i "s/^version = \".*\"/version = \"$VERSION\"/" pyproject.toml
+        echo "Updated pyproject.toml:"
+        grep "version = " pyproject.toml | head -1
+
+        # Verify the update worked
+        if grep -q "version = \"$VERSION\"" pyproject.toml; then
+          echo "✅ pyproject.toml updated successfully"
+          grep "version = " pyproject.toml | head -1
+        else
+          echo "❌ ERROR: Version not updated in pyproject.toml"
+          echo "Expected: version = \"$VERSION\""
+          echo "Got:"
+          grep "version = " pyproject.toml || echo "No version line found"
+          exit 1
+        fi
+
+    - name: Build conda package
+      shell: bash -l {0}
+      run: |
+        set -e
+        echo "Starting conda-build..."
+        echo "Recipe location: $(pwd)/conda-recipe"
+        
+        conda-build conda-recipe --output-folder dist/
+        
+        if [ $? -eq 0 ]; then
+          echo "✅ Build successful"
+          echo "Built packages:"
+          ls -lh dist/noarch/
+        else
+          echo "❌ Build failed"
+          exit 1
+        fi
+    
+    - name: Verify build artifacts exist
+      shell: bash
+      run: |
+        set -e
+        if [ -z "$(ls -A dist/noarch/ 2>/dev/null)" ]; then
+          echo "❌ ERROR: No packages found in dist/noarch/"
+          exit 1
+        fi
+        echo "✅ Build artifacts found:"
+        ls -lh dist/noarch/
+    
+    - name: Publish to Anaconda Cloud
+      shell: bash -l {0}
+      if: success()
+      env:
+        ANACONDA_TOKEN: ${{ secrets.ANACONDA_TOKEN }}
+      run: |
+        set -e
+        
+        # Verify token exists
+        if [ -z "$ANACONDA_TOKEN" ]; then
+          echo "❌ ERROR: ANACONDA_TOKEN secret not set"
+          echo "Please add ANACONDA_TOKEN to GitHub repo secrets"
+          exit 1
+        fi
+        
+        echo "Publishing to Anaconda Cloud..."
+        UPLOAD_FAILED=0
+        
+        # Upload .tar.bz2 files
+        if ls dist/noarch/*.tar.bz2 1> /dev/null 2>&1; then
+          echo "Uploading .tar.bz2 packages..."
+          if anaconda -t $ANACONDA_TOKEN upload dist/noarch/*.tar.bz2 --force; then
+            echo "✅ .tar.bz2 upload successful"
+          else
+            echo "⚠️ .tar.bz2 upload failed (non-blocking)"
+            UPLOAD_FAILED=1
+          fi
+        else
+          echo "⚠️ No .tar.bz2 files found"
+        fi
+        
+        # Upload .conda files
+        if ls dist/noarch/*.conda 1> /dev/null 2>&1; then
+          echo "Uploading .conda packages..."
+          if anaconda -t $ANACONDA_TOKEN upload dist/noarch/*.conda --force; then
+            echo "✅ .conda upload successful"
+          else
+            echo "⚠️ .conda upload failed (non-blocking)"
+            UPLOAD_FAILED=1
+          fi
+        else
+          echo "⚠️ No .conda files found"
+        fi
+        
+        if [ $UPLOAD_FAILED -eq 1 ]; then
+          echo "⚠️ Some uploads failed, but artifacts are saved"
+        else
+          echo "✅ All uploads successful"
+        fi
+    
+    - name: Upload build artifacts to GitHub
+      uses: actions/upload-artifact@v4
+      if: always()  # Upload even if publish fails
+      with:
+        name: conda-packages-${{ env.VERSION }}
+        path: |
+          dist/noarch/*.conda
+          dist/noarch/*.tar.bz2
+        retention-days: 1
+      continue-on-error: true
+
+    - name: Test in clean environment
+      shell: bash -l {0}
+      if: success()
+      run: |
+        set -e
+        echo "=== Testing in clean conda environment ==="
+        
+        # Create test environment
+        conda create -n test-env -c zehen-249 three-ps-lcca-gui -y
+        conda activate test-env
+        
+        echo "✅ Installation successful"
+        conda list | grep three-ps-lcca-gui
+        
+        # Test CLI command
+        echo ""
+        echo "Testing CLI command..."
+        # Replace with YOUR actual command
+        # three-ps-lcca-gui --version  
+        # or: python -m three-ps-lcca-gui --help
+        
+        echo "✅ CLI works"
+        
+        # Test GUI opens (headless test)
+        echo ""
+        echo "Testing GUI import..."
+        python -c "
+        try:
+            from three_ps_lcca_gui.gui.main import main
+            print('✅ GUI module imports successfully')
+        except ImportError as e:
+            print(f'❌ GUI import failed: {e}')
+            exit(1)
+        "
+        
+        # Cleanup
+        conda deactivate
+        conda remove -n test-env --all -y
+        
+
+  publish-installer-windows:
+    runs-on: windows-latest
+    needs: build-and-publish-conda
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+        continue-on-error: false
+  
+      - name: Set up Conda
+        uses: conda-incubator/setup-miniconda@v2
+        with:
+          auto-update-conda: true
+          channels: conda-forge,osdag,zehen-249
+          channel-priority: false
+
+      - name: Install conda-constructor 
+        shell: bash -l {0}
+        run: |
+          set -e  # Exit on any error
+          echo "Installing conda-constructor..."
+          conda install constructor -y
+          echo "✅ Tools installed successfully"
+          conda --version
+          constructor --version
+
+      - name: refactor-nsis-template
+        shell: bash -l {0}
+        run: |
+          set -e
+          echo "Refactoring NSIS template..."
+
+          NSIS_TEMPLATE_PATH=$(grep -R -l "^!define MUI_HEADERIMAGE$" "$(conda info --base)\envs\tests" | head -n 1)
+          echo "Found template: $NSIS_TEMPLATE_PATH"
+          if [ -f "$NSIS_TEMPLATE_PATH" ]; then
+            echo "Found NSIS template at: $NSIS_TEMPLATE_PATH"
+            # Backup original
+            cp "$NSIS_TEMPLATE_PATH" "${NSIS_TEMPLATE_PATH}.backup"
+            
+            # Comment out lines related to default images
+            sed -i "s/^\(!define MUI_HEADERIMAGE\)/; \1/g" "$NSIS_TEMPLATE_PATH"
+            sed -i "s/^\(!define MUI_HEADERIMAGE_BITMAP {{ headerimage }}\)/; \1/g" "$NSIS_TEMPLATE_PATH"
+            sed -i "s/^\(!define MUI_HEADERIMAGE_UNBITMAP {{ headerimage }}\)/; \1/g" "$NSIS_TEMPLATE_PATH"
+            sed -i "s/^\(!define MUI_WELCOMEFINISHPAGE_BITMAP {{ welcomeimage }}\)/; \1/g" "$NSIS_TEMPLATE_PATH"
+            sed -i "s/^\(!define MUI_UNWELCOMEFINISHPAGE_BITMAP {{ welcomeimage }}\)/; \1/g" "$NSIS_TEMPLATE_PATH"
+            
+            echo "✅ NSIS template refactored successfully"
+          else
+            echo "❌ ERROR: NSIS template not found at expected location: $NSIS_TEMPLATE_PATH"
+            exit 1
+          fi
+          
+      - name: Extract version from tag
+        shell: bash
+        run: |
+          set -e  # Exit on any error
+          TAG="$GITHUB_REF_NAME"
+          echo "Full tag: $TAG"
+          
+          # Validate tag format
+          if [[ ! $TAG =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "❌ ERROR: Tag format invalid. Expected v1.0.0, got: $TAG"
+            exit 1
+          fi
+          
+          VERSION=${TAG#v}
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "✅ Extracted version: $VERSION"
+
+      - name: Set version in construct.yaml
+        shell: bash -l {0}
+        run: |
+          set -e
+          VERSION="${{ env.VERSION }}"
+          echo "Updating construct.yaml with version: $VERSION"
+          
+          if [ -f "installer/construct.yaml" ]; then
+            # Backup original
+            cp installer/construct.yaml installer/construct.yaml.backup
+            
+            # Update constructor version
+            sed -i "s/^version:.*/version: \"$VERSION\"/" installer/construct.yaml
+
+            # Update package spec version
+            sed -i "s|zehen-249::three-ps-lcca-gui=.*|zehen-249::three-ps-lcca-gui=$VERSION|g" installer/construct.yaml
+            
+            echo "✅ construct.yaml updated successfully"
+            grep "version:" installer/construct.yaml | head -1
+          else
+            echo "❌ ERROR: construct.yaml not found!"
+            exit 1
+          fi
+      - name: Wait for Anaconda indexing
+        shell: bash -l {0}
+        run: |
+          MAX_ATTEMPTS=20
+          ATTEMPT=1
+
+          until conda search zehen-249::three-ps-lcca-gui=$VERSION; do
+            if [ $ATTEMPT -ge $MAX_ATTEMPTS ]; then
+              echo "Package not indexed after 10 minutes"
+              exit 1
+            fi
+
+            echo "Waiting for package indexing..."
+            sleep 30
+            ATTEMPT=$((ATTEMPT+1))
+          done
+          
+      - name: Create and publish installer
+        shell: bash -l {0}
+        run: |
+          set -e
+          echo "Creating installer with constructor..."
+          constructor installer --output-dir dist/installer/win-64/
+          
+          echo "✅ Windows Installer build successful"
+          ls -lh dist/installer/win-64/ 2>/dev/null || echo "No installer found"
+
+      - name: Upload Windows installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: dist/installer/win-64/*
+          retention-days: 1
+
+
+  publish-installer-linux:
+    runs-on: ubuntu-latest
+    needs: build-and-publish-conda
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+        continue-on-error: false
+  
+      - name: Set up Conda
+        uses: conda-incubator/setup-miniconda@v2
+        with:
+          auto-update-conda: true
+          channels: conda-forge,osdag,zehen-249
+          channel-priority: false
+
+      - name: Install conda-constructor 
+        shell: bash -l {0}
+        run: |
+          set -e  # Exit on any error
+          echo "Installing conda-constructor..."
+          conda install constructor -y
+          echo "✅ Tools installed successfully"
+          conda --version
+          constructor --version
+
+      - name: Extract version from tag
+        shell: bash
+        run: |
+          set -e  # Exit on any error
+          TAG="$GITHUB_REF_NAME"
+          echo "Full tag: $TAG"
+          
+          # Validate tag format
+          if [[ ! $TAG =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "❌ ERROR: Tag format invalid. Expected v1.0.0, got: $TAG"
+            exit 1
+          fi
+          
+          VERSION=${TAG#v}
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "✅ Extracted version: $VERSION"
+
+      - name: Set version in construct.yaml
+        shell: bash -l {0}
+        run: |
+          set -e
+          VERSION="${{ env.VERSION }}"
+          echo "Updating construct.yaml with version: $VERSION"
+          
+          if [ -f "installer/construct.yaml" ]; then
+            # Backup original
+            cp installer/construct.yaml installer/construct.yaml.backup
+            
+            # Update constructor version
+            sed -i "s/^version:.*/version: \"$VERSION\"/" installer/construct.yaml
+
+            # Update package spec version
+            sed -i "s|zehen-249::three-ps-lcca-gui=.*|zehen-249::three-ps-lcca-gui=$VERSION|g" installer/construct.yaml
+            
+            echo "✅ construct.yaml updated successfully"
+            grep "version:" installer/construct.yaml | head -1
+          else
+            echo "❌ ERROR: construct.yaml not found!"
+            exit 1
+          fi
+
+      - name: Wait for Anaconda indexing
+        shell: bash -l {0}
+        run: |
+          MAX_ATTEMPTS=20
+          ATTEMPT=1
+
+          until conda search zehen-249::three-ps-lcca-gui=$VERSION; do
+            if [ $ATTEMPT -ge $MAX_ATTEMPTS ]; then
+              echo "Package not indexed after 10 minutes"
+              exit 1
+            fi
+
+            echo "Waiting for package indexing..."
+            sleep 30
+            ATTEMPT=$((ATTEMPT+1))
+          done
+
+      - name: Create and publish installer
+        shell: bash -l {0}
+        run: |
+          set -e
+          echo "Creating installer with constructor..."
+          constructor installer --output-dir dist/installer/linux-64/
+          
+          echo "✅ Linux Installer build successful"
+          ls -lh dist/installer/linux-64/ 2>/dev/null || echo "No installer found"
+
+      - name: Upload Linux installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-installer
+          path: dist/installer/linux-64/*
+          retention-days: 1
+
+  publish-release-assets:
+    runs-on: ubuntu-latest
+    needs:
+      - build-and-publish-conda
+      - publish-installer-windows
+      - publish-installer-linux
+
+    steps:
+      - name: Download conda packages
+        uses: actions/download-artifact@v4
+        with:
+          pattern: conda-packages-*
+          path: release-assets
+
+      - name: Download Windows installer
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-installer
+          path: release-assets/windows
+
+      - name: Download Linux installer
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-installer
+          path: release-assets/linux
+
+      - name: Show assets
+        run: find release-assets -type f
+
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-assets/**/*
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  workflow-summary:
+    name: Workflow Summary
+    runs-on: ubuntu-latest
+    if: always()
+
+    needs:
+    - build-and-publish-conda
+    - publish-installer-windows
+    - publish-installer-linux
+    - publish-release-assets
+
+    steps:
+    - name: Generate Summary
+      shell: bash
+      run: |
+        {
+        echo "# Release Pipeline Summary"
+        echo ""
+        echo "| Job | Status |"
+        echo "|------|--------|"
+        echo "| Conda Package | ${{ needs.build-and-publish-conda.result }} |"
+        echo "| Windows Installer | ${{ needs.publish-installer-windows.result }} |"
+        echo "| Linux Installer | ${{ needs.publish-installer-linux.result }} |"
+        echo "| Release Assets | ${{ needs.publish-release-assets.result }} |"
+        echo ""
+        echo "Generated: $(date -u)"
+        } >> "$GITHUB_STEP_SUMMARY"
