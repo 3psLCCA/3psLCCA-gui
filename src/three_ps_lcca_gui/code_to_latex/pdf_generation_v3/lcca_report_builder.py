@@ -773,7 +773,8 @@ def compile_lcca_report_pdf(
                 logo_path=logo_path,
             )
             tex_path.write_text(tex_content, encoding="utf-8")
-            final_tex_path.write_text(tex_content, encoding="utf-8")
+            if keep_artifacts:
+                final_tex_path.write_text(tex_content, encoding="utf-8")
 
             if not shutil.which(_PDFLATEX) and not os.path.exists(_PDFLATEX):
                 raise RuntimeError(
