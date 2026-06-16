@@ -10,6 +10,14 @@ from three_ps_lcca_gui.core.safechunk_engine import SafeChunkEngine
 SafeChunkEngine.APP_NAME = APP_NAME
 SafeChunkEngine.APP_AUTHOR = APP_AUTHOR
 
+# Conda-forge's PySide6 build ships no Wayland platform plugin, so on a Wayland
+# session Qt prints a "Could not find the Qt platform plugin wayland" warning
+# before falling back to xcb (via XWayland) and working normally anyway. Skip
+# straight to xcb to silence the noise; no-op if the user set their own
+# QT_QPA_PLATFORM. See devtools/dev_notes_log/3psLCCA_wayland_plugin_warning.md.
+if platform.system() == "Linux" and "QT_QPA_PLATFORM" not in os.environ:
+    os.environ["QT_QPA_PLATFORM"] = "xcb"
+
 from PySide6.QtWidgets import (
     QApplication,
     QSpinBox,

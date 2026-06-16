@@ -20,5 +20,10 @@ dependencies:
   - osdag::osdag_latex_env
   - platformdirs
   - beautifulsoup4
+  # Linux only; fontconfig 2.17/2.18 has a font-fallback crash (FcCharSetFindLeafForward) that
+  # segfaults PySide6 apps using glyphs outside the active font's charset. See
+  # devtools/dev_notes_log/3psLCCA_fontconfig_segfault_fix.md. environment.yml has no platform
+  # selector syntax, so this pin is harmless-but-unnecessary on Windows.
+  - fontconfig <2.17
   - pip:
     - pywebview

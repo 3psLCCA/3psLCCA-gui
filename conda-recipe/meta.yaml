@@ -54,6 +54,7 @@ requirements:
     - platformdirs
     - beautifulsoup4
     - odfpy
+    - fontconfig <2.17  # [linux]
 
 about:
   summary: >-

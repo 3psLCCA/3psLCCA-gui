@@ -41,6 +41,7 @@ channels:
 
 specs:
   - zehen-249::three-ps-lcca-gui=1.0.2
+  - fontconfig <2.17 # [linux] avoid FcCharSetFindLeafForward segfault, see devtools/dev_notes_log/3psLCCA_fontconfig_segfault_fix.md
 
 # Add in system env variables
 initialize_conda: false
