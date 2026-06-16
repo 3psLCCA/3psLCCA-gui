@@ -72,7 +72,7 @@ case on this machine.
 Force Qt straight to `xcb`, skipping the `wayland` lookup (and its warning)
 entirely:
 ```bash
-QT_QPA_PLATFORM=xcb /home/renu/threePSLCCA/bin/threePSLCCA
+QT_QPA_PLATFORM=xcb /home/<user>/threePSLCCA/bin/threePSLCCA
 ```
 
 To make this the default without requiring the env var every time, add a
@@ -122,15 +122,15 @@ step would be if a fully Wayland-native target environment comes up later.
 
 ```bash
 # Which platform plugins does this Qt build actually ship?
-ls /home/renu/threePSLCCA/lib/qt6/plugins/platforms/
+ls /home/<user>/threePSLCCA/lib/qt6/plugins/platforms/
 
 # Session details that drive Qt's auto-detection
 echo "XDG_SESSION_TYPE=$XDG_SESSION_TYPE WAYLAND_DISPLAY=$WAYLAND_DISPLAY DISPLAY=$DISPLAY"
 
 # Confirm the app runs fine even with the warning present (no QT_QPA_PLATFORM set)
-PYTHONFAULTHANDLER=1 timeout 8 /home/renu/threePSLCCA/bin/threePSLCCA
+PYTHONFAULTHANDLER=1 timeout 8 /home/<user>/threePSLCCA/bin/threePSLCCA
 # exit 124 (timeout killed a still-running process) = healthy, warning is harmless
 
 # Confirm forcing xcb silences the warning with no behavior change
-QT_QPA_PLATFORM=xcb PYTHONFAULTHANDLER=1 timeout 8 /home/renu/threePSLCCA/bin/threePSLCCA
+QT_QPA_PLATFORM=xcb PYTHONFAULTHANDLER=1 timeout 8 /home/<user>/threePSLCCA/bin/threePSLCCA
 ```
