@@ -29,7 +29,7 @@ exclude = ["*.debug", "*.tests", "*.egg-info"]
 
 [project]
 name = "three_ps_lcca_gui"
-version = "1.0.2"
+version = "1.0.0"
 dependencies = [
     "platformdirs",
     "PySide6",
@@ -56,5 +56,10 @@ readme = "README.md"
 license = {file = "LICENSE"}
 keywords = ["steel design", "life cycle analysis", "engineering"]
 
-[project.scripts]
+# GUI Launcher
+[project.gui-scripts]
 threePSLCCA = "three_ps_lcca_gui.gui.main:main"
+
+# CLI Launcher
+[project.scripts]
+threePSLCCA-debug = "three_ps_lcca_gui.gui.main:main"

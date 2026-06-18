@@ -285,7 +285,7 @@ jobs:
           set -e
           echo "Refactoring NSIS template..."
 
-          NSIS_TEMPLATE_PATH=$(grep -R -l "^!define MUI_HEADERIMAGE$" "$(conda info --base)\envs\tests" | head -n 1)
+          NSIS_TEMPLATE_PATH=$(grep -R -l "^!define MUI_HEADERIMAGE$" "$(conda info --base)\envs" | head -n 1)
           echo "Found template: $NSIS_TEMPLATE_PATH"
           if [ -f "$NSIS_TEMPLATE_PATH" ]; then
             echo "Found NSIS template at: $NSIS_TEMPLATE_PATH"
