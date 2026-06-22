@@ -5,10 +5,11 @@ import ctypes
 
 # ── Global App Configuration ──────────────────────────────────────────────────
 # This MUST happen before any other project imports to ensure paths are set correctly
-from three_ps_lcca_gui.gui.version import APP_NAME, APP_AUTHOR
+from three_ps_lcca_gui.gui.version import APP_NAME, APP_AUTHOR, APP_DATA_NAME
 from three_ps_lcca_gui.core.safechunk_engine import SafeChunkEngine
 SafeChunkEngine.APP_NAME = APP_NAME
 SafeChunkEngine.APP_AUTHOR = APP_AUTHOR
+SafeChunkEngine.APP_DATA_NAME = APP_DATA_NAME
 
 # Conda-forge's PySide6 build ships no Wayland platform plugin, so on a Wayland
 # session Qt prints a "Could not find the Qt platform plugin wayland" warning

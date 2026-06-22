@@ -120,12 +120,14 @@ class SafeChunkEngine:
     VERSION = ENGINE_VER
     APP_NAME: str = None
     APP_AUTHOR: str = None
+    APP_DATA_NAME: str = None  # separate AppData folder name for user files
 
     @staticmethod
     def get_default_base_dir(
         use_local: bool = False,
         app_name: str = None,
         app_author: str = None,
+        app_data_name: str = None,
     ) -> str:
         """
         Returns the default base directory for projects.
@@ -140,6 +142,7 @@ class SafeChunkEngine:
         # Resolve defaults
         name = app_name or SafeChunkEngine.APP_NAME
         author = app_author or SafeChunkEngine.APP_AUTHOR
+        data_name = app_data_name or SafeChunkEngine.APP_DATA_NAME or name
 
         if not name or not author:
             # Fallback for safety: if not configured, use local folder instead of crashing
@@ -152,9 +155,10 @@ class SafeChunkEngine:
             os.makedirs(path, exist_ok=True)
             return path
 
-        # Standard AppData path
-        base = platformdirs.user_data_dir(name)
-        full_path = os.path.join(base, author , "user_projects")
+        # Standard AppData path — uses APP_DATA_NAME so user files live in a
+        # separate folder from the app installation folder.
+        base = platformdirs.user_data_dir(data_name)
+        full_path = os.path.join(base, author, "user_projects")
         os.makedirs(full_path, exist_ok=True)
         return full_path
 
