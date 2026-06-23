@@ -1,5 +1,5 @@
 {% set name = "three-ps-lcca-gui" %}
-{% set version = "1.0.0" %}
+{% set version = "1.1.0" %}
 {% set git_url = "https://github.com/3psLCCA/3psLCCA-gui.git" %}
 {% set branch = "main" %}
 
@@ -16,7 +16,11 @@ source:
 
 build:
   number: 0
+  noarch: false
   script:  "{{ PYTHON }} -m pip install . --no-deps -vv"
+
+  entry_points:
+    - threePSLCCA=three_ps_lcca_gui.gui.main:main
 
 
 channels:

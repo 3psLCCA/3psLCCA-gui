@@ -25,11 +25,11 @@ three_ps_lcca_gui = [
 [tool.setuptools.packages.find]
 namespaces = true
 where = ["src"]
-exclude = ["*.debug", "*.tests", "*.egg-info"]
+exclude = ["*.tests", "*.tests.*", "*.debug", "*.debug.*"]
 
 [project]
 name = "three_ps_lcca_gui"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
     "platformdirs",
     "PySide6",
@@ -55,11 +55,3 @@ authors = [
 readme = "README.md"
 license = {file = "LICENSE"}
 keywords = ["steel design", "life cycle analysis", "engineering"]
-
-# GUI Launcher
-[project.gui-scripts]
-threePSLCCA = "three_ps_lcca_gui.gui.main:main"
-
-# CLI Launcher
-[project.scripts]
-threePSLCCA-debug = "three_ps_lcca_gui.gui.main:main"
