@@ -1,6 +1,6 @@
 from pylatex import LongTable, MultiColumn, NoEscape
 from pylatex.utils import bold, escape_latex
-from ..gui.components.outputs.lcc_data import _MASTER_ROWS, _STAGE_META, _CREDIT_KEYS, _get
+from ..gui.components.outputs.lcc_data import _MASTER_ROWS, _CREDIT_KEYS, _get
 from .SETTINGS import DECIMAL_PLACES_FOR_LATEX
 
 _N_COLS  = 3
@@ -37,7 +37,7 @@ def _cat_header(cat: str) -> NoEscape:
 
 def _item_row(label: str, cat: str, val: float) -> list:
     return [
-        NoEscape(r"\quad\quad " + escape_latex(label)),
+        NoEscape(r"\hangindent=2em\hangafter=1 \quad\quad " + escape_latex(label)),
         escape_latex(_CAT_LABELS.get(cat, cat)),
         _fmt(val),
     ]
@@ -80,9 +80,13 @@ def results_to_latex(controller) -> str:
     grand_total = 0.0
     first_stage = True
 
-    for sk, chart_title, _, _, _, _, optional in _STAGE_META:
-        if optional and not has_recon:
-            continue
+    report_stages = [
+        ("initial_stage", "Initial Stage"),
+        ("use_stage", "Use Stage"),
+        ("end_of_life", "End-of-Life Stage"),
+    ]
+
+    for sk, chart_title in report_stages:
 
         if not first_stage:
             table.append(NoEscape(r"\midrule"))
@@ -91,19 +95,22 @@ def results_to_latex(controller) -> str:
         table.append(_stage_header(chart_title))
         table.append(NoEscape(r"\midrule"))
 
-        stage_rows  = [(cat, key, lbl) for s, cat, key, lbl in _MASTER_ROWS if s == sk]
+        source_stages = [sk, "reconstruction"] if sk == "end_of_life" and has_recon else [sk]
+        stage_rows = [(s, cat, key, lbl) for s, cat, key, lbl in _MASTER_ROWS if s in source_stages]
         current_cat = None
         stage_total = 0.0
 
-        for cat, key, label in stage_rows:
+        for source_sk, cat, key, label in stage_rows:
             if cat != current_cat:
                 table.append(_cat_header(cat))
                 current_cat = cat
 
-            val = _get(results, sk, cat, key)
+            val = _get(results, source_sk, cat, key)
             display_val = -val if key in _CREDIT_KEYS else val
             stage_total += display_val
             grand_total += display_val
+            if source_sk == "reconstruction":
+                label = f"Reconstruction | {label}"
             table.add_row(_item_row(label, cat, display_val))
 
         table.append(NoEscape(r"\cmidrule(l){1-3}"))
@@ -111,6 +118,6 @@ def results_to_latex(controller) -> str:
 
     # ── Grand total ───────────────────────────────────────────────────────────
     table.append(NoEscape(r"\midrule"))
-    table.add_row([bold("Grand Total (NPV)"), "", _bold_val(grand_total)])
+    table.add_row([bold("Total life cycle cost"), "", _bold_val(grand_total)])
 
     return table.dumps()
