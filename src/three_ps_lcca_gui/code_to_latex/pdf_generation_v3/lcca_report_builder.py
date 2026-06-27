@@ -376,11 +376,11 @@ def _summary_replacements(controller) -> tuple[str, str, str, str]:
         return "", "", "", ""
 
     stages = [
-        ("initial_stage", "Initial stage"),
-        ("use_stage", "Use stage"),
-        ("reconstruction", "Reconstruction"),
-        ("end_of_life", "End-of-life"),
-    ]
+    ("initial_stage", "Initial stage"),
+    ("use_stage", "Use stage"),
+    ("end_of_life", "End-of-life"),
+    ("reconstruction", "Reconstruction"),
+]
     pillars = [
         ("economic", "Economic"),
         ("environmental", "Environmental"),
