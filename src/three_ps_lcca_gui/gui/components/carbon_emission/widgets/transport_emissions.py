@@ -1,4 +1,4 @@
-﻿import math
+import math
 import datetime
 import time
 from three_ps_lcca_gui.gui.themes import get_token
@@ -23,24 +23,48 @@ from PySide6.QtCore import Qt, QSize, QTimer
 from .transport_dialog import TransportDialog
 from PySide6.QtGui import QColor
 from ...utils.definitions import STRUCTURE_CHUNKS, UNIT_DIMENSION
-from ...utils.table_widgets import TooltipTableMixin
+from ...utils.table_widgets import TooltipTableMixin, WordWrapHeaderView
+from ...utils.display_format import fmt, fmt_comma
+from ...utils.icons import make_icon, make_icon_btn
+from ...utils.validation_helpers import freeze_widgets
 
 
 class _TransportEmissionsTable(TooltipTableMixin, QTableWidget):
-    """QTableWidget with tooltip + word-wrap for transport emissions rows."""
+    """Transport table with a WordWrapHeaderView installed at construction time.
+
+    Installing it here (instead of relying on the global _TableHeaderWordWrapFilter)
+    means the header is always visible: the filter skips tables that already use
+    WordWrapHeaderView, so no deferred swap occurs and no hidden-header race exists.
+    """
 
     # Material, Category, kg Factor, Quantity (kg), Trips, Emission, Warnings
     _COL_RATIOS = [0.20, 0.12, 0.09, 0.11, 0.07, 0.16, 0.25]
     _COL_MINS   = [80,   60,   55,   70,   45,   100,  80]
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        hdr = WordWrapHeaderView(Qt.Horizontal, parent=self)
+        self.setHorizontalHeader(hdr)
+        hdr.show()
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
         w = self.viewport().width()
         for col, (ratio, min_w) in enumerate(zip(self._COL_RATIOS, self._COL_MINS)):
             self.setColumnWidth(col, max(min_w, int(w * ratio)))
-from ...utils.display_format import fmt, fmt_comma
-from ...utils.icons import make_icon, make_icon_btn
-from ...utils.validation_helpers import freeze_widgets
+
+    def _content_height(self) -> int:
+        hh = self.horizontalHeader()
+        h = (hh.height() or hh.sizeHint().height()) + 2 * self.frameWidth()
+        for r in range(self.rowCount()):
+            h += self.rowHeight(r)
+        return h
+
+    def sizeHint(self) -> QSize:
+        return QSize(super().sizeHint().width(), self._content_height())
+
+    def minimumSizeHint(self) -> QSize:
+        return QSize(super().minimumSizeHint().width(), self._content_height())
 
 
 # ---------------------------------------------------------------------------
@@ -317,10 +341,9 @@ class VehicleCard(QGroupBox):
         table.verticalHeader().setVisible(False)
         table.verticalHeader().setDefaultSectionSize(32)
         table.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
+        table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
 
         for mat in mat_results:
-            # print(f"[DEBUG] mat: {mat}")
             row = table.rowCount()
             table.insertRow(row)
             status = mat.get("status", "ok")
@@ -376,10 +399,6 @@ class VehicleCard(QGroupBox):
                 warn_item.setForeground(QColor(get_token("")))
                 warn_item.setBackground(QColor(get_token("warning")))
                 table.setItem(row, 6, warn_item)
-
-        row_h = table.verticalHeader().defaultSectionSize()
-        header_h = table.horizontalHeader().sizeHint().height()
-        table.setFixedHeight(header_h + table.rowCount() * row_h + 4)
         return table
 
     def _item(self, text="", align=None) -> QTableWidgetItem:
