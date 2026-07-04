@@ -420,7 +420,6 @@ class TransportEmissions(QWidget):
         self.controller = controller
         self.setObjectName("TransportEmissions")
 
-        self._details_visible = False
         self._frozen = False
         self._loaded = False
         if controller and hasattr(controller, "project_loaded"):
@@ -441,19 +440,18 @@ class TransportEmissions(QWidget):
 
         self.total_lbl = QLabel("Total Transport Emissions: - kgCO₂e")
         self.vehicle_lbl = QLabel("Vehicles: -")
-        self.details_btn = QPushButton("Show Details ▼")
-        self.details_btn.setFlat(True)
-        self.details_btn.setCursor(Qt.PointingHandCursor)
-        self.details_btn.clicked.connect(self._toggle_details)
+        self.add_btn = QPushButton("+ Add Delivery")
+        self.add_btn.setMinimumHeight(32)
+        self.add_btn.clicked.connect(self._open_add_dialog)
 
         summary_layout.addWidget(self.total_lbl)
         summary_layout.addWidget(_vline())
         summary_layout.addWidget(self.vehicle_lbl)
         summary_layout.addStretch()
-        summary_layout.addWidget(self.details_btn)
+        summary_layout.addWidget(self.add_btn)
         outer.addWidget(summary_bar)
 
-        # ── Details (hidden by default) ───────────────────────────────────
+        # ── Details breakdown ─────────────────────────────────────────────
         self.details_widget = QWidget()
         details_layout = QHBoxLayout(self.details_widget)
         details_layout.setContentsMargins(8, 0, 8, 8)
@@ -468,19 +466,9 @@ class TransportEmissions(QWidget):
             details_layout.addWidget(_vline())
 
         details_layout.addStretch()
-        self.details_widget.setVisible(False)
         outer.addWidget(self.details_widget)
 
         outer.addWidget(_hline())
-
-        # ── Add Vehicle Button ────────────────────────────────────────────
-        add_row = QHBoxLayout()
-        self.add_btn = QPushButton("+ Add Delivery")
-        self.add_btn.setMinimumHeight(32)
-        self.add_btn.clicked.connect(self._open_add_dialog)
-        add_row.addWidget(self.add_btn)
-        add_row.addStretch()
-        outer.addLayout(add_row)
 
         # ── Scroll area for vehicle cards ─────────────────────────────────
         scroll = QScrollArea()
@@ -492,15 +480,6 @@ class TransportEmissions(QWidget):
         self.container_layout.setSpacing(8)
         scroll.setWidget(self.container)
         outer.addWidget(scroll)
-
-    # ── UI Helpers ───────────────────────────────────────────────────────
-
-    def _toggle_details(self):
-        self._details_visible = not self._details_visible
-        self.details_widget.setVisible(self._details_visible)
-        self.details_btn.setText(
-            "Hide Details ▲" if self._details_visible else "Show Details ▼"
-        )
 
     # ── Refresh ──────────────────────────────────────────────────────────
 
