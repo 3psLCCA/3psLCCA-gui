@@ -36,7 +36,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from PySide6.QtCore import Qt, QEvent, QRect, QSize, QTimer
+from PySide6.QtCore import Qt, QEvent, QRect, QSize
 from PySide6.QtGui import QFont
 
 from ...base_widget import ScrollableForm
@@ -418,7 +418,27 @@ class _FrozenActionCol(QTableWidget):
 
 
 class _MachineryTable(TooltipTableMixin, QTableWidget):
-    """QTableWidget with tooltip + word-wrap for machinery equipment rows."""
+    """Equipment table that reports its full content height as its size hint.
+
+    With a Fixed vertical size policy (set by the owner), the surrounding layout
+    reserves exactly header + all rows, so every row is shown without the table's
+    own scrollbar and the subtotal/button rows below are never overlapped; the
+    page's scroll area does the scrolling. This hint is the single source of
+    truth for the table's height - no manual pinning or deferred geometry passes.
+    """
+
+    def _content_height(self) -> int:
+        hh = self.horizontalHeader()
+        h = (hh.height() or hh.sizeHint().height()) + 2 * self.frameWidth()
+        for r in range(self.rowCount()):
+            h += self.rowHeight(r)
+        return h
+
+    def sizeHint(self) -> QSize:
+        return QSize(super().sizeHint().width(), self._content_height())
+
+    def minimumSizeHint(self) -> QSize:
+        return QSize(super().minimumSizeHint().width(), self._content_height())
 
 
 class _DetailedTable(QWidget):
@@ -435,7 +455,6 @@ class _DetailedTable(QWidget):
         ("",                    Qt.AlignCenter | Qt.AlignVCenter),  # 9 placeholder - reserves _ACTION_W
     ]
     _ROW_H = 36
-    _HEADER_H = 38  # fallback if header not yet painted
 
     def __init__(self, on_change, parent=None):
         super().__init__(parent)
@@ -472,11 +491,7 @@ class _DetailedTable(QWidget):
         self._table.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self._table.cellChanged.connect(self._on_cell_changed)
         self._table.cellDoubleClicked.connect(self._open_edit_dialog)
-        self._geometry_timer = QTimer(self)
-        self._geometry_timer.setSingleShot(True)
-        self._geometry_timer.setInterval(0)
-        self._geometry_timer.timeout.connect(self._do_geometry_update)
-        self._table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
+        self._table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self._table.setMinimumWidth(0)
         self._table.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self._table.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
@@ -525,30 +540,14 @@ class _DetailedTable(QWidget):
         layout.addLayout(btn_layout)
         self._frozen = False
 
-        # Size the table to exactly fit header-only on startup.
-        # _refresh_table_height() pins both min and max, so the table never
-        # floats or leaves blank space regardless of row count.
+        # Report the initial (header-only) content height to the layout.
         self._refresh_table_height()
 
     # ── Height management ─────────────────────────────────────────────────
 
-    def _table_content_height(self) -> int:
-        hh = self._table.horizontalHeader()
-        header_h = hh.height() if hh.height() > 0 else self._HEADER_H
-        rows_h = self._table.rowCount() * self._ROW_H
-        return header_h + rows_h + 4  # +4 for frame border
-
     def _refresh_table_height(self):
-        """Pin the table to exactly fit its content - no scrollbars, no blank stretch."""
-        h = self._table_content_height()
-        self._table.setMinimumHeight(h)
-        self._table.setMaximumHeight(h)
-        if hasattr(self, "_geometry_timer"):
-            self._geometry_timer.start()
-        else:
-            self._do_geometry_update()
-
-    def _do_geometry_update(self):
+        """Row count changed: let the table re-report its content height so the
+        layout re-fits it, then move the frozen action-column overlay to match."""
         self._table.updateGeometry()
         self.updateGeometry()
         if hasattr(self, "_frozen_col"):
