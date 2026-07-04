@@ -1,0 +1,226 @@
+[
+  {
+    "sheetName": "Foundation",
+    "data": [
+      {
+        "src_id": "F001",
+        "name": "Excavation in hard rock",
+        "unit": "m3",
+        "rate": 850,
+        "rate_src": "Maha PWD SOR 2023",
+        "carbon_emission": 0.045,
+        "carbon_emission_units_den": "m3",
+        "conversion_factor": 1,
+        "carbon_emission_src": "IPCC 2021",
+        "component": "Excavation"
+      },
+      {
+        "src_id": "F002",
+        "name": "Pile (600mm dia, 12m)",
+        "unit": "nos",
+        "rate": 48000,
+        "rate_src": "Market Rate",
+        "carbon_emission": 0.235,
+        "carbon_emission_units_den": "nos",
+        "conversion_factor": 1,
+        "carbon_emission_src": null,
+        "component": "Pile"
+      },
+      {
+        "src_id": "F003",
+        "name": "Pile Cap (1.5x1.5x0.75m)",
+        "unit": "m3",
+        "rate": 7200,
+        "rate_src": "DSR 2023",
+        "carbon_emission": 0.312,
+        "carbon_emission_units_den": "m3",
+        "conversion_factor": 1,
+        "carbon_emission_src": "DSR 2023",
+        "component": "Pile Cap"
+      }
+    ]
+  },
+  {
+    "sheetName": "Sub Structure",
+    "data": [
+      {
+        "src_id": "S001",
+        "name": "Pier (RCC M35)",
+        "unit": "m3",
+        "rate": 9500,
+        "rate_src": "Maha PWD SOR 2023",
+        "carbon_emission": 0.298,
+        "carbon_emission_units_den": "m3",
+        "conversion_factor": 1,
+        "carbon_emission_src": "IPCC 2021",
+        "component": "Pier"
+      },
+      {
+        "src_id": "S002",
+        "name": "Pier Cap (RCC M35)",
+        "unit": "m3",
+        "rate": 9800,
+        "rate_src": "DSR 2023",
+        "carbon_emission": 0.298,
+        "carbon_emission_units_den": "m3",
+        "conversion_factor": 1,
+        "carbon_emission_src": null,
+        "component": "Pier Cap"
+      },
+      {
+        "src_id": "S003",
+        "name": "Pedestal",
+        "unit": "m3",
+        "rate": 8200,
+        "rate_src": "Market Rate",
+        "carbon_emission": 0.285,
+        "carbon_emission_units_den": "m3",
+        "conversion_factor": 1,
+        "carbon_emission_src": null,
+        "component": "Pedestal"
+      },
+      {
+        "src_id": "S004",
+        "name": "Bearings (Elastomeric)",
+        "unit": "nos",
+        "rate": 12500,
+        "rate_src": "Manufacturer Quote",
+        "carbon_emission": null,
+        "carbon_emission_units_den": null,
+        "conversion_factor": null,
+        "carbon_emission_src": null,
+        "component": "Bearings"
+      }
+    ]
+  },
+  {
+    "sheetName": "Super Structure",
+    "data": [
+      {
+        "src_id": "SS001",
+        "name": "PSC Girder (25m span)",
+        "unit": "nos",
+        "rate": 285000,
+        "rate_src": "Maha PWD SOR 2023",
+        "carbon_emission": 0.412,
+        "carbon_emission_units_den": "nos",
+        "conversion_factor": 1,
+        "carbon_emission_src": "IPCC 2021",
+        "component": "Girder"
+      },
+      {
+        "src_id": "SS002",
+        "name": "Deck Slab (RCC M40)",
+        "unit": "m3",
+        "rate": 10200,
+        "rate_src": "DSR 2023",
+        "carbon_emission": 0.335,
+        "carbon_emission_units_den": "m3",
+        "conversion_factor": 1,
+        "carbon_emission_src": null,
+        "component": "Deck Slab"
+      },
+      {
+        "src_id": "SS003",
+        "name": "Asphalt wearing course",
+        "unit": "m2",
+        "rate": 496,
+        "rate_src": "Maha PWD SOR",
+        "carbon_emission": 0.162,
+        "carbon_emission_units_den": "m2-mm",
+        "conversion_factor": 12,
+        "carbon_emission_src": "Maha PWD",
+        "component": "Deck Slab"
+      },
+      {
+        "src_id": "SS004",
+        "name": "Diaphragm (RCC M35)",
+        "unit": "m3",
+        "rate": 9200,
+        "rate_src": "Market Rate",
+        "carbon_emission": 0.298,
+        "carbon_emission_units_den": "m3",
+        "conversion_factor": 1,
+        "carbon_emission_src": null,
+        "component": "Diaphragm"
+      }
+    ]
+  },
+  {
+    "sheetName": "Miscellaneous",
+    "data": [
+      {
+        "src_id": "M001",
+        "name": "MS Tubular Railing",
+        "unit": "rmt",
+        "rate": 3200,
+        "rate_src": "Market Rate",
+        "carbon_emission": 2.1,
+        "carbon_emission_units_den": "rmt",
+        "conversion_factor": 1,
+        "carbon_emission_src": null,
+        "component": "Railing & Crash Barrier & Median"
+      },
+      {
+        "src_id": "M002",
+        "name": "Drainage Pipe (300mm)",
+        "unit": "rmt",
+        "rate": 1800,
+        "rate_src": "DSR 2023",
+        "carbon_emission": 0.089,
+        "carbon_emission_units_den": "rmt",
+        "conversion_factor": 1,
+        "carbon_emission_src": null,
+        "component": "Drainage"
+      },
+      {
+        "src_id": "M003",
+        "name": "Waterproofing membrane",
+        "unit": "m2",
+        "rate": 380,
+        "rate_src": "Market Rate",
+        "carbon_emission": 0.045,
+        "carbon_emission_units_den": "m2",
+        "conversion_factor": 1,
+        "carbon_emission_src": null,
+        "component": "Waterproofing"
+      },
+      {
+        "src_id": "M005",
+        "name": "Guard Stone",
+        "unit": "xyz",
+        "rate": 250,
+        "rate_src": null,
+        "carbon_emission": null,
+        "carbon_emission_units_den": null,
+        "conversion_factor": null,
+        "carbon_emission_src": null,
+        "component": "Drainage"
+      },
+      {
+        "src_id": "BF001",
+        "name": "Expansion Joint (50mm)",
+        "unit": "rmt",
+        "rate": 5500,
+        "rate_src": "Market Rate",
+        "carbon_emission": null,
+        "carbon_emission_units_den": null,
+        "conversion_factor": null,
+        "carbon_emission_src": null,
+        "component": "Bridge Furniture"
+      },
+      {
+        "src_id": "BF002",
+        "name": "Handrail (SS)",
+        "unit": "rmt",
+        "rate": 4200,
+        "rate_src": "DSR 2023",
+        "carbon_emission": null,
+        "carbon_emission_units_den": null,
+        "conversion_factor": null,
+        "carbon_emission_src": null,
+        "component": "Bridge Furniture"
+      }
+    ]
+  }
+]

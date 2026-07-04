@@ -799,7 +799,8 @@ class MaterialDialog(QDialog):
             self.setWindowTitle(f"Edit Material - {comp_name}")
         else:
             self.setWindowTitle(f"Add Material - {comp_name}")
-        self.setMinimumWidth(520)
+        self.setMinimumWidth(680)
+        self.resize(720, 640)
         self.setWindowFlag(Qt.WindowContextHelpButtonHint, False)
 
         v = data.get("values", {}) if self.is_edit else {}
@@ -826,6 +827,7 @@ class MaterialDialog(QDialog):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
 
         inner = QWidget()
         root = QVBoxLayout(inner)
@@ -844,15 +846,52 @@ class MaterialDialog(QDialog):
             sor_info_row.setContentsMargins(0, 0, 0, 0)
             sor_info_row.setSpacing(4)
             sor_info_row.addWidget(QLabel("Suggestions from:"))
-            _sor_val = (
-                self._sor_db_key
-                if self._sor_db_key
-                else "- not set (configure in Project Settings)"
-            )
-            sor_val_lbl = QLabel(_sor_val)
-            sor_val_lbl.setStyleSheet(
-                f"font-size: 11px; color: {get_token('text_secondary')}; font-style: italic;"
-            )
+
+            if not self._sor_db_key:
+                # Not configured at all
+                _sor_text  = "─  not set  (configure in Project Settings)"
+                _sor_style = (
+                    f"font-size: 11px; color: {get_token('text_secondary')};"
+                    f" font-style: italic;"
+                )
+            else:
+                # Check if the key actually exists in the registry / custom DB
+                _is_custom = self._sor_db_key.startswith("custom::")
+                if _is_custom:
+                    try:
+                        _cdb_name = self._sor_db_key[len("custom::"):]
+                        _db_valid = (
+                            CustomMaterialDB is not None
+                            and _cdb_name in CustomMaterialDB().list_db_names()
+                        )
+                    except Exception:
+                        _db_valid = False
+                else:
+                    try:
+                        _db_valid = any(
+                            e.get("db_key") == self._sor_db_key
+                            and e.get("status") == "OK"
+                            for e in list_databases()
+                        )
+                    except Exception:
+                        _db_valid = False
+
+                if _db_valid:
+                    _sor_text  = self._sor_db_key
+                    _sor_style = (
+                        f"font-size: 11px; color: {get_token('text_secondary')};"
+                        f" font-style: italic;"
+                    )
+                else:
+                    _sor_text  = f"⚠  \"{self._sor_db_key}\"  —  database not found"
+                    _sor_style = (
+                        f"font-size: 11px; color: {get_token('error', '#c0392b')};"
+                        f" font-weight: 600;"
+                    )
+
+            sor_val_lbl = QLabel(_sor_text)
+            sor_val_lbl.setStyleSheet(_sor_style)
+            sor_val_lbl.setWordWrap(True)
             sor_info_row.addWidget(sor_val_lbl, stretch=1)
             root.addLayout(sor_info_row)
 
@@ -899,7 +938,7 @@ class MaterialDialog(QDialog):
         self._ui_ready = False
         self._user_edited_snapshot = {}  # saved when user unchecks "Allow editing"
         self._reload_suggestions()
-        self.name_in.textChanged.connect(self._on_name_search_changed)
+        self.name_in.textEdited.connect(self._on_name_search_changed)
         if self.sor_cb:
             self.sor_cb.currentIndexChanged.connect(self._on_sor_changed)
 
@@ -1352,6 +1391,14 @@ class MaterialDialog(QDialog):
             db_keys=db_keys, comp_name=comp_filter, sheet_name=sheet_filter
         )
 
+        # Stamp a _searchable_name temp key on every item: "Name  |  ID" when an
+        # ID exists, otherwise just "Name". This is the single display + lookup key
+        # used by the completer — no separate mapping dict needed.
+        for name, item in self._suggestions.items():
+            raw_id = item.get("src_id")
+            src_id = str(raw_id).strip() if raw_id not in (None, "", 0, 0.0) else ""
+            item["_searchable_name"] = f"{name}  |  {src_id}" if src_id else name
+
         if self._suggestions:
             if self._active_completer is None:
                 self._active_completer = QCompleter(self)
@@ -1399,33 +1446,27 @@ class MaterialDialog(QDialog):
         """
         Filter completer suggestions using order-independent token matching.
 
-        Also handles autofill: when the text is an exact match of a known
-        suggestion (i.e. the user just selected one from the popup), call
-        _on_suggestion_selected directly instead of relying on the activated
-        signal, whose timing relative to textChanged is not guaranteed.
+        Each item carries a _searchable_name temp key: "Name  |  ID" when the
+        item has an ID, otherwise just "Name". The completer displays and passes
+        back this string; _on_suggestion_selected resolves it to the real name.
+
+        Special token: "?" → show all suggestions.
         """
         if not self._suggestions:
             return
         q = text.strip()
-        # Complete name match → autofill (add mode only).
-        # Use case-insensitive exact match against the full suggestion name.
-        # Guard with _ui_ready so this doesn't fire during __init__ before
-        # all widgets (unit_in, carbon_em_in, etc.) have been created.
+
+        # ── Exact name match → autofill (add mode only) ───────────────────────
         _q_lower = q.lower()
         _exact_key = next(
             (k for k in self._suggestions if k.lower() == _q_lower), None
         ) if not self._skip_suggestions and q != self._sor_filled_name else None
         if _exact_key is not None:
-            print(f"[MaterialDialog] Exact match found: '{q}' → '{_exact_key}'")
-            print(f"[MaterialDialog] All suggestions ({len(self._suggestions)}):")
-            for k in sorted(self._suggestions.keys()):
-                print(f"  '{k}'  lower='{k.lower()}'")
-            print(f"[MaterialDialog] q='{q}'  q_lower='{_q_lower}'")
             if self._ui_ready and not self.is_edit:
-                self._on_suggestion_selected(_exact_key)
+                self._on_suggestion_selected(self._suggestions[_exact_key]["_searchable_name"])
             return
+
         # Name no longer matches the autofilled suggestion → clear stale DB values.
-        # In edit mode, just mark as customized — never wipe existing field values.
         if self._ui_ready and self._sor_item is not None and q != self._sor_filled_name:
             if self.is_edit or self._db_original.get("action") == "excel":
                 self._is_customized = True
@@ -1433,13 +1474,15 @@ class MaterialDialog(QDialog):
                 self._reset_sor_state()
         if self._active_completer is None:
             return
+
+        # ── Normal search: match _searchable_name (covers both name and ID) ───
         if not q or q == "?":
-            filtered = sorted(self._suggestions.keys())
+            filtered = sorted(item["_searchable_name"] for item in self._suggestions.values())
         else:
             filtered = sorted(
-                name
-                for name in self._suggestions
-                if AdvancedSearchEngine.is_match(q, name)
+                item["_searchable_name"]
+                for name, item in self._suggestions.items()
+                if AdvancedSearchEngine.is_match(q, item["_searchable_name"])
             )
         self._active_completer.setModel(QStringListModel(filtered))
         if filtered and (q == "?" or q):
@@ -1735,16 +1778,25 @@ class MaterialDialog(QDialog):
 
     # ── Suggestion auto-fill ──────────────────────────────────────────────
 
-    def _on_suggestion_selected(self, name: str):
-        item = self._suggestions.get(name)
-        if not item:
+    def _on_suggestion_selected(self, display: str):
+        # display is item["_searchable_name"] — resolve back to the real name key.
+        name, item = next(
+            ((n, it) for n, it in self._suggestions.items()
+             if it.get("_searchable_name") == display),
+            (None, None),
+        )
+        if item is None:
             return
 
         # New suggestion - discard any snapshot from a previous suggestion's edit session
-        self.id_in.setText(str(item.get("src_id", "")))
+        self.id_in.setText(str(item.get("src_id", "") or ""))
         self._user_edited_snapshot = {}
         self._sor_filling = True
         try:
+            # Write the plain name into the field while _sor_filling suppresses
+            # field-change signals — prevents _reset_sor_state firing mid-autofill.
+            self._sor_filled_name = name
+            self.name_in.setText(name)
             unit = item.get("unit", "")
             unit_filled = bool(unit)
             if unit_filled:
