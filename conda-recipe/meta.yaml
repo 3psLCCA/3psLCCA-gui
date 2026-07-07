@@ -21,7 +21,9 @@ build:
   entry_points:
     - threePSLCCA = three_ps_lcca_gui.gui.main:main
 
-  
+  post-link: post-link.bat
+  pre-unlink: pre-unlink.bat
+
 channels:
   - conda-forge
   - osdag
@@ -55,6 +57,7 @@ requirements:
     - beautifulsoup4
     - odfpy
     - fontconfig <2.17  # [linux]
+
 
 about:
   summary: >-

@@ -18,6 +18,7 @@ three_ps_lcca_gui = [
     "gui/components/structure/registry/material_database/**",
     "gui/components/carbon_emission/cscc-database-2018-master/**",
     "gui/components/utils/doc_handler/doc_build/**",
+    "report/3psLCCAReportTitlePage.tex",
     "code_to_latex/pdf_generation_v3/images/**"
 ]
 
