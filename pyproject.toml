@@ -18,17 +18,18 @@ three_ps_lcca_gui = [
     "gui/components/structure/registry/material_database/**",
     "gui/components/carbon_emission/cscc-database-2018-master/**",
     "gui/components/utils/doc_handler/doc_build/**",
+    "report/3psLCCAReportTitlePage.tex",
     "code_to_latex/pdf_generation_v3/images/**"
 ]
 
 [tool.setuptools.packages.find]
 namespaces = true
 where = ["src"]
-exclude = ["*.debug", "*.tests", "*.egg-info"]
+exclude = ["*.tests", "*.tests.*", "*.debug", "*.debug.*"]
 
 [project]
 name = "three_ps_lcca_gui"
-version = "1.0.2"
+version = "1.1.0"
 dependencies = [
     "platformdirs",
     "PySide6",
@@ -54,6 +55,3 @@ authors = [
 readme = "README.md"
 license = {file = "LICENSE"}
 keywords = ["steel design", "life cycle analysis", "engineering"]
-
-[project.scripts]
-threePSLCCA = "three_ps_lcca_gui.gui.main:main"
