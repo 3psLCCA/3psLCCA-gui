@@ -475,7 +475,6 @@ class _DetailedTable(QWidget):
         hh.setSectionResizeMode(QHeaderView.Interactive)
         hh.setStretchLastSection(False)
         hh.setMinimumSectionSize(60)
-        hh.setSectionResizeMode(7, QHeaderView.Stretch)  # Emissions fills remaining space
         hh.setSectionResizeMode(8, QHeaderView.Fixed)
         self._table.setColumnWidth(8, 0)
         self._table.setColumnHidden(8, True)
@@ -561,14 +560,17 @@ class _DetailedTable(QWidget):
         vp_w = self._table.viewport().width()
         if vp_w <= 0:
             return
-        # Col 7 (Emissions) is Stretch - only size cols 0-6
-        ratios = {0: 0.22, 1: 0.14, 2: 0.12, 3: 0.10, 4: 0.10, 5: 0.12, 6: 0.14}
-        mins   = {0: 150,   1: 150,   2: 150,   3: 120,   4: 120,   5: 180,   6: 120}
-        col_widths = {c: max(mins[c], int(vp_w * r)) for c, r in ratios.items()}
+        # Cols 0-7 share the viewport minus the col-9 placeholder (_ACTION_W).
+        # Col 9 is a fixed placeholder that reserves space for the frozen overlay;
+        # subtracting it leaves the true content area for proportional distribution.
+        avail = max(1, vp_w - _ACTION_W)
+        ratios = {0: 0.16, 1: 0.14, 2: 0.12, 3: 0.10, 4: 0.10, 5: 0.12, 6: 0.10, 7: 0.16}
+        mins   = {0: 140,  1: 120,  2: 110,  3: 90,   4: 90,   5: 140,  6: 100,  7: 100}
+        col_widths = {c: max(mins[c], int(avail * r)) for c, r in ratios.items()}
         used = sum(col_widths.values())
-        if used >= vp_w:
-            # Scale down to always fit - no horizontal overflow
-            scale = vp_w / used
+        if used > avail:
+            # Scale down proportionally so columns never overflow
+            scale = avail / used
             col_widths = {c: max(mins[c], int(w * scale)) for c, w in col_widths.items()}
         hh = self._table.horizontalHeader()
         hh.blockSignals(True)

@@ -69,17 +69,12 @@ class GroupedHeaderView(QHeaderView):
             super().paintSection(painter, bottom, logical_index)
             painter.restore()
             return
-        # Paint background/frame via style (no text), then draw word-wrapped text manually
+        # Non-grouped column: spans full height — delegate to Qt's C++ pipeline.
+        # super().paintSection() is Fusion-safe: it calls drawControl(CE_Header)
+        # with opt.text set correctly, so the pen is always valid.
         painter.save()
-        opt = QStyleOptionHeader()
-        self.initStyleOption(opt)
-        opt.rect    = rect
-        opt.section = logical_index
-        opt.text    = ""
-        self.style().drawControl(QStyle.ControlElement.CE_Header, opt, painter, self)
-        text = self.model().headerData(logical_index, Qt.Horizontal, Qt.DisplayRole) or ""
-        text_rect = rect.adjusted(6, 4, -6, -4)
-        painter.drawText(text_rect, Qt.AlignLeft | Qt.AlignVCenter | Qt.TextWordWrap, str(text))
+        painter.setClipRect(rect)
+        super().paintSection(painter, rect, logical_index)
         painter.restore()
 
     def paintEvent(self, event):
@@ -132,27 +127,28 @@ class WordWrapHeaderView(QHeaderView):
         return QSize(s.width(), max(s.height(), self._MIN_HEIGHT))
 
     def paintSection(self, painter, rect, logical_index):
-        painter.save()
-        opt = QStyleOptionHeader()
-        self.initStyleOption(opt)
-        opt.rect    = rect
-        opt.section = logical_index
-        opt.text    = ""
-        self.style().drawControl(QStyle.ControlElement.CE_Header, opt, painter, self)
-
         bg = self.model().headerData(logical_index, self.orientation(), Qt.BackgroundRole)
         bg_color = bg.color() if isinstance(bg, QBrush) else (bg if isinstance(bg, QColor) else None)
         if bg_color and bg_color.isValid() and bg_color.alpha() > 0:
+            # Draw standard section first (Fusion-safe), then overlay tint + text with contrast pen.
+            painter.save()
+            super().paintSection(painter, rect, logical_index)
+            painter.restore()
+            painter.save()
             painter.fillRect(rect.adjusted(0, 0, 0, -2), bg_color)
+            painter.setFont(self._font if self._font else self.font())
             painter.setPen(contrast_color(bg_color))
+            text = self.model().headerData(logical_index, self.orientation(), Qt.DisplayRole) or ""
+            painter.drawText(rect.adjusted(6, 4, -6, -4), self.defaultAlignment() | Qt.TextWordWrap, str(text))
+            painter.restore()
         else:
-            painter.setPen(opt.palette.color(QPalette.ButtonText))
-
-        text = self.model().headerData(logical_index, self.orientation(), Qt.DisplayRole) or ""
-        text_rect = rect.adjusted(6, 4, -6, -4)
-        painter.setFont(self._font if self._font else self.font())
-        painter.drawText(text_rect, self.defaultAlignment() | Qt.TextWordWrap, str(text))
-        painter.restore()
+            # Normal path: delegate entirely to Qt's C++ rendering pipeline.
+            # super().paintSection() is Fusion-safe — same proven approach as GroupedHeaderView.
+            if self._font:
+                painter.setFont(self._font)
+            painter.save()
+            super().paintSection(painter, rect, logical_index)
+            painter.restore()
 
 
 # ---------------------------------------------------------------------------
