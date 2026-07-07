@@ -17,7 +17,7 @@ DOCS_DIR = Path(__file__).parent / "docs"
 def open_glossary(slug_parts: list[str] | None = None, parent=None) -> None:
     """Open the glossary browser via pywebview."""
     from .webview_handler import open_glossary as _open_glossary
-    _open_glossary(slug_parts)
+    _open_glossary(slug_parts, parent=parent)
 
 
 def close_glossary() -> None:

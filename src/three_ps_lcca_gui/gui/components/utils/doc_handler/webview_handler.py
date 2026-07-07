@@ -159,17 +159,31 @@ def _focus_glossary_window() -> None:
         pass
 
 
-def open_glossary(slug_parts=None) -> None:
+def _report_launch_failure(stderr: bytes, parent) -> None:
+    from PySide6.QtWidgets import QMessageBox
+    detail = stderr.decode(errors="replace").strip() or "The glossary process exited unexpectedly."
+    QMessageBox.critical(parent, "Glossary", f"Could not open the glossary:\n\n{detail}")
+
+
+def open_glossary(slug_parts=None, parent=None) -> None:
     if _is_running():
         if slug_parts:
             _NAV_FILE.write_text("/".join(slug_parts) + ".md", encoding="utf-8")
         _focus_glossary_window()
         return
-    subprocess.Popen(
+    proc = subprocess.Popen(
         [sys.executable, str(FILE_PATH),
          json.dumps(slug_parts or []), json.dumps(_get_theme())],
         creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
+        stderr=subprocess.PIPE,
     )
+
+    def _check_startup():
+        if proc.poll() is not None and proc.returncode != 0:
+            _report_launch_failure(proc.stderr.read(), parent)
+
+    from PySide6.QtCore import QTimer
+    QTimer.singleShot(1500, _check_startup)
 
 
 if __name__ == "__main__":
