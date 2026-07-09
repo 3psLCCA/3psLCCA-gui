@@ -271,7 +271,7 @@ class LCCDetailsTable(QWidget):
 
         # Grand Total Row
         tr_idx = len(rows)
-        gt_item = QTableWidgetItem("Grand Total")
+        gt_item = QTableWidgetItem("Total")
         gt_item.setFont(f_bold)
         gt_item.setBackground(QColor(get_token("surface_mid")))
         self.table.setItem(tr_idx, 0, gt_item)
