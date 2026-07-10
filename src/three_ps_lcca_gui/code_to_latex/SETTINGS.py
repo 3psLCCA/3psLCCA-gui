@@ -38,7 +38,12 @@ REQUIRED_LATEX_PACKAGES = {
     "hyperref":   ["hidelinks", "hypertexnames=false"],
     "bookmark":   None,
     "tikz":       None,
-    "tcolorbox":  ["most"],
+    "tcolorbox":  ["many"],        # NOT "most": that also pulls in the "listingsutf8"
+                                   # library, which \RequirePackage{listingsutf8} — a
+                                   # separate CTAN package not in the LaTeX bundle and
+                                   # never actually used (no lstlisting/tcblisting here).
+                                   # "many" = raster,skins,breakable,hooks,theorems,fitting
+                                   # — covers the `enhanced` (skins) usage in title_page.py.
 }
 
 # ─────────────────────────────────────────────────────────────────────────────

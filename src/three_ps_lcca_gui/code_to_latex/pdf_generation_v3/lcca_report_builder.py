@@ -5,6 +5,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+from functools import lru_cache
 from pathlib import Path
 from typing import Callable
 
@@ -680,8 +681,14 @@ def _copy_static_assets(work_dir: Path) -> None:
     shutil.copy2(src, dst)
 
 
+@lru_cache(maxsize=1)
 def _check_and_report_missing_packages() -> str:
-    """Helper to identify missing LaTeX packages from the REQUIRED list."""
+    """Helper to identify missing LaTeX packages from the REQUIRED list.
+
+    Cached: package availability doesn't change within a run, so this should
+    only actually probe pdflatex once even though a failed compile can trigger
+    it up to 4x (draftmode + final, x2 attempts).
+    """
     missing = []
     executable = _PDFLATEX if os.path.isabs(_PDFLATEX) else shutil.which(_PDFLATEX)
     if not executable:
