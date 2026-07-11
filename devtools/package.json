@@ -12,7 +12,7 @@
   "type": "commonjs",
   "dependencies": {
     "katex": "^0.17.0",
-    "marked": "^18.0.4",
+    "marked": "^18.0.6",
     "mathjax-full": "^3.2.1"
   }
 }
