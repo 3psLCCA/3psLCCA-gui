@@ -1,10 +1,13 @@
-# Periodic Maintenance Carbon Cost
+## Periodic Maintenance Carbon Cost
 
-It is the embodied carbon emission cost due to usage of materials and equipment required for periodic maintenance of bridges.
+Monetary cost associated with carbon emissions generated from periodic maintenance activities, such as resurfacing, repainting, and minor repairs, is calculated as:
 
-$$PMEC = PWF \times PIECP$$
+$$
+PM_{EC} = PWF \times P_{IECP}
+$$
 
 where:
-- **$PMEC$**: emission cost due to periodic maintenance
-- **$PWF$**: present worth factor
-- **$PIECP$**: percentage of initial carbon emission cost for periodic maintenance
+
+- $PM_{EC}$ = Carbon emission cost due to periodic maintenance
+- $PWF$ = Present Worth Factor
+- $P_{IECP}$ = Percentage of the initial carbon emission cost for periodic maintenance

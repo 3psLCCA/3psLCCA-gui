@@ -1,14 +1,15 @@
-# Crash Rate
+# Crash rate
 
-Crash rate can be expressed as the frequency of crashes relative to the total distance traveled by all vehicles over a specific period of time.
+Crash rate refers to the number of traffic accidents occurring per day per million vehicle-kilometres travelled.
 
-$$Crash\ Rate = \frac{C \times 10^6}{V \times 365 \times T \times L}$$
-*(Accidents per million vehicle kilometers)*
+**Unit:** Accidents/day/million vehicle-kilometres travelled
+
+$$\text{Crash Rate} = \frac{C \times 10^6}{V \times 365 \times T \times L}$$
 
 where:
-- **$C$**: Total number of accidents recorded during the study period
-- **$V$**: Average Annual Daily Traffic (AADT)
-- **$365$**: Number of days in a year
-- **$10^6$**: Scaling factor to express rates per "million"
-- **$T$**: Timeframe or analysis period (in years)
-- **$L$**: Length of the roadway segment (in kilometers)
+- $C$ = Total number of accidents recorded during the study period
+- $V$ = Average annual daily traffic (AADT), representing the number of vehicles per day
+- $365$ = Number of days
+- $10^6$ = Scaling factor to express the rates per "million"
+- $T$ = Timeframe or analysis period (in years)
+- $L$ = Length of the roadway segment (in kilometers)

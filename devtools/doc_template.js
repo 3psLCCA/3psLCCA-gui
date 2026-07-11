@@ -1,4 +1,18 @@
 (function(){
+  // Open external links in the system browser, not inside the webview
+  document.addEventListener('click', function(e) {
+    var a = e.target.closest('a[href]');
+    if (!a) return;
+    var href = a.getAttribute('href');
+    if (!href || !/^https?:\/\//i.test(href)) return;
+    e.preventDefault();
+    if (window.pywebview && pywebview.api && pywebview.api.open_url) {
+      pywebview.api.open_url(href);
+    } else {
+      window.open(href, '_blank');
+    }
+  });
+
   // Search - pure DOM, no pywebview needed
   var inp = document.getElementById('search');
   inp && (inp.oninput = function(){
@@ -31,4 +45,8 @@
       }).catch(function(){});
     }, 300);
   });
+
+  // Scroll active nav item into view so sidebar always shows current page
+  var active = document.querySelector('.nav-item.active');
+  if (active) active.scrollIntoView({ block: 'nearest' });
 })();

@@ -2,6 +2,7 @@ import os
 import sys
 import json
 import subprocess
+import webbrowser
 from pathlib import Path
 
 FILE_PATH     = Path(__file__).resolve()
@@ -109,6 +110,11 @@ class GlossaryAPI:
             _NAV_FILE.unlink(missing_ok=True)
             return path
         return None
+
+    def open_url(self, url: str) -> None:
+        """Open an external URL in the system default browser."""
+        if url and url.startswith(("http://", "https://")):
+            webbrowser.open(url)
 
 
 def _icon_path() -> str | None:

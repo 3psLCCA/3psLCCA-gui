@@ -1,5 +1,4 @@
-# Minor Injury
+# Minor injury
 
-A minor injury can be defined as a non-fatal, non-permanent injury requiring minimal medical intervention or resulting in temporary/short-term loss of working time.
-
-It covers a wide range of non-emergency events such as cuts, wounds, bruises, swelling, and more. These injuries are generally defined as physical harms that are not life-threatening, do not cause permanent disability, and do not require extensive hospitalization or surgical interventions. They are typically treatable with first aid or primary care and generally allow for full recovery within a short period, often within a few days or weeks.
+As per Road Accidents in India 2023 (MORTH)  
+A minor injury can be defined as injuries but a person is slightly injured. This will be an injury of minor nature such as a cut, sprain or bruise, where only first aid is required and does not require hospitalisation. 

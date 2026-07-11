@@ -1,10 +1,13 @@
-# Major Repair Carbon Cost
+## Major Repair Carbon Emission Cost
 
-It is the embodied carbon emission cost due to usage of materials required for major repair work of bridges.
+Major repair carbon emission cost is the monetary cost associated with the carbon emissions generated from the use of materials and machinery during major repair works. It is calculated as:
 
-$$MREC = PWF \times PIECM$$
+$$
+MR_{EC} = PWF \times P_{IECM}
+$$
 
 where:
-- **$MREC$**: carbon emission cost due to major repairs
-- **$PWF$**: present worth factor
-- **$PIECM$**: percentage of initial carbon emission cost for major repairs
+
+- $MR_{EC}$ = Carbon emission cost due to major repairs
+- $PWF$ = Present Worth Factor
+- $P_{IECM}$ = Percentage of the initial carbon emission cost for major repairs

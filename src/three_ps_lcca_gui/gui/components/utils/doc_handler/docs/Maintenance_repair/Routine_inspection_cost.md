@@ -2,12 +2,12 @@
 
 These are the costs corresponding to periodic (annual) inspection activities that are needed to maintain the functionality and load-carrying capacity of the bridge. This includes expenses for routine maintenance activities like resurfacing, repainting, and minor repairs.
 
-$$RIC = PWF \times PICS$$
+$$RIC = PWF \times P_{ICS}$$
 
 where:
 - **$RIC$**: routine inspection cost
 - **$PWF$**: present worth factor
-- **$PICS$**: percentage of initial construction cost for routine inspection
+- **$P_{ICS}$**: percentage of initial construction cost for routine inspection
 
 PWF converts future periodic costs to present worth for life cycle cost estimation.
 

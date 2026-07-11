@@ -1,5 +1,5 @@
-# Social Cost of Carbon (SSC)
+# Social cost of carbon (SCC)
 
-Further information and tools for exploring the social cost of carbon can be found at the following resource:
+The social cost of carbon (SCC) represents the economic cost associated with climate damage (or benefit) that results from the emission of an additional tonne of carbon dioxide (tCO2).
 
-[Country-level SSC Explorer](https://country-level-scc.github.io/explorer/)
+[country-level-scc.github.io/explorer](https://country-level-scc.github.io/explorer/)

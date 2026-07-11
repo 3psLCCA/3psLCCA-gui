@@ -1,9 +1,5 @@
 # Design Life
 
-As per Clause 101.55 of IRC:5-2015 *(Standard Specifications and Code of Practice for Road Bridges, Section-I: General Features of Design, Eighth Revision)*:
+As per **Clause 104.1.4** of **IRC:5-2024** (*Standard Specifications and Code of Practice for Road Bridges, Section I: General Features of Design, Eighth Revision*), **design life** is defined as:
 
-> "The design life of all structural components is 100 years. Depending upon the importance and criticality of the bridge, a higher design life may be prescribed by the authorities."
-
-As per Section 3 of IRC:112-2020 *(Code of Practice for Concrete Road Bridges)*:
-
-> "Design life refers to the assumed period for which a structure or part of it is used for its intended purpose with anticipated maintenance, but without the necessity of major repairs."
+> The period during which the bridge or its components are able to perform their intended design functions with the requisite level of safety for users, subject to regular inspection, maintenance, and repairs.

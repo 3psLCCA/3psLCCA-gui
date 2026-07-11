@@ -1,3 +1,3 @@
-# Material Emissions
+# Material emissions
 
-Material emissions are standardised as the cumulative environmental loads associated with a material extraction to disposal. The total greenhouse gas emissions associated with a product, material or service throughout its entire life-from raw materials extraction to final disposal.
+Carbon emissions equipment associated with the extraction of raw materials, processing, manufacturing, and production of materials used in the construction project.  

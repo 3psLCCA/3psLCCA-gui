@@ -1,11 +1,10 @@
 # Periodic Maintenance Cost
 
-Periodic maintenance cost refers to the cost incurred due to routine works carried out at regular intervals to preserve the bridge condition and prevent deterioration. It includes activities such as resurfacing, repainting, minor crack sealing, drainage cleaning, and protective treatments. These works are preventive in nature and do not involve structural strengthening.
+The expenses incurred for periodic maintenance activities such as resurfacing, repainting, and minor repairs to preserve the asset's condition, functionality, and service life.
 
-$$PMC = PWF \times PICM$$
+$$PMC = PWF \times P_{ICM}$$
 
 where:
-- **$PMC$**: periodic maintenance cost
-- **$PWF$**: present worth factor
-- **$PICM$**: percentage of initial construction cost for periodic maintenance cost
-    
+- $PMC$ = periodic maintenance cost
+- $PWF$ = present worth factor
+- $P_{ICM}$ = percentage of initial construction for periodic maintenance cost

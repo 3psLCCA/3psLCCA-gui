@@ -1,3 +1,3 @@
-# Machinery/Equipment Emissions
+# Machinery emissions
 
-Machinery emissions are defined as the inventory of elementary flows released into the environment.
+Carbon emissions equivalent associated with the use of construction machinery and equipment during the construction process. 

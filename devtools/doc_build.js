@@ -107,7 +107,7 @@ function buildTree() {
         const catPath = path.join(DOCS_DIR, dirName);
         if (!fs.statSync(catPath).isDirectory()) continue;
         const mdFiles = fs.readdirSync(catPath)
-            .filter(f => f.endsWith('.md') && f !== '404.md').sort();
+            .filter(f => f.endsWith('.md') && f !== '404.md' && !f.startsWith('_')).sort();
         if (!mdFiles.length) continue;
         const items = mdFiles.map(f => {
             const src = fs.readFileSync(path.join(catPath, f), 'utf8');

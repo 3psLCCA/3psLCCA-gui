@@ -1,10 +1,13 @@
-# Demolition and Disposal Carbon Cost
+# Demolition and Disposal Related Carbon Emissions
 
-Carbon emission cost due to demolition and disposal for reconstruction is the emission cost from the demolition and disposal activities at the end of design life or service life of the bridge.
+Carbon emissions due to demolition and disposal activities of the bridge at the end of its service life are calculated as:
 
-$$D_{REC} = PWF \times PIECD$$
+$$
+D_{FEC} = PWF \times P_{IECD}
+$$
 
 where:
-- **$D_{REC}$**: carbon emission cost due to demolition and disposal for reconstruction
-- **$PWF$**: present worth factor
-- **$PIECD$**: percentage of initial carbon emission cost
+
+- $D_{FEC}$ = Carbon emission cost due to demolition and disposal for reconstruction
+- $PWF$ = Present Worth Factor
+- $P_{IECD}$ = Percentage of the initial carbon emission cost

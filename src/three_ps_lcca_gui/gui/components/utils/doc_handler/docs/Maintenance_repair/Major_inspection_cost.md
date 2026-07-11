@@ -1,11 +1,13 @@
-# Major Inspection Cost
+## Major Inspection Cost
 
-These are the costs corresponding to the periodic inspection activities for a bridge to identify any signs of deterioration or damage and to ensure that the bridge remains in a safe and operational state. These inspections are performed at set intervals.
+Major inspection cost represents the cost associated with periodic inspection activities carried out to identify signs of deterioration or damage and to ensure that the bridge remains in a safe and operational condition. These inspections are performed at specified intervals and are calculated as:
 
-$$MIC = PWF \times PICI$$
+$$
+M_{IC} = PWF \times P_{ICI}
+$$
 
 where:
-- **$MIC$**: major inspection cost
-- **$PWF$**: present worth factor
-- **$PICI$**: percentage of initial construction cost for major inspection
-    
+
+- $M_{IC}$ = Major inspection cost
+- $PWF$ = Present Worth Factor
+- $P_{ICI}$ = Percentage of the initial construction cost for major inspections

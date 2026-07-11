@@ -2,9 +2,10 @@
 
 Demolition and disposal cost for reconstruction is the cost incurred for the demolition of the structure at the end of design life or service life of bridge.
 
-$$D_{cr} = PWF \times PICD$$
+$$D_{cf} = PWF \times P_{ICD}$$
 
 where:
-- **$D_{cr}$**: demolition and disposal cost for reconstruction
-- **$PWF$**: present worth factor
-- **$PICD$**: percentage of initial construction cost
+- $D_{cf}$ = demolition cost at end-of-life
+- $PWF$ = present worth factor
+- $P_{ICD}$ = percentage of initial construction cost
+

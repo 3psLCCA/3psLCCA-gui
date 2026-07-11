@@ -33,7 +33,7 @@ body{
   background:color-mix(in srgb,var(--ac) 11%,transparent);
   color:var(--ac);border-left-color:var(--ac);font-weight:600;
 }
-#content{flex:1;overflow-y:auto;padding:40px 48px;max-width:860px;}
+#content{flex:1;overflow-y:auto;overflow-x:hidden;padding:40px 48px;}
 h1{font-size:1.75em;font-weight:700;margin-bottom:.55em;line-height:1.2}
 h2{font-size:1.25em;font-weight:600;margin:1.5em 0 .45em}
 h3{font-size:1.05em;font-weight:600;margin:1.2em 0 .4em}
@@ -59,9 +59,9 @@ blockquote{
   color:var(--dm);margin:.6em 0;
 }
 .math-display{
-  text-align:center;margin:1em 0;overflow-x:auto;
+  text-align:center;margin:1em 0;
 }
-mjx-container[display="true"]{display:block;text-align:center;margin:.9em 0;overflow-x:auto}
+mjx-container[display="true"]{display:block;text-align:center;margin:.9em 0;}
 mjx-container{display:inline-block;vertical-align:middle}
 ::-webkit-scrollbar{width:6px}
 ::-webkit-scrollbar-thumb{background:var(--bd);border-radius:3px}

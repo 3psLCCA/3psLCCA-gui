@@ -1,3 +1,3 @@
-# Traffic Rerouting Emissions
+# Transport Vehicle Reference
 
-It can be defined as the additional pollutants and greenhouse gases released into the atmosphere due to changes in the traffic patterns-such as detours, congestion and lower speeds caused by construction, maintenance or rehabilitation activities.
+Additional carbon dioxide equivalent (CO₂e) emissions resulting from vehicle rerouting and traffic disruptions caused during construction and other activities such as maintenance, major repairs, replacement of bearing and expansion joints and demolition. 
