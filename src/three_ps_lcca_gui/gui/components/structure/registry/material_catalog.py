@@ -61,7 +61,7 @@ from pathlib import Path
 # ─────────────────────────────────────────────────────────────────────────────
 
 # Increment when the manifest JSON structure changes incompatibly
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 # Root folder that contains <COUNTRY>/<REGION>/ sub-trees
 MATERIAL_DB_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -217,28 +217,39 @@ def _validate_data(data, db_key: str) -> tuple[list[str], list[str]]:
 #  PRIVATE - collect index fields from a loaded SOR file
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _collect_indexes(raw: list[dict]) -> tuple[list[str], list[str]]:
+def _collect_indexes(raw: list[dict]) -> tuple[list[str], list[str], dict[str, list[str]]]:
     """
-    Return (sheets, components) sorted lists for the manifest index.
-    sheets     — unique sheetName values
-    components — unique component values collected from every entry
+    Return (sheets, components, component_map) sorted lists/dictionaries for the manifest index.
+    sheets        — unique sheetName values
+    components    — unique component values collected from every entry
+    component_map — dictionary mapping each sheetName to a sorted list of unique component values within that sheet
     """
     sheets: set[str] = set()
     components: set[str] = set()
+    component_map: dict[str, set[str]] = {}
 
     for section in raw:
         sheet = section.get("sheetName", "")
-        if sheet:
-            sheets.add(sheet)
+        if not sheet:
+            continue
+        sheets.add(sheet)
+        if sheet not in component_map:
+            component_map[sheet] = set()
         for entry in section.get("data", []):
             comp = entry.get("component")
             if comp:
                 if isinstance(comp, list):
-                    components.update(c for c in comp if isinstance(c, str) and c.strip())
+                    valid_comps = [c for c in comp if isinstance(c, str) and c.strip()]
+                    components.update(valid_comps)
+                    component_map[sheet].update(valid_comps)
                 elif isinstance(comp, str) and comp.strip():
                     components.add(comp)
+                    component_map[sheet].add(comp)
 
-    return sorted(sheets), sorted(components)
+    # Convert sets to sorted lists in component_map
+    sorted_component_map = {k: sorted(list(v)) for k, v in component_map.items()}
+
+    return sorted(sheets), sorted(components), sorted_component_map
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -321,7 +332,7 @@ def build_registry(root: str = MATERIAL_DB_ROOT,
     Manifest structure
     ------------------
     {
-      "_meta": { "schema_version": 2, "built_at": "...", "root": [...], "total": N, "ok": N, "failed": N },
+      "_meta": { "schema_version": 3, "built_at": "...", "root": [...], "total": N, "ok": N, "failed": N },
       "INDIA/Bihar/Darbhanga-2025": {
           "db_key":       "INDIA/Bihar/Darbhanga-2025",
           "path":         ["material_database", "INDIA", "Bihar", "Darbhanga-2025.json"],
@@ -331,6 +342,7 @@ def build_registry(root: str = MATERIAL_DB_ROOT,
           "record_count": 4,
           "sheets":       ["Foundation", "Sub Structure", ...],   ← unique sheetName values
           "components":   ["Excavation", "Pier", "Pile", ...],    ← unique component values
+          "component_map": {"Foundation": ["Excavation"], ...},   ← mapping of sheet to its components
           "errors":       [],
           "warnings":     [...],
           "file_meta":    { "size_bytes": ..., "last_modified": ..., "md5": ... }
@@ -353,12 +365,12 @@ def build_registry(root: str = MATERIAL_DB_ROOT,
 
         report = check_integrity_by_path(jf_str)
 
-        sheets, components = [], []
+        sheets, components, component_map = [], [], {}
         if report["status"] == "OK" and report["record_count"] > 0:
             try:
                 with open(jf_str, "r", encoding="utf-8") as f:
                     raw = json.load(f)
-                sheets, components = _collect_indexes(raw)
+                sheets, components, component_map = _collect_indexes(raw)
             except Exception:
                 pass
 
@@ -374,6 +386,7 @@ def build_registry(root: str = MATERIAL_DB_ROOT,
             "record_count": report["record_count"],
             "sheets":       sheets,       # unique sheetName values → categories
             "components":   components,   # unique component values → sub-categories
+            "component_map": component_map, # mapping of sheetName to list of components
             "errors":       report["errors"],
             "warnings":     report["warnings"],
             "file_meta":    report["file_meta"],
