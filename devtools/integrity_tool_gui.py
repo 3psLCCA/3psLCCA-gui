@@ -107,13 +107,23 @@ def _md5(path: str) -> str:
 
 def _abs(rel: str) -> str:
     """Resolve a relative path against the project root."""
-    return os.path.normpath(os.path.join(_PROJECT_ROOT, rel))
+    path = os.path.normpath(os.path.join(_PROJECT_ROOT, rel))
+    if not os.path.exists(path):
+        # Try prepending src/three_ps_lcca_gui/
+        alt_path = os.path.normpath(os.path.join(_PROJECT_ROOT, "src", "three_ps_lcca_gui", rel))
+        if os.path.exists(alt_path):
+            return alt_path
+    return path
 
 
 def _rel(abs_path: str) -> str:
     """Make a path relative to the project root, forward slashes."""
     try:
-        return Path(abs_path).relative_to(_PROJECT_ROOT).as_posix()
+        rel = Path(abs_path).relative_to(_PROJECT_ROOT).as_posix()
+        prefix = "src/three_ps_lcca_gui/"
+        if rel.startswith(prefix):
+            rel = rel[len(prefix):]
+        return rel
     except ValueError:
         return Path(abs_path).as_posix()
 
