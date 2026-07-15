@@ -123,15 +123,42 @@ def _icon_path() -> str | None:
     return str(ico) if ico.is_file() else None
 
 
+def _browser_fallback(target: dict) -> None:
+    """Open the doc in the system default browser (no pywebview backend)."""
+    url = target.get("url")
+    if not url:
+        import tempfile
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".html", delete=False, encoding="utf-8"
+        ) as f:
+            f.write(target["html"])
+            url = Path(f.name).as_uri()
+    webbrowser.open(url)
+
+
 def run():
-    import webview
     slug  = json.loads(sys.argv[1]) if len(sys.argv) > 1 else None
     theme = json.loads(sys.argv[2]) if len(sys.argv) > 2 else None
+    target = _resolve(slug)
 
     api = GlossaryAPI(theme)
-    webview.create_window("Glossary", js_api=api, width=1100, height=750, **_resolve(slug))
-    webview.start(gui="edgechromium" if os.name == "nt" else None, icon=_icon_path())
-    api._cleanup()
+    try:
+        try:
+            import webview
+            from webview.errors import WebViewException
+        except ImportError:
+            _browser_fallback(target)
+            return
+        try:
+            webview.create_window("Glossary", js_api=api, width=1100, height=750, **target)
+            webview.start(gui="edgechromium" if os.name == "nt" else None, icon=_icon_path())
+        except WebViewException:
+            # No GTK/Qt backend available (e.g. Linux without python3-gi and
+            # without QtWebEngine) - the built pages degrade gracefully without
+            # the pywebview JS API, so hand off to the default browser instead.
+            _browser_fallback(target)
+    finally:
+        api._cleanup()
 
 
 def close_glossary() -> None:
