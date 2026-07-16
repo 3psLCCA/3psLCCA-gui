@@ -123,6 +123,27 @@ def _icon_path() -> str | None:
     return str(ico) if ico.is_file() else None
 
 
+def _open_in_browser(url: str) -> None:
+    """Open a URL in the default web browser.
+
+    On Linux, webbrowser.open() delegates to xdg-open, which routes file://
+    URLs to the text/html MIME handler - not necessarily a browser (e.g.
+    Notion). Launch the browser reported by xdg-settings instead.
+    """
+    if sys.platform.startswith(("linux", "freebsd", "openbsd", "netbsd")):
+        try:
+            desktop = subprocess.check_output(
+                ["xdg-settings", "get", "default-web-browser"],
+                text=True, timeout=5,
+            ).strip()
+            if desktop.endswith(".desktop"):
+                subprocess.Popen(["gtk-launch", desktop, url])
+                return
+        except (OSError, subprocess.SubprocessError):
+            pass
+    webbrowser.open(url)
+
+
 def _browser_fallback(target: dict) -> None:
     """Open the doc in the system default browser (no pywebview backend)."""
     url = target.get("url")
@@ -133,7 +154,7 @@ def _browser_fallback(target: dict) -> None:
         ) as f:
             f.write(target["html"])
             url = Path(f.name).as_uri()
-    webbrowser.open(url)
+    _open_in_browser(url)
 
 
 def run():
