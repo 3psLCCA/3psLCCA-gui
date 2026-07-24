@@ -99,7 +99,7 @@ The glossary for the terms used in the equations are mentioned below.
 \item $\mathrm{TCR}$ = Time cost for reconstruction
 \item $\mathrm{TL}$ = Tyre life
 \item $\mathrm{TN}$ = Number of tyres
-\item $\mathrm{UPD}$ = Utilization per day
+\item $\mathrm{UPD}$ = Utilisation per day
 \item $\mathrm{VOC}$ = Vehicle operating cost
 \item $\mathrm{VOT}$ = Value of time cost
 \item $\mathrm{W}$ = Width of carriageway
@@ -344,7 +344,7 @@ FXC = \frac{b}{UPD}
 
 \begin{table}[H]
 \centering
-\caption*{\textit{Table B-8 Utilization per day equations for different vehicles}}
+\caption*{\textit{Table B-8 Utilisation per day equations for different vehicles}}
 {\fontsize{9pt}{11pt}\selectfont
 \setlength{\tabcolsep}{6pt}
 \renewcommand{\arraystretch}{1.9}

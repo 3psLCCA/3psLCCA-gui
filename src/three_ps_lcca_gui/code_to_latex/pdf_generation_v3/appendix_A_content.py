@@ -97,14 +97,14 @@ This Life Cycle Cost Assessment (LCCA) has been carried out using a deterministi
 software-based approach. The analysis is based on standard engineering practice,
 published guidelines, and reasonable assumptions adopted to ensure consistency,
 transparency, and comparability of results. The key assumptions adopted in the
-present study are summarized below.
+present study are summarised below.
 
 \vspace{0.5em}
 
 \begin{itemize}
 \item The analysis period corresponds to the \textbf{design/service life of the bridge} as specified in the project data.
 \item The study includes: initial construction, routine inspection, periodic maintenance, major inspections, repairs, replacement of bearings and expansion joints, reconstruction, demolition and disposal, and associated road user costs.
-\item Only greenhouse gas (GHG) emissions are considered for environmental cost monetization.
+\item Only greenhouse gas (GHG) emissions are considered for environmental cost monetisation.
 \item Other impacts such as noise pollution, local business impacts, regional economic disruptions, and broader social externalities are outside the scope of this study.
 \item Components not explicitly defined in the input data or methodology are excluded.
 \item Future technological advancement, policy changes, traffic growth variations, or economic structural shifts are not considered.
@@ -132,7 +132,7 @@ present study are summarized below.
 \item Maintenance and repair emissions are assumed proportional to initial construction emissions.
 \item Demolition and disposal emissions are assumed proportional to construction emissions.
 \item Recycling is assumed to generate cost recovery (treated as negative cost).
-\item Environmental cost is calculated by monetizing carbon emissions using a single Social Cost of Carbon (SCC) value.
+\item Environmental cost is calculated by monetising carbon emissions using a single Social Cost of Carbon (SCC) value.
 \item Average Daily Traffic (ADT) is assumed constant within each defined analysis period.
 \item Traffic composition (cars, two-wheelers, buses, LCVs, HCVs, MCVs) is based on input data.
 \item Traffic diversion during construction, maintenance, repair, replacement, reconstruction, and demolition is assumed over a predefined detour length.
@@ -164,7 +164,7 @@ and comparability of results.
 \begin{itemize}
 \item The analysis period corresponds to the \textbf{design/service life of the bridge} as specified in the project data.
 \item The study includes: initial construction, routine inspection, periodic maintenance, major inspections, repairs, replacement of bearings and expansion joints, reconstruction, demolition and disposal, and associated road user costs.
-\item Only greenhouse gas (GHG) emissions are considered for environmental cost monetization.
+\item Only greenhouse gas (GHG) emissions are considered for environmental cost monetisation.
 \item Other impacts such as noise pollution, local business impacts, regional economic disruptions, and broader social externalities are outside the scope of this study.
 \item Components not explicitly defined in the input data or methodology are excluded.
 \item Future technological advancement, policy changes, traffic growth variations, or economic structural shifts are not considered.
@@ -192,7 +192,7 @@ and comparability of results.
 \item Maintenance and repair emissions are assumed proportional to initial construction emissions.
 \item Demolition and disposal emissions are assumed proportional to construction emissions.
 \item Recycling is assumed to generate cost recovery (treated as negative cost).
-\item Environmental cost is calculated by monetizing carbon emissions using a single Social Cost of Carbon (SCC) value.
+\item Environmental cost is calculated by monetising carbon emissions using a single Social Cost of Carbon (SCC) value.
 \item Average Daily Traffic (ADT) is assumed constant within each defined analysis period.
 \item Traffic composition (cars, two-wheelers, buses, LCVs, HCVs, MCVs) is based on input data.
 \item Traffic diversion during construction, maintenance, repair, replacement, reconstruction, and demolition is assumed over a predefined detour length.

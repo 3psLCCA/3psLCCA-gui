@@ -197,7 +197,7 @@ def _legend(currency: str) -> NoEscape:
 def _fmt(val):
     if val is None:
         return _CENTER_DASH
-    return f"{val:.{DECIMAL_PLACES_FOR_LATEX}f}"
+    return f"{val:,.{DECIMAL_PLACES_FOR_LATEX}f}"
 
 
 def _mat_cell(name: str, source: str):
