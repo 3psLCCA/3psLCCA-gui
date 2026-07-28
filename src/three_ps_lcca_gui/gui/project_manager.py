@@ -6,6 +6,7 @@ from three_ps_lcca_gui.gui.project_window import ProjectWindow
 from three_ps_lcca_gui.gui.project_controller import ProjectController
 from three_ps_lcca_gui.gui.components.utils.common_requested_data import set_controller
 from three_ps_lcca_gui.gui.components.new_project_dialog import NewProjectDialog
+from three_ps_lcca_gui.gui.api import tokens
 
 import three_ps_lcca_gui.core.start_manager as sm
 
@@ -96,35 +97,9 @@ class ProjectManager:
                     target.show()
 
                 def _do_init():
-                    new_id = f"proj_{os.urandom(4).hex()}"
-                    success = target.controller.init_project(
-                        new_id, is_new=True, display_name=display_name
-                    )
-                    if success:
-                        import copy
-                        from three_ps_lcca_gui.gui.components.structure.widgets.defaults import STRUCTURE_DEFAULTS
-                        engine = target.controller.engine
-                        engine.stage_update(
-                            {
-                                "project_name": display_name,
-                                "project_country": country,
-                                "project_currency": currency,
-                                "unit_system": unit_system or "metric",
-                            },
-                            "general_info",
-                        )
-                        engine.stage_update({"project_country": country}, "bridge_data")
-                        engine.stage_update(copy.deepcopy(STRUCTURE_DEFAULTS), "str_component_registry")
-                        # Force flush so chunks exist before widgets load
-                        engine.force_sync()
-                        target.project_id = target.controller.active_project_id
-                        sm.record_open(target.project_id)
-
-                        # Pre-warm controller chunk cache so all widget
-                        # refresh_from_engine calls during preload are
-                        # cache hits - no disk I/O after this point.
-                        _warm_cache(target)
-
+                    if self._init_new_project(
+                        target, display_name, country, currency, unit_system
+                    ):
                         def _on_complete():
                             dialog.finish_loading()
                             target.show_project_view()
@@ -181,6 +156,70 @@ class ProjectManager:
 
             # Yield one tick so card loading state paints before heavy work
             QTimer.singleShot(0, _do_open)
+
+    def _init_new_project(
+        self, target, display_name: str, country: str, currency: str, unit_system: str
+    ) -> str | None:
+        """Shared core of new-project creation (dialog flow and local API):
+        engine init, default chunks, token, cache warm-up. Returns the new
+        project_id, or None if engine init failed. Caller drives preload/UI."""
+        new_id = f"proj_{os.urandom(4).hex()}"
+        if not target.controller.init_project(
+            new_id, is_new=True, display_name=display_name
+        ):
+            return None
+
+        import copy
+        from three_ps_lcca_gui.gui.components.structure.widgets.defaults import STRUCTURE_DEFAULTS
+        engine = target.controller.engine
+        engine.stage_update(
+            {
+                "project_name": display_name,
+                "project_country": country,
+                "project_currency": currency,
+                "unit_system": unit_system or "metric",
+            },
+            "general_info",
+        )
+        engine.stage_update({"project_country": country}, "bridge_data")
+        engine.stage_update(copy.deepcopy(STRUCTURE_DEFAULTS), "str_component_registry")
+        # Force flush so chunks exist before widgets load
+        engine.force_sync()
+        target.project_id = target.controller.active_project_id
+        sm.record_open(target.project_id)
+        tokens.ensure_token(target.project_id)
+
+        # Pre-warm controller chunk cache so all widget refresh_from_engine
+        # calls during preload are cache hits - no disk I/O after this point.
+        _warm_cache(target)
+        return target.project_id
+
+    def create_project(
+        self, display_name: str, country: str, currency: str, unit_system: str = "metric"
+    ) -> str | None:
+        """Programmatic project creation (local API) - same steps as the New
+        Project dialog flow, without the dialog. Returns the new project_id,
+        or None if creation failed. Must be called on the Qt main thread."""
+        target = self._find_empty_window() or self._create_window()
+        if not target.isVisible():
+            target.show()
+
+        project_id = self._init_new_project(
+            target, display_name, country, currency, unit_system
+        )
+        if project_id is None:
+            target.show_home()
+            target.show()
+            return None
+
+        def _on_complete():
+            target.show_project_view()
+            target.show()
+            target.activateWindow()
+            QTimer.singleShot(0, self.refresh_all_home_screens)
+
+        target.preload_all(_on_complete)
+        return project_id
 
     def is_project_open(self, project_id: str) -> bool:
         return self._find_window_for_project(project_id) is not None

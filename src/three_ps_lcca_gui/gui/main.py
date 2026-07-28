@@ -283,13 +283,24 @@ def main():
             sm.set_name("")  # Mark as seen
 
     # Start resource tracker (dev mode + logger only)
-    from three_ps_lcca_gui.gui._CONFIG import DEV_MODE, ATTACH_LOGGER
+    from three_ps_lcca_gui.gui._CONFIG import DEV_MODE, ATTACH_LOGGER, LOCAL_API_ENABLED
     if DEV_MODE and ATTACH_LOGGER:
         from three_ps_lcca_gui.gui.sys_tracker import SysTracker
         SysTracker.instance().start()
 
     # Initialize Project Manager and Close Splash
     manager = ProjectManager()
+
+    # Local HTTP API - lets external tools read/update an open project's GUI.
+    # LOCAL_API_ENABLED is a hard kill switch (off by default, not yet ready
+    # for release); the settings toggle only matters once it's True. Failure
+    # to bind must never block startup.
+    if LOCAL_API_ENABLED and sm.get_pref("api_enabled", "true") == "true":
+        from three_ps_lcca_gui.gui.api.server import start_api_server
+
+        api_handle = start_api_server(manager)
+        if api_handle:
+            app.aboutToQuit.connect(api_handle.shutdown)
 
     # Heavy work first - splash stays visible during entire load
     manager.open_project()

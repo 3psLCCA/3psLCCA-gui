@@ -409,7 +409,7 @@
     ],
     "file_meta": {
       "size_bytes": 844599,
-      "last_modified": "2026-07-15T20:34:13.738551",
+      "last_modified": "2026-07-27T19:50:34.250972",
       "md5": "62c6e2788c1b376597c23f52c5cc85b8"
     }
   },
@@ -719,7 +719,7 @@
     ],
     "file_meta": {
       "size_bytes": 196131,
-      "last_modified": "2026-07-15T20:34:13.932087",
+      "last_modified": "2026-07-27T19:50:34.494391",
       "md5": "f6dfeed3b7340f2718020ce4bc411cd9"
     }
   },
@@ -1196,7 +1196,7 @@
     ],
     "file_meta": {
       "size_bytes": 460146,
-      "last_modified": "2026-07-15T20:34:14.626299",
+      "last_modified": "2026-07-27T19:50:35.218385",
       "md5": "55274c8630b407fd8186758a252bf9a1"
     }
   },
@@ -1640,7 +1640,7 @@
     ],
     "file_meta": {
       "size_bytes": 982615,
-      "last_modified": "2026-07-15T20:34:15.028947",
+      "last_modified": "2026-07-27T19:50:35.669660",
       "md5": "5936fc66d42be2a6d5c13fd7ce6679b4"
     }
   },
@@ -1824,13 +1824,13 @@
     ],
     "file_meta": {
       "size_bytes": 163083,
-      "last_modified": "2026-07-15T20:34:15.209893",
+      "last_modified": "2026-07-27T19:50:35.931949",
       "md5": "57beb77ad394cf079c48676e33814953"
     }
   },
   "_meta": {
     "schema_version": 3,
-    "built_at": "2026-07-15T20:34:32.928850",
+    "built_at": "2026-07-27T19:55:06.519418",
     "root": [
       "material_database"
     ],

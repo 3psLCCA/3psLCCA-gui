@@ -356,7 +356,11 @@ def build_registry(root: str = MATERIAL_DB_ROOT,
         raise FileNotFoundError(f"Material database root not found: {root}")
 
     manifest = {}
-    json_files = sorted(Path(root).rglob("*.json"))
+    manifest_abs = Path(manifest_path).resolve()
+    json_files = [
+        jf for jf in sorted(Path(root).rglob("*.json"))
+        if jf.resolve() != manifest_abs
+    ]
 
     for jf in json_files:
         jf_str = str(jf)

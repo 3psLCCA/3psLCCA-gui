@@ -384,6 +384,10 @@ def main(xlsx_path: str, out_path: str | None = None) -> None:
 
     print(f"\nWritten {total_entries} entries -> {dest}")
 
+    from tokenized import write_tokens_file
+    tokens_path = write_tokens_file(sor, dest)
+    print(f"Tokens written -> {tokens_path}")
+
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:

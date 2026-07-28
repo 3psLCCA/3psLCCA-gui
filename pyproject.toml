@@ -10,6 +10,7 @@ include-package-data = true
 
 [tool.setuptools.package-data]
 three_ps_lcca_gui = [
+    "gui/api/api_home.html",
     "gui/components/utils/units.json",
     "gui/assets/**",
     "gui/themes/**",
@@ -33,6 +34,7 @@ version = "1.1.0"
 dependencies = [
     "platformdirs",
     "PySide6",
+    "Flask",
     "psutil",
     "Pillow",
     "matplotlib",

@@ -46,6 +46,97 @@ def get_custom_units() -> list[dict]:
     return _custom_units_cache
 
 
+# Dimension label -> SI base unit code, mirrors CustomUnitDialog._DIMS in
+# structure/widgets/material_dialog.py - the local API's "add a custom unit"
+# path must accept exactly the same dimensions the GUI dialog offers.
+CUSTOM_UNIT_DIMENSIONS: dict[str, str] = {
+    "Mass": "kg", "Length": "m", "Area": "m2", "Volume": "m3", "Count": "nos",
+}
+
+
+def list_available_units() -> list[dict]:
+    """Every unit a caller can use as-is: canonical units (deduped across
+    their aliases) plus any custom units already defined. Same set
+    CustomUnitDialog's combo shows (minus its "+ Add Custom Unit..." control
+    row). Pure, no Qt - safe to call from any thread."""
+    seen_ids: set[int] = set()
+    result: list[dict] = []
+    for code, data in _all_units.items():
+        if id(data) in seen_ids:
+            continue  # alias entry for a canonical unit already listed
+        seen_ids.add(id(data))
+        result.append({
+            "code": code,
+            "label": data.get("display", code),
+            "name": data.get("name", ""),
+            "dimension": data.get("dimension", ""),
+            "to_si": data.get("to_si"),
+            "custom": False,
+        })
+    for c in _custom_units_cache:
+        result.append({
+            "code": c["symbol"],
+            "label": c["symbol"],
+            "name": c.get("name", ""),
+            "dimension": c.get("dimension", ""),
+            "to_si": c.get("to_si"),
+            "custom": True,
+        })
+    return result
+
+
+def validate_custom_unit(unit: dict) -> list[str]:
+    """Pure validation mirroring CustomUnitDialog._validate_and_accept() -
+    symbol required and not already taken (built-in or custom, case
+    insensitive), dimension one of the five the dialog offers, to_si a
+    positive number."""
+    errors = []
+    symbol = (unit.get("symbol") or "").strip()
+    if not symbol:
+        errors.append("custom_unit.symbol is required")
+    else:
+        existing = {c.lower() for c in UNIT_TO_SI} | {
+            c["symbol"].lower() for c in _custom_units_cache
+        }
+        if symbol.lower() in existing:
+            errors.append(
+                f"custom_unit.symbol {symbol!r} already exists - use that "
+                f"unit code directly instead of redefining it"
+            )
+
+    if unit.get("dimension") not in CUSTOM_UNIT_DIMENSIONS:
+        errors.append(
+            f"custom_unit.dimension must be one of {sorted(CUSTOM_UNIT_DIMENSIONS)}"
+        )
+
+    to_si = unit.get("to_si")
+    if isinstance(to_si, bool) or not isinstance(to_si, (int, float)) or to_si <= 0:
+        errors.append("custom_unit.to_si must be a positive number")
+
+    return errors
+
+
+def save_custom_unit(unit: dict) -> dict:
+    """Persists a validated custom unit (mirrors
+    MaterialDialog._add_custom_unit's save step) and refreshes the in-process
+    cache so it's immediately resolvable. Caller must have already run
+    validate_custom_unit() and gotten no errors."""
+    from ..structure.registry.custom_material_db import CustomMaterialDB
+
+    symbol = unit["symbol"].strip()
+    dimension = unit["dimension"]
+    record = {
+        "symbol": symbol,
+        "name": (unit.get("name") or "").strip(),
+        "dimension": dimension,
+        "to_si": float(unit["to_si"]),
+        "si_unit": CUSTOM_UNIT_DIMENSIONS[dimension],
+    }
+    CustomMaterialDB().save_custom_unit(record)
+    load_custom_units()
+    return record
+
+
 def get_known_units() -> set[str]:
     """Return the full set of recognised unit codes (canonical + aliases + custom).
 
@@ -73,6 +164,27 @@ def _build_aliases() -> dict[str, str]:
     return result
 
 _UNIT_ALIASES: dict[str, str] = _build_aliases()
+
+
+def canonical_unit_code(code: str) -> str:
+    """Normalize a unit code to its canonical form (e.g. 'sqm' -> 'm2').
+    Raw SOR/database rows often use alias spellings; the GUI's unit dropdown
+    only matches canonical codes exactly (no alias resolution), so an alias
+    stored verbatim shows the unit field blank when editing that material.
+    Callers that persist a unit from a catalog row should store the
+    canonical form via this function.
+
+    Note: UNIT_TO_SI is NOT a valid "is this canonical" test - it also
+    contains alnum-safe aliases (e.g. "sqm") baked in directly alongside
+    their canonical entry (e.g. "m2"), sharing the same to_si value. Only
+    _UNIT_ALIASES reliably maps alias -> canonical code, so it's the sole
+    source of truth here. Returns `code` unchanged if it's already
+    canonical, a custom unit, or not recognized at all (compound
+    expressions like 'kg/m2' pass through untouched - only simple
+    canonical/alias lookups are handled here)."""
+    if not code:
+        return code
+    return _UNIT_ALIASES.get(code.strip().lower(), code)
 
 
 # ---------------------------------------------------------------------------

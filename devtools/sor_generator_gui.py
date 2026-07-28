@@ -197,7 +197,7 @@ class _BatchWorker(QThread):
         ok = fail = 0
 
         if self._delete_existing:
-            existing_json = sorted(folder.rglob("*.json"))
+            existing_json = sorted(folder.rglob("*.json")) + sorted(folder.rglob("*.tokens"))
             for jp in existing_json:
                 try:
                     jp.unlink()
@@ -223,6 +223,7 @@ class _BatchWorker(QThread):
             rel = xlsx_path.relative_to(folder)
             try:
                 from sor_json_generator import build_sor_json, parse_excel
+                from tokenized import write_tokens_file
                 buf = io.StringIO()
                 with redirect_stdout(buf):
                     parsed = parse_excel(str(xlsx_path))
@@ -230,6 +231,7 @@ class _BatchWorker(QThread):
                 json_path.write_text(
                     _json.dumps(sor, indent=2, ensure_ascii=False), encoding="utf-8"
                 )
+                write_tokens_file(sor, json_path)
                 self.progress.emit(f"✓ {rel}", False)
                 ok += 1
             except Exception as exc:
@@ -760,6 +762,14 @@ class SorGeneratorDialog(QDialog):
         self._last_written = str(dest)
         total_entries = sum(len(s["data"]) for s in self._sor)
         self._log_line(f"Written {total_entries} entries -> {dest}", color=_GREEN)
+
+        # --- Tokens sidecar (parallel to the JSON, for API/search lookups) ---
+        try:
+            from tokenized import write_tokens_file
+            tokens_path = write_tokens_file(self._sor, dest)
+            self._log_line(f"Tokens written -> {tokens_path}", color=_GREEN)
+        except Exception as exc:
+            self._log_line(f"Tokens write failed: {exc}", color=_RED)
 
         # --- Integrity check -------------------------------------------------
         self._run_integrity_check(str(dest))

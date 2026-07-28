@@ -24,12 +24,18 @@ engine.list_by_category("Foundation", component="Pile")  # further filter by com
 engine.search("steel rebar")                          # full-text across all
 engine.search("steel rebar", category="Sub Structure", component="Pier")
 engine.search("PVC", region="Bihar")
+engine.search_advanced("steel rebar")                 # same matching, but also checks 'description'
+engine.list_tokens()                                  # vocabulary of searchable tokens
+engine.list_tokens(category="Foundation", region="Bihar")
 """
 
 import json
 import re
 from three_ps_lcca_gui.gui.components.structure.registry.material_catalog import (
     get_registry, get_path, list_databases,
+)
+from three_ps_lcca_gui.gui.components.structure.registry.tokenizer import (
+    tokenize_name as _tokenize_name,
 )
 
 
@@ -53,6 +59,12 @@ class AdvancedSearchEngine:
         """Split normalized text into word tokens."""
         normalized = AdvancedSearchEngine.normalize(text)
         return normalized.split() if normalized else []
+
+    @staticmethod
+    def tokenize_name(text: str) -> list[str]:
+        """Stop-word-filtered tokens for a material name/description, as
+        used to build the registry's `.tokens` sidecars (tokenizer.py)."""
+        return _tokenize_name(text)
 
     @staticmethod
     def _token_matches(tok: str, item: str) -> bool:
@@ -301,6 +313,71 @@ class MaterialSearchEngine:
             if AdvancedSearchEngine.is_match(query, item.get("name", "")):
                 results.append(item)
         return results
+
+    def search_advanced(self,
+                        query:     str,
+                        category:  str | None = None,
+                        component: str | None = None,
+                        db_key:    str | None = None,
+                        region:    str | None = None) -> list[dict]:
+        """
+        Like search(), but matches against src_id + name + description
+        concatenated - so a query term that only appears in an entry's
+        description or src_id (not its name) still matches, unlike search()
+        which is name-only. Useful since list_tokens() draws its vocabulary
+        from name + description too.
+
+        Parameters
+        ----------
+        query     : tokens to match against entry 'src_id' + 'name' + 'description'
+        category  : restrict to sheetName            (optional)
+        component : restrict to component value       (optional)
+        db_key    : restrict to one db_key            (optional)
+        region    : restrict to a region              (optional)
+        """
+        results = []
+        for item in self._iter_items(db_key=db_key,
+                                     category=category,
+                                     component=component):
+            if region and item.get("region", "").lower() != region.lower():
+                continue
+            parts = [str(item["src_id"])] if item.get("src_id") else []
+            parts.append(item.get("name", ""))
+            if item.get("description"):
+                parts.append(item["description"])
+            text = " ".join(parts)
+            if AdvancedSearchEngine.is_match(query, text):
+                results.append(item)
+        return results
+
+    def list_tokens(self,
+                    category:  str | None = None,
+                    component: str | None = None,
+                    db_key:    str | None = None,
+                    region:    str | None = None) -> list[str]:
+        """
+        Return the sorted, deduplicated vocabulary of searchable tokens across
+        matching entries' name/description fields - the same stop-word-filtered
+        tokenizer used to build the registry's `.tokens` sidecars (tokenizer.py).
+        Lets a caller (e.g. an LLM driving the search API) discover real terms
+        for a database instead of guessing words that return zero results.
+
+        Parameters
+        ----------
+        category  : restrict to sheetName            (optional)
+        component : restrict to component value       (optional)
+        db_key    : restrict to one db_key            (optional)
+        region    : restrict to a region              (optional)
+        """
+        found: set[str] = set()
+        for item in self._iter_items(db_key=db_key, category=category, component=component):
+            if region and item.get("region", "").lower() != region.lower():
+                continue
+            found.update(AdvancedSearchEngine.tokenize_name(item.get("name", "")))
+            description = item.get("description")
+            if description:
+                found.update(AdvancedSearchEngine.tokenize_name(description))
+        return sorted(found)
 
     def summary(self) -> None:
         """Print a human-readable category/component summary of loaded databases."""

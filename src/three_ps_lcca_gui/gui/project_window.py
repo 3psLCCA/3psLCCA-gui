@@ -475,6 +475,12 @@ class ProjectWindow(QMainWindow):
         action_info.triggered.connect(self._show_project_info)
         self.menuFile.addAction(action_info)
 
+        from three_ps_lcca_gui.gui._CONFIG import LOCAL_API_ENABLED
+        if LOCAL_API_ENABLED:
+            action_api_access = QAction("API Access", self)
+            action_api_access.triggered.connect(self._show_api_access)
+            self.menuFile.addAction(action_api_access)
+
         self.menuFile.addSeparator()
 
         action_close = QAction("Close Project", self)
@@ -933,6 +939,9 @@ class ProjectWindow(QMainWindow):
         else:
             if self.controller.engine and self.controller.engine.is_active():
                 self.controller.close_project()
+        if self.project_id:
+            from three_ps_lcca_gui.gui.api import tokens
+            tokens.clear_token(self.project_id)
         self.project_id = None
 
         new_win = self.manager._create_window()
@@ -1143,6 +1152,13 @@ class ProjectWindow(QMainWindow):
 
         dlg.exec()
 
+    def _show_api_access(self):
+        if not self.project_id:
+            return
+        from three_ps_lcca_gui.gui.components.api_access_dialog import ApiAccessDialog
+        dlg = ApiAccessDialog(self.project_id, parent=self)
+        dlg.exec()
+
     def _open_rollback_dialog(self):
         if not self.controller.engine or not self.controller.engine.is_active():
             return
@@ -1166,6 +1182,9 @@ class ProjectWindow(QMainWindow):
         else:
             if self.controller.engine:
                 self.controller.close_project()
+        if self.project_id:
+            from three_ps_lcca_gui.gui.api import tokens
+            tokens.clear_token(self.project_id)
         self.project_id = None
         self.manager.remove_window(self)
         self.manager.refresh_all_home_screens()
