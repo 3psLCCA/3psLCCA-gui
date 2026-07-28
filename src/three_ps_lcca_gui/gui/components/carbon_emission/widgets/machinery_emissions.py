@@ -442,15 +442,22 @@ class _MachineryTable(TooltipTableMixin, QTableWidget):
 
 
 class _DetailedTable(QWidget):
+    # Header labels are left-aligned even for numeric (right-aligned data)
+    # columns: when a column is too narrow for its full heading, Qt anchors
+    # visible text to the alignment edge - right-aligned text would show the
+    # *tail* of the label (e.g. "ssion") instead of its start ("Emiss").
+    # Left alignment keeps the beginning of the label visible regardless of
+    # column width. Data-cell alignment (set per-item in _add_blank_row) is
+    # unaffected by this and stays right-aligned for numbers.
     HEADERS = [
         ("Equipment Name",      Qt.AlignLeft   | Qt.AlignVCenter),  # 0
         ("Energy Source",       Qt.AlignLeft   | Qt.AlignVCenter),  # 1
-        ("Fuel / Power Rating", Qt.AlignRight  | Qt.AlignVCenter),  # 2
-        ("Avg Hrs/Day",         Qt.AlignRight  | Qt.AlignVCenter),  # 3
-        ("No. of Days",         Qt.AlignRight  | Qt.AlignVCenter),  # 4
-        ("EF (kg CO₂e/unit)",   Qt.AlignRight  | Qt.AlignVCenter),  # 5
-        ("Consumption",         Qt.AlignRight  | Qt.AlignVCenter),  # 6
-        ("Emissions (kg CO₂e)", Qt.AlignRight  | Qt.AlignVCenter),  # 7
+        ("Fuel / Power Rating", Qt.AlignLeft   | Qt.AlignVCenter),  # 2
+        ("Avg Hrs/Day",         Qt.AlignLeft   | Qt.AlignVCenter),  # 3
+        ("No. of Days",         Qt.AlignLeft   | Qt.AlignVCenter),  # 4
+        ("EF (kg CO₂e/unit)",   Qt.AlignLeft   | Qt.AlignVCenter),  # 5
+        ("Consumption",         Qt.AlignLeft   | Qt.AlignVCenter),  # 6
+        ("Emissions (kg CO₂e)", Qt.AlignLeft   | Qt.AlignVCenter),  # 7
         ("Action",              Qt.AlignCenter | Qt.AlignVCenter),  # 8 hidden - frozen overlay
         ("",                    Qt.AlignCenter | Qt.AlignVCenter),  # 9 placeholder - reserves _ACTION_W
     ]
@@ -475,6 +482,13 @@ class _DetailedTable(QWidget):
         hh.setSectionResizeMode(QHeaderView.Interactive)
         hh.setStretchLastSection(False)
         hh.setMinimumSectionSize(60)
+        # Equipment Name absorbs all remaining width automatically (same
+        # pattern as material_emissions.py's "Material" column) so the row of
+        # real columns always fills exactly 100% of the viewport - manual
+        # ratio math elsewhere can under-fill by a few px from int() rounding,
+        # leaving a gap short of the frozen action-column overlay instead of
+        # extending fully underneath it.
+        hh.setSectionResizeMode(0, QHeaderView.Stretch)
         hh.setSectionResizeMode(8, QHeaderView.Fixed)
         self._table.setColumnWidth(8, 0)
         self._table.setColumnHidden(8, True)
@@ -560,12 +574,15 @@ class _DetailedTable(QWidget):
         vp_w = self._table.viewport().width()
         if vp_w <= 0:
             return
-        # Cols 0-7 share the viewport minus the col-9 placeholder (_ACTION_W).
-        # Col 9 is a fixed placeholder that reserves space for the frozen overlay;
-        # subtracting it leaves the true content area for proportional distribution.
+        # Cols 1-7 share the viewport minus the col-9 placeholder (_ACTION_W);
+        # col 0 (Equipment Name) is QHeaderView.Stretch and absorbs whatever's
+        # left automatically, so the row always fills exactly 100% of the
+        # viewport - it's excluded here rather than folded into a ratio that
+        # would have to sum to 1.0 (fragile under per-column int() rounding).
+        # Col 9 is a fixed placeholder that reserves space for the frozen overlay.
         avail = max(1, vp_w - _ACTION_W)
-        ratios = {0: 0.16, 1: 0.14, 2: 0.12, 3: 0.10, 4: 0.10, 5: 0.12, 6: 0.10, 7: 0.16}
-        mins   = {0: 140,  1: 120,  2: 110,  3: 90,   4: 90,   5: 140,  6: 100,  7: 100}
+        ratios = {1: 0.14, 2: 0.12, 3: 0.10, 4: 0.10, 5: 0.12, 6: 0.10, 7: 0.16}
+        mins   = {1: 120,  2: 110,  3: 90,   4: 90,   5: 140,  6: 100,  7: 100}
         col_widths = {c: max(mins[c], int(avail * r)) for c, r in ratios.items()}
         used = sum(col_widths.values())
         if used > avail:
