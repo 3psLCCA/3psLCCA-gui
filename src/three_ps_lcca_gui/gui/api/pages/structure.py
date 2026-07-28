@@ -555,7 +555,7 @@ _ADD_MANUAL_TOP_KEYS = {"component", "values", "state", "custom_unit"}
 _ADD_MANUAL_STATE_KEYS = {"included_in_carbon_emission", "included_in_recyclability"}
 _ADD_MANUAL_VALUE_KEYS = {
     "material_name", "unit", "quantity", "rate", "rate_source", "src_id",
-    "carbon_emission", "carbon_unit_den", "carbon_emission_src",
+    "carbon_emission", "carbon_unit_den", "carbon_unit_num", "carbon_emission_src",
     "conversion_factor", "scrap_rate", "post_demolition_recovery_percentage",
 }
 _ADD_MANUAL_REQUIRED_VALUE_KEYS = {"material_name", "unit", "quantity", "rate"}
@@ -569,9 +569,11 @@ def _add_manual(
     {...}, "state": {...}?, "custom_unit": {...}?} - no list wrapper, one
     material per call, no bulk. Instead of the full "carbon_unit" string
     (e.g. "kgCO₂e/kg", awkward to type by hand), accepts "carbon_unit_den"
-    - just the denominator (e.g. "kg") - and builds the full string itself.
-    If `component` doesn't exist yet in this chunk, it's auto-created, same
-    as add_from_catalog. Returns (merged_data, registry_patch_or_None,
+    - the denominator (e.g. "kg", or a compound like "m^2/kg" to match an
+    emission factor expressed per that ratio) - plus an optional
+    "carbon_unit_num" (default "kgCO₂e") and joins them as "num/den". If
+    `component` doesn't exist yet in this chunk, it's auto-created, same as
+    add_from_catalog. Returns (merged_data, registry_patch_or_None,
     warning_or_None, errors) - always None warning (nothing here has a
     fallback-with-warning case like add_from_catalog's carbon lookup)."""
     if not isinstance(payload, dict):
@@ -594,9 +596,10 @@ def _add_manual(
     if bad_vals:
         return current, None, None, [
             f"unrecognized values key(s) {sorted(bad_vals)} - allowed: "
-            f"{sorted(_ADD_MANUAL_VALUE_KEYS)} (use \"carbon_unit_den\" - just "
-            f"the denominator, e.g. \"kg\" - instead of the full \"carbon_unit\" "
-            f"string; the server builds it)"
+            f"{sorted(_ADD_MANUAL_VALUE_KEYS)} (use \"carbon_unit_den\" - the "
+            f"denominator, e.g. \"kg\" - and optionally \"carbon_unit_num\" "
+            f"(default \"kgCO₂e\") instead of the full \"carbon_unit\" string; "
+            f"the server joins them as \"num/den\")"
         ]
     missing = _ADD_MANUAL_REQUIRED_VALUE_KEYS - set(values_in)
     if missing:
@@ -625,15 +628,17 @@ def _add_manual(
         return current, None, None, [dup_error]
 
     # Build values: start from the full field set (defaults None), overlay
-    # everything the caller sent except carbon_unit_den, which gets turned
-    # into carbon_unit instead of being stored under its own name.
+    # everything the caller sent except carbon_unit_den/carbon_unit_num,
+    # which get joined into carbon_unit instead of being stored under their
+    # own names.
     values = dict(_EMPTY_VALUES)
     for k, v in values_in.items():
-        if k != "carbon_unit_den":
+        if k not in ("carbon_unit_den", "carbon_unit_num"):
             values[k] = v
     den = values_in.get("carbon_unit_den")
     if den:
-        values["carbon_unit"] = f"kgCO₂e/{den}"
+        num = values_in.get("carbon_unit_num") or "kgCO₂e"
+        values["carbon_unit"] = f"{num}/{den}"
 
     if values.get("unit") and not values_in.get("unit_to_si"):
         values["unit_to_si"] = _unit_to_si(values["unit"])
@@ -845,11 +850,19 @@ def _chunk_schema(chunk: str, tab: str) -> dict:
                     "src_id": "string, optional - your own reference id",
                     "carbon_emission": "number, optional - emission factor",
                     "carbon_unit_den": (
-                        "string, optional - JUST the denominator unit (e.g. "
-                        "\"kg\"), not the full \"carbon_unit\" string. The "
-                        "server builds \"kgCO₂e/<carbon_unit_den>\" and stores "
-                        "that - you never type the ₂ subscript by hand. "
-                        "Required if state.included_in_carbon_emission is true."
+                        "string, optional - the denominator unit (e.g. \"kg\", "
+                        "or a compound like \"m^2/kg\" to match an emission "
+                        "factor expressed per that ratio), not the full "
+                        "\"carbon_unit\" string. The server joins it with "
+                        "carbon_unit_num as \"<carbon_unit_num>/<carbon_unit_den>\" "
+                        "and stores that - you never type the ₂ subscript by "
+                        "hand. Required if state.included_in_carbon_emission "
+                        "is true."
+                    ),
+                    "carbon_unit_num": (
+                        "string, optional, default \"kgCO₂e\" - the numerator "
+                        "half of the carbon_unit ratio, paired with "
+                        "carbon_unit_den. Only needed to override the default."
                     ),
                     "carbon_emission_src": "string, optional",
                     "conversion_factor": "number, optional",
