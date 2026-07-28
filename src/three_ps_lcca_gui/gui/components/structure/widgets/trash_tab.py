@@ -124,12 +124,11 @@ class TrashTabWidget(QWidget):
 
                     table = StructureTableWidget(self, comp_name, is_trash_view=True)
                     self._trash_tables[(chunk_id, comp_name)] = table
+                    g_layout.addWidget(table)
+                    self.container_layout.addWidget(group)
 
                     for original_idx, item in trashed_items:
                         table.add_row(item, original_idx)
-
-                    g_layout.addWidget(table)
-                    self.container_layout.addWidget(group)
 
         if not has_content:
             empty_lbl = QLabel("No items in Trash Bin.")
@@ -138,6 +137,7 @@ class TrashTabWidget(QWidget):
 
         # Force items to the top
         self.container_layout.addStretch()
+        self.container.adjustSize()
 
     def permanent_delete(self, comp_name, data_index):
         """Permanently remove an item from the data store."""

@@ -13,6 +13,7 @@ from ...utils.display_format import fmt, fmt_comma
 from ...utils.icons import make_icon
 from ...utils.table_widgets import (
     GroupedHeaderView,
+    WordWrapHeaderView,
     BaseActionDelegate,
     TooltipTableMixin,
 )
@@ -132,6 +133,15 @@ class _FrozenActionTable(QTableWidget):
         super().__init__(parent_table)
         self._parent_table = parent_table
 
+        # Use WordWrapHeaderView (not the plain default QHeaderView) so this
+        # header is exempt from the app-wide _TableHeaderWordWrapFilter, which
+        # asynchronously (QTimer.singleShot(0, ...)) replaces the header of any
+        # QTableWidget/QTableView that isn't already a GroupedHeaderView or
+        # WordWrapHeaderView. That swap runs fully decoupled from reposition()/
+        # resizeEvent()/showEvent(), so if it ever landed on the plain header
+        # this widget used before, nothing here would know to resync afterward.
+        self.setHorizontalHeader(WordWrapHeaderView(Qt.Horizontal, font=_HDR_FONT))
+
         self.setColumnCount(1)
         hdr_item = QTableWidgetItem("Action")
         hdr_item.setTextAlignment(Qt.AlignCenter | Qt.AlignVCenter)
@@ -204,7 +214,15 @@ class _FrozenActionTable(QTableWidget):
         x = p.width() - _ACTION_W
         y = vp.y() - main_hdr_h
         self.move(x, y)
-        self.setFixedHeight(p.viewport().height() + main_hdr_h)
+
+        # Use the summed *row* heights rather than p.viewport().height() - the
+        # viewport's own geometry only catches up with a newly-grown row (e.g.
+        # from word-wrap in resizeRowsToContents()) after another layout pass,
+        # leaving the overlay briefly shorter than its actual header+row content
+        # in the meantime. Row heights themselves are already up to date here,
+        # since resizeEvent() calls resizeRowsToContents() before reposition().
+        rows_h = sum(p.rowHeight(r) for r in range(p.rowCount()))
+        self.setFixedHeight(rows_h + main_hdr_h)
 
 
 # ---------------------------------------------------------------------------
