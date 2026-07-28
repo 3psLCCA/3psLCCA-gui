@@ -1090,6 +1090,17 @@ class MachineryEmissions(ScrollableForm):
 
     # ── Base overrides ────────────────────────────────────────────────────
 
+    def showEvent(self, event):
+        super().showEvent(event)
+        # _shrink_stack_to_current() was last run in _build_ui(), before this
+        # widget was ever shown/polished - the detailed table's sizeHint() can
+        # be wrong at that point (e.g. an unpolished header height), capping
+        # the stack too short and cramping the banners/margins around it until
+        # something else (like a row-count change) reruns it. Rerun once here
+        # too so the layout is correct from the very first paint, not only
+        # after the user first interacts with the table.
+        self._shrink_stack_to_current()
+
     def _on_field_changed(self):
         if self._loading:
             return
