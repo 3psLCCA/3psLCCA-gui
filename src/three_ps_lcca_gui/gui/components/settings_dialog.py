@@ -10,6 +10,7 @@ SettingsDialog - sidebar gear-button dialog (Save / Cancel).
 import three_ps_lcca_gui.core.start_manager as sm
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QDialog,
     QDialogButtonBox,
@@ -135,6 +136,38 @@ class SettingsPanel(QWidget):
         theme_hint.setFont(font(FS_SM))
         layout.addWidget(theme_hint)
 
+        layout.addSpacing(8)
+
+        # ── Local API ─────────────────────────────────────────────────────
+        layout.addWidget(QLabel("<b>Local API</b>"))
+
+        self._api_checkbox = QCheckBox("Enable local API server")
+        self._api_checkbox.setChecked(sm.get_pref("api_enabled", "true") == "true")
+        layout.addWidget(self._api_checkbox)
+
+        api_hint = QLabel(
+            "Lets external tools read/update an open project over a local HTTP "
+            "API (File → API Access). Change takes effect after restart."
+        )
+        api_hint.setEnabled(False)
+        api_hint.setFont(font(FS_SM))
+        api_hint.setWordWrap(True)
+        layout.addWidget(api_hint)
+
+        # Actual bound URL - the port is picked automatically at startup (the
+        # default may be busy, e.g. a second app instance), so it's shown here
+        # rather than configured here.
+        from three_ps_lcca_gui.gui.api.server import get_active_port
+        port = get_active_port()
+        if port:
+            api_url_label = QLabel(f"Running at:  http://127.0.0.1:{port}")
+            api_url_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        else:
+            api_url_label = QLabel("Server not running.")
+            api_url_label.setEnabled(False)
+        api_url_label.setFont(font(FS_SM))
+        layout.addWidget(api_url_label)
+
         layout.addStretch()
 
     # ── Public API ────────────────────────────────────────────────────────────
@@ -159,6 +192,7 @@ class SettingsPanel(QWidget):
         set_appearance_mode(mode)
         set_active_theme("light", light_mod)
         set_active_theme("dark", dark_mod)
+        sm.set_pref("api_enabled", "true" if self._api_checkbox.isChecked() else "false")
 
         if changed:
             reapply()

@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${name}</title>
+<style>
+  :root {
+    --bg: #ffffff; --fg: #1a1d21; --muted: #5c6470; --line: #e3e6ea;
+    --card: #f6f7f9; --accent: #1a6feb; --get: #0d7a3f; --post: #9c4a00;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #16181c; --fg: #e8eaed; --muted: #9aa3ae; --line: #2c3138;
+      --card: #1e2126; --accent: #6aa5ff; --get: #4cc38a; --post: #f0a35e;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg);
+         font: 15px/1.6 system-ui, "Segoe UI", sans-serif; }
+  main { max-width: 880px; margin: 0 auto; padding: 40px 24px 80px; }
+  h1 { font-size: 26px; margin: 0 0 4px; }
+  h2 { font-size: 19px; margin: 40px 0 12px; padding-top: 24px;
+       border-top: 1px solid var(--line); }
+  p, li { color: var(--fg); }
+  .muted { color: var(--muted); }
+  .tag { display: inline-block; font-size: 12px; color: var(--muted);
+         border: 1px solid var(--line); border-radius: 999px;
+         padding: 1px 10px; margin-left: 8px; vertical-align: middle; }
+  code, pre { font-family: ui-monospace, Consolas, monospace; font-size: 13px; }
+  code { background: var(--card); border-radius: 4px; padding: 2px 6px; }
+  pre { background: var(--card); border: 1px solid var(--line); border-radius: 8px;
+        padding: 10px 14px; overflow-x: auto; margin: 10px 0 0; }
+  ol li, ul li { margin: 6px 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--line);
+           vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; white-space: nowrap; }
+  .ep { background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+        padding: 14px 18px; margin: 12px 0; }
+  .ep-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .method { font-weight: 700; font-size: 13px; font-family: ui-monospace, Consolas, monospace; }
+  .method.get { color: var(--get); }
+  .method.post { color: var(--post); }
+  .path { background: none; padding: 0; font-size: 14px; }
+  .chip { font-size: 11px; border-radius: 999px; padding: 1px 9px; margin-left: auto; }
+  .chip.auth { background: color-mix(in srgb, var(--post) 15%, transparent); color: var(--post); }
+  .chip.open { background: color-mix(in srgb, var(--get) 15%, transparent); color: var(--get); }
+  .summary { margin: 8px 0 0; }
+  .detail { margin: 8px 0 0; font-size: 14px; color: var(--muted); }
+  .detail b { color: var(--fg); }
+  .page { margin: 0 6px 6px 0; display: inline-block; }
+  a { color: var(--accent); }
+</style>
+</head>
+<body>
+<main>
+  <h1>${name}<span class="tag">v${version}</span></h1>
+  <p class="muted">${description}</p>
+  <p><b>Base URL:</b> <code>${base_url}</code></p>
+  <p class="muted">${host_note}</p>
+  <p class="muted">Machine-readable version of this page:
+     <a href="/help" rel="alternate" type="application/json">GET /help</a>
+     (always JSON - point scripts and AI agents there).</p>
+
+  <h2>Getting started</h2>
+  <ol>${quickstart}</ol>
+
+  <h2>Authentication</h2>
+  <table>${auth_rows}</table>
+
+  <h2>Endpoints</h2>
+  ${endpoints}
+
+  <h2>Available pages</h2>
+  <p>Use any of these as <code>{page}</code> in the data endpoints:</p>
+  <p>${pages}</p>
+
+  <h2>Conventions</h2>
+  <ul>${conventions}</ul>
+
+  <h2>Troubleshooting</h2>
+  <ul>${troubleshooting}</ul>
+
+  <h2>Errors</h2>
+  <p class="muted">${errors_format}</p>
+  <table>
+    <tr><th>Status</th><th>Error</th><th>Meaning</th><th>How to resolve</th></tr>
+    ${errors_rows}
+  </table>
+</main>
+</body>
+</html>
