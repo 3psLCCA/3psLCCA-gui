@@ -28,6 +28,7 @@ from types import ModuleType
 from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtGui import QColor, QFont
 from PySide6.QtWidgets import (
+    QCheckBox,
     QDialog,
     QFileDialog,
     QHBoxLayout,
@@ -185,14 +186,24 @@ class _BatchWorker(QThread):
     progress = Signal(str, bool)   # (message, is_error)
     finished = Signal(int, int)    # (ok_count, fail_count)
 
-    def __init__(self, folder: str):
+    def __init__(self, folder: str, delete_existing: bool = False):
         super().__init__()
         self._folder = folder
+        self._delete_existing = delete_existing
 
     def run(self):
         import json as _json
         folder = Path(self._folder)
         ok = fail = 0
+
+        if self._delete_existing:
+            existing_json = sorted(folder.rglob("*.json"))
+            for jp in existing_json:
+                try:
+                    jp.unlink()
+                    self.progress.emit(f"🗑 deleted {jp.relative_to(folder)}", False)
+                except OSError as exc:
+                    self.progress.emit(f"✗ could not delete {jp.relative_to(folder)}: {exc}", True)
 
         all_xlsx = sorted(folder.rglob("*.xlsx"))
         xlsx_files = []
@@ -374,6 +385,14 @@ class SorGeneratorDialog(QDialog):
         self._batch_btn.clicked.connect(self._run_batch)
         parse_row.addWidget(self._batch_btn)
 
+        self._delete_existing_chk = QCheckBox("Delete existing JSON files first")
+        self._delete_existing_chk.setStyleSheet(f"color:{_TEXT};")
+        self._delete_existing_chk.setToolTip(
+            "Before converting, recursively delete every .json file already\n"
+            "present in the selected folder, then regenerate from the .xlsx files."
+        )
+        parse_row.addWidget(self._delete_existing_chk)
+
         parse_row.addStretch()
         root.addLayout(parse_row)
 
@@ -544,6 +563,20 @@ class SorGeneratorDialog(QDialog):
         if not folder:
             return
 
+        delete_existing = self._delete_existing_chk.isChecked()
+        if delete_existing:
+            reply = QMessageBox.warning(
+                self,
+                "Delete Existing JSON Files?",
+                f"This will permanently delete every .json file found under:\n\n{folder}\n\n"
+                "before regenerating them from the .xlsx files. This cannot be undone.\n\n"
+                "Continue?",
+                QMessageBox.Yes | QMessageBox.Cancel,
+                QMessageBox.Cancel,
+            )
+            if reply != QMessageBox.Yes:
+                return
+
         self._log.clear()
         self._table.setRowCount(0)
         self._sor = []
@@ -556,7 +589,7 @@ class SorGeneratorDialog(QDialog):
         self._batch_btn.setText("Converting...")
         self._log_line(f"Batch folder: {folder}")
 
-        self._worker = _BatchWorker(folder)
+        self._worker = _BatchWorker(folder, delete_existing=delete_existing)
         self._worker.progress.connect(self._on_batch_progress)
         self._worker.finished.connect(self._on_batch_done)
         self._worker.start()

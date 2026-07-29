@@ -1,23 +1,23 @@
 {
   "_meta": {
-    "last_regen": "2026-03-25T21:42:30.351851",
+    "last_regen": "2026-07-15T20:34:51.916314",
     "root_hint": "osbridgelcca_new"
   },
   "files": {
     "gui/components/utils/units.json": {
-      "md5": "7f7e87f201c0ba7a7375f90b11b4c991",
-      "size_bytes": 9900,
-      "regen_at": "2026-03-25T21:42:30.344245"
+      "md5": "78f91f0b407f4765bc2128a29f4c9434",
+      "size_bytes": 10222,
+      "regen_at": "2026-07-15T20:34:51.909267"
     },
     "gui/components/structure/registry/material_catalog.json": {
-      "md5": "1100c68ea365ae96257eb0186e3deec6",
-      "size_bytes": 24267,
-      "regen_at": "2026-03-25T21:42:30.345732"
+      "md5": "542e2aaae43c8d866122b807eaa70e10",
+      "size_bytes": 245499,
+      "regen_at": "2026-07-15T20:34:51.911057"
     },
     "data/wpi_db.json": {
-      "md5": "72460ddc247d7c1514ac62278f4b7395",
-      "size_bytes": 23603,
-      "regen_at": "2026-03-25T21:42:30.346927"
+      "md5": "71723a5c1ceff85418c80879e18028e2",
+      "size_bytes": 43049,
+      "regen_at": "2026-07-15T20:34:51.912046"
     }
   }
 }

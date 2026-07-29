@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import errno
 import tempfile
 from pathlib import Path
 
@@ -35,14 +36,25 @@ def _latex_path(path: str) -> str:
 def _image_value_to_path(value: str, name: str) -> str:
     if not value:
         return ""
-    path = Path(value)
-    if path.exists():
-        return str(path)
+    # A base64-encoded image is far longer than any real path, so probing it
+    # with Path.exists() raises OSError (ENAMETOOLONG). Treat that as "not a
+    # path" and fall through to base64 decoding; re-raise anything else.
     try:
-        raw = base64.b64decode(value)
+        if Path(value).exists():
+            return str(Path(value))
+    except OSError as exc:
+        if exc.errno != errno.ENAMETOOLONG:
+            raise
+    try:
+        raw = base64.b64decode(value, validate=True)
     except Exception:
         return ""
-    suffix = ".png" if raw.startswith(b"\x89PNG") else ".jpg"
+    if raw.startswith(b"\x89PNG\r\n\x1a\n"):
+        suffix = ".png"
+    elif raw.startswith(b"\xff\xd8\xff"):
+        suffix = ".jpg"
+    else:
+        return ""
     out_path = Path(tempfile.gettempdir()) / f"3ps_lcca_{name}{suffix}"
     out_path.write_bytes(raw)
     return str(out_path)

@@ -6,7 +6,7 @@ from .SETTINGS import DECIMAL_PLACES_FOR_LATEX
 from .html_to_latex import format_remarks_latex
 from .common_code import latex_layout
 
-_FMT    = f"{{:.{DECIMAL_PLACES_FOR_LATEX}f}}"
+_FMT    = f"{{:,.{DECIMAL_PLACES_FOR_LATEX}f}}"
 _EMDASH = r"\textemdash"
 
 
