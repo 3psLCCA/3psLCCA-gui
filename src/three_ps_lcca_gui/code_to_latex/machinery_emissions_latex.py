@@ -3,7 +3,7 @@ from ..gui.components.utils.common_requested_data import get_machinery_emissions
 from .SETTINGS import DECIMAL_PLACES_FOR_LATEX
 from .html_to_latex import format_remarks_latex
 
-_FMT = f"{{:.{DECIMAL_PLACES_FOR_LATEX}f}}"
+_FMT = f"{{:,.{DECIMAL_PLACES_FOR_LATEX}f}}"
 _EMDASH = r"\textemdash"
 
 
