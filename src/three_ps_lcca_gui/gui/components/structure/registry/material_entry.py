@@ -13,6 +13,7 @@ validate_material_values() below is the pure equivalent used by the API; if a
 rule changes in one place it must change in both.
 """
 
+import math
 import uuid as _uuid_mod
 
 from three_ps_lcca_gui.gui.components.utils.unit_resolver import canonical_unit_code
@@ -70,15 +71,36 @@ def _valid(val) -> bool:
     return val not in (None, "", 0, 0.0)
 
 
+def _valid_carbon_num(val) -> bool:
+    """Stricter than _valid() for carbon_emission/conversion_factor
+    specifically: a raw catalog/SOR row is untrusted data, and _valid() alone
+    would call NaN, Infinity, or a negative number "available" (none of them
+    are None/""/0). That would default included_in_carbon_emission=True onto
+    a corrupted row, which validate_material_values() now hard-rejects -
+    turning one bad database row into an unaddable material with no way for
+    the caller to override it (rate/carbon_emission/conversion_factor aren't
+    settable via add_from_catalog). Treating a bad value as "not available"
+    instead degrades gracefully to the same "no carbon data" fallback a
+    genuinely blank row already gets."""
+    return (
+        isinstance(val, (int, float))
+        and not isinstance(val, bool)
+        and not math.isnan(val)
+        and not math.isinf(val)
+        and val > 0
+    )
+
+
 def carbon_data_available(dict_b: dict) -> bool:
     """True if a raw SOR/database row has enough carbon data to be included
     in carbon emission calculations by default - the same three-field check
     convert_sor_item_to_material() uses internally, exposed so callers (e.g.
     the local API's add_from_catalog path) can check eligibility before
     deciding whether to honor an explicit include_in_carbon_emission=true."""
-    return all(
-        _valid(dict_b.get(k))
-        for k in ("carbon_emission", "carbon_emission_units_den", "conversion_factor")
+    return (
+        _valid_carbon_num(dict_b.get("carbon_emission"))
+        and _valid(dict_b.get("carbon_emission_units_den"))
+        and _valid_carbon_num(dict_b.get("conversion_factor"))
     )
 
 
@@ -203,7 +225,11 @@ def validate_material_values(values: dict, state: dict | None = None) -> dict:
         errors.append("unit is required (select a unit code, e.g. 'cum', 'kg', 'MT')")
 
     qty = values.get("quantity")
-    if not isinstance(qty, (int, float)) or isinstance(qty, bool) or qty <= 0:
+    if not isinstance(qty, (int, float)) or isinstance(qty, bool):
+        errors.append(f"quantity must be a number greater than zero, got {qty!r}")
+    elif math.isnan(qty) or math.isinf(qty):
+        errors.append(f"quantity cannot be NaN or Infinity, got {qty!r}")
+    elif qty <= 0:
         errors.append(f"quantity must be a number greater than zero, got {qty!r}")
 
     rate = values.get("rate")
@@ -211,6 +237,8 @@ def validate_material_values(values: dict, state: dict | None = None) -> dict:
         errors.append("rate (unit cost) is required")
     elif not isinstance(rate, (int, float)) or isinstance(rate, bool):
         errors.append(f"rate must be a number, got {rate!r}")
+    elif math.isnan(rate) or math.isinf(rate):
+        errors.append(f"rate cannot be NaN or Infinity, got {rate!r}")
     elif rate < 0:
         errors.append("rate cannot be negative")
     elif rate == 0:
@@ -225,12 +253,29 @@ def validate_material_values(values: dict, state: dict | None = None) -> dict:
                 "carbon_unit is required when included_in_carbon_emission is true "
                 "(format: 'kgCO₂e/<unit>')"
             )
-        if ef is None or not isinstance(ef, (int, float)) or ef <= 0:
+        ef_is_num = isinstance(ef, (int, float)) and not isinstance(ef, bool)
+        cf_is_num = isinstance(cf, (int, float)) and not isinstance(cf, bool)
+
+        # NaN/Infinity/negative are never a legitimate emission factor or
+        # conversion factor - unlike "0 or blank" (which just means "skip
+        # carbon costing for this entry", a warning-only, intentional
+        # opt-out), these are nonsensical inputs that would corrupt any
+        # downstream carbon-cost calculation. Hard reject, same tier as
+        # quantity/rate.
+        if ef_is_num and (math.isnan(ef) or math.isinf(ef)):
+            errors.append(f"carbon_emission cannot be NaN or Infinity, got {ef!r}")
+        elif cf_is_num and (math.isnan(cf) or math.isinf(cf)):
+            errors.append(f"conversion_factor cannot be NaN or Infinity, got {cf!r}")
+        elif ef_is_num and ef < 0:
+            errors.append(f"carbon_emission cannot be negative, got {ef!r}")
+        elif cf_is_num and cf < 0:
+            errors.append(f"conversion_factor cannot be negative, got {cf!r}")
+        elif ef is None or not ef_is_num or ef <= 0:
             warnings.append(
                 "carbon_emission (emission factor) is 0 or blank - carbon cost "
                 "will be skipped for this entry"
             )
-        elif cf is None or not isinstance(cf, (int, float)) or cf <= 0:
+        elif cf is None or not cf_is_num or cf <= 0:
             warnings.append(
                 "conversion_factor is 0 or blank - carbon cost will be skipped "
                 "for this entry"
@@ -240,11 +285,33 @@ def validate_material_values(values: dict, state: dict | None = None) -> dict:
     if recycle_on:
         scrap = values.get("scrap_rate")
         recovery = values.get("post_demolition_recovery_percentage")
-        if isinstance(recovery, (int, float)) and not isinstance(recovery, bool) and recovery > 100:
-            errors.append("post_demolition_recovery_percentage cannot exceed 100")
-        scrap_missing = not isinstance(scrap, (int, float)) or isinstance(scrap, bool) or scrap <= 0
-        recovery_missing = not isinstance(recovery, (int, float)) or isinstance(recovery, bool) or recovery <= 0
-        if scrap_missing and recovery_missing:
+
+        # Both fields may be omitted/None (recyclability with no data yet) -
+        # that's fine, only ever folds into the "contributes nothing" warning
+        # below. But if a value IS given, it must be a sane number: never
+        # NaN/Infinity, and never negative (0 is fine - "no scrap value" /
+        # "nothing recovered").
+        if scrap is not None:
+            if not isinstance(scrap, (int, float)) or isinstance(scrap, bool):
+                errors.append(f"scrap_rate must be a number, got {scrap!r}")
+            elif math.isnan(scrap) or math.isinf(scrap):
+                errors.append(f"scrap_rate cannot be NaN or Infinity, got {scrap!r}")
+            elif scrap < 0:
+                errors.append("scrap_rate cannot be negative")
+
+        if recovery is not None:
+            if not isinstance(recovery, (int, float)) or isinstance(recovery, bool):
+                errors.append(f"post_demolition_recovery_percentage must be a number, got {recovery!r}")
+            elif math.isnan(recovery) or math.isinf(recovery):
+                errors.append(f"post_demolition_recovery_percentage cannot be NaN or Infinity, got {recovery!r}")
+            elif recovery < 0:
+                errors.append("post_demolition_recovery_percentage cannot be negative")
+            elif recovery > 100:
+                errors.append("post_demolition_recovery_percentage cannot exceed 100")
+
+        scrap_blank_or_zero = scrap is None or scrap == 0
+        recovery_blank_or_zero = recovery is None or recovery == 0
+        if scrap_blank_or_zero and recovery_blank_or_zero:
             warnings.append(
                 "both scrap_rate and post_demolition_recovery_percentage are "
                 "zero or blank - recyclability will contribute nothing"

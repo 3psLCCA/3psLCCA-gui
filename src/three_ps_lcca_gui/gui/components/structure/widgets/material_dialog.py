@@ -49,6 +49,7 @@ from ...utils.doc_link import doc_inline, doc_label
 from ..registry.material_catalog import list_databases
 from ..registry.search_engine import MaterialSearchEngine, AdvancedSearchEngine, _component_matches
 
+import math
 import os
 import uuid as _uuid_mod
 
@@ -2170,6 +2171,14 @@ class MaterialDialog(QDialog):
             qty = float(self.qty_in.text() or 0)
         except ValueError:
             qty = 0
+        # float("nan")/float("inf") parse without raising ValueError, so the
+        # try/except above doesn't catch them - the input is normally blocked
+        # by QDoubleValidator, but this guards against paste/programmatic
+        # bypass rather than silently accepting a value that would corrupt
+        # every downstream sum/total that uses this quantity.
+        if math.isnan(qty) or math.isinf(qty):
+            QMessageBox.critical(self, "Validation Error", "Quantity cannot be NaN or Infinity.")
+            return
         if qty <= 0:
             QMessageBox.critical(
                 self, "Validation Error", "Quantity must be greater than zero."
@@ -2184,6 +2193,9 @@ class MaterialDialog(QDialog):
             rate = float(_rate_text)
         except ValueError:
             rate = 0
+        if math.isnan(rate) or math.isinf(rate):
+            QMessageBox.critical(self, "Validation Error", "Rate cannot be NaN or Infinity.")
+            return
         if rate < 0:
             QMessageBox.critical(self, "Validation Error", "Rate cannot be negative.")
             return
@@ -2208,6 +2220,30 @@ class MaterialDialog(QDialog):
             _cf_text = self.conv_factor_in.text().strip()
             ef = float(_ef_text) if _ef_text else None
             cf = float(_cf_text) if _cf_text else None
+
+            # NaN/Infinity are never legitimate here - hard reject, same as
+            # quantity/rate, rather than the "0 or blank" warn-and-continue
+            # below (which is an intentional "skip carbon costing" opt-out).
+            if ef is not None and (math.isnan(ef) or math.isinf(ef)):
+                QMessageBox.critical(
+                    self, "Validation Error", "Emission factor cannot be NaN or Infinity."
+                )
+                return
+            if cf is not None and (math.isnan(cf) or math.isinf(cf)):
+                QMessageBox.critical(
+                    self, "Validation Error", "Conversion factor cannot be NaN or Infinity."
+                )
+                return
+            if ef is not None and ef < 0:
+                QMessageBox.critical(
+                    self, "Validation Error", "Emission factor cannot be negative."
+                )
+                return
+            if cf is not None and cf < 0:
+                QMessageBox.critical(
+                    self, "Validation Error", "Conversion factor cannot be negative."
+                )
+                return
 
             if ef is None or ef <= 0:
                 reply = QMessageBox.warning(
@@ -2256,6 +2292,27 @@ class MaterialDialog(QDialog):
             except ValueError:
                 recycle = None
 
+            if scrap is not None and (math.isnan(scrap) or math.isinf(scrap)):
+                QMessageBox.critical(
+                    self, "Validation Error", "Scrap rate cannot be NaN or Infinity."
+                )
+                return
+            if recycle is not None and (math.isnan(recycle) or math.isinf(recycle)):
+                QMessageBox.critical(
+                    self, "Validation Error", "Recovery percentage cannot be NaN or Infinity."
+                )
+                return
+            if scrap is not None and scrap < 0:
+                QMessageBox.critical(
+                    self, "Validation Error", "Scrap rate cannot be negative."
+                )
+                return
+            if recycle is not None and recycle < 0:
+                QMessageBox.critical(
+                    self, "Validation Error", "Recovery percentage cannot be negative."
+                )
+                return
+
             recycle_val = recycle or 0
             if recycle_val > 100:
                 QMessageBox.critical(
@@ -2265,8 +2322,8 @@ class MaterialDialog(QDialog):
 
             scrap_blank   = scrap is None
             recycle_blank = recycle is None
-            scrap_zero    = scrap is not None and scrap <= 0
-            recycle_zero  = recycle is not None and recycle <= 0
+            scrap_zero    = scrap is not None and scrap == 0
+            recycle_zero  = recycle is not None and recycle == 0
 
             if (scrap_blank or scrap_zero) and (recycle_blank or recycle_zero):
                 _detail = (
