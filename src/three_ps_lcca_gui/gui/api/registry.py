@@ -47,6 +47,7 @@ def register_chunk(
     trash_by_id=None,
     read_only: bool = False,
     refresh_via_signal: bool = False,
+    dynamic_options: dict | None = None,
 ) -> None:
     """Registers a chunk with the API. Call this once, at import time, from a
     module under gui/api/pages/ - see pages/bridge_data.py for the pattern.
@@ -103,6 +104,19 @@ def register_chunk(
     refresh_via_signal - bridge updates write via the controller only and emit
                    controller.chunk_updated; the page widget (which has no
                    load_data_dict) repaints itself from that signal
+    dynamic_options - optional {field_key: (current_data) -> list[str]} for
+                   FieldDef combo fields whose real options aren't known at
+                   FieldDef-declaration time and are instead computed at
+                   runtime from the chunk's own stored data - e.g.
+                   general_info's "sor_database", whose GUI widget
+                   (GeneralInfo._populate_sor_combo) fills the combo from
+                   the material catalog filtered by project_country, not
+                   from a fixed list. Without this, describe_chunk_fields()
+                   would always report that field's static (placeholder,
+                   usually empty) FieldDef.options instead of what the GUI
+                   actually offers. Called fresh on every GET - never
+                   cached - so it reflects the chunk's current data (e.g.
+                   the current project_country).
     """
     merged_warns = dict(warn_rules or {})
     for fd in field_defs or []:
@@ -124,10 +138,11 @@ def register_chunk(
         "trash_by_id": trash_by_id,
         "read_only": read_only,
         "refresh_via_signal": refresh_via_signal,
+        "dynamic_options": dynamic_options or {},
     }
 
 
-def describe_chunk_fields(chunk: str) -> dict | None:
+def describe_chunk_fields(chunk: str, data: dict | None = None) -> dict | None:
     """Static schema for a chunk's fields - label, type, options/min/max,
     unit, required/locked flags, default, and warn-range if any. Pure data
     introspection (no Qt/engine access), safe to call from any thread.
@@ -138,7 +153,13 @@ def describe_chunk_fields(chunk: str) -> dict | None:
     be a plain dict (computed once, at register_chunk time) or a zero-arg
     callable (invoked fresh on every call) - use a callable for anything that
     can change at runtime, e.g. a units list that grows as custom units are
-    defined, so GET never serves a stale snapshot."""
+    defined, so GET never serves a stale snapshot.
+
+    `data` - the chunk's current stored data (as returned by GET), used only
+    to evaluate `dynamic_options` hooks (e.g. general_info's "sor_database",
+    whose real options depend on project_country) - pass None to skip that
+    (options then fall back to the field's static FieldDef.options, usually
+    empty for a dynamic field)."""
     entry = CHUNK_PAGE_MAP.get(chunk)
     if entry is None:
         return None
@@ -153,13 +174,21 @@ def describe_chunk_fields(chunk: str) -> dict | None:
 
     locked_keys = getattr(entry["widget_cls"], "_LOCKED", set())
     warn_rules = entry.get("warn_rules", {})
+    dynamic_options = entry.get("dynamic_options") or {}
 
     fields = []
     for item in entry["field_defs"]:
         if isinstance(item, Section):
             fields.append({"type": "section", "title": item.title})
             continue
-        fields.append(_describe_field(item, locked_keys, warn_rules))
+        info = _describe_field(item, locked_keys, warn_rules)
+        provider = dynamic_options.get(info["key"])
+        if provider is not None and data is not None:
+            try:
+                info["options"] = list(provider(data))
+            except Exception:
+                pass  # keep the static (fallback) options rather than 500ing the whole GET
+        fields.append(info)
 
     return {"chunk": chunk, "fields": fields}
 
@@ -185,9 +214,11 @@ def _describe_field(fd: FieldDef, locked_keys: set, warn_rules: dict) -> dict:
         info["min"], info["max"], info["decimals"] = fd.options
     elif fd.field_type == "upload_img":
         # Accepts either a raw base64 string (as stored) or an http(s) image
-        # URL - see gui/api/image_upload.py, which fetches + converts URLs
-        # before the payload reaches validation/storage.
+        # URL - see gui/api/image_upload.py, which fetches/decodes + validates
+        # both before the payload reaches storage. Only JPEG/PNG are accepted;
+        # anything else (GIF included) is rejected regardless of source.
         info["format"] = "base64_or_url"
+        info["accepted_image_formats"] = ["JPEG", "PNG"]
 
     # A page can declare warn ranges two ways: a module-level {key: (...)}
     # dict passed to register_chunk() as warn_rules (e.g. bridge_data,

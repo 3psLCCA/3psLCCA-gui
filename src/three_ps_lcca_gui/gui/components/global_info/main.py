@@ -69,7 +69,7 @@ AGENCY_FIELDS = [
     FieldDef(
         "agency_logo",
         "Organisation's Logo",
-        "[Appears on the report cover page. PNG or JPG recommended.]",
+        "[Appears on the report cover page. Must be a JPG or PNG image.]",
         "upload_img",
         options="default",
     ),

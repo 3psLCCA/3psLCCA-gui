@@ -703,7 +703,7 @@ def _create_app(bridge: ApiBridge) -> Flask:
         # to construct a valid POST body. FieldDef pages return a flat
         # "fields" list; table/nested pages return their hand-written
         # "schema" dict (shape, update semantics, entry schema).
-        schema = describe_chunk_fields(chunk) or {}
+        schema = describe_chunk_fields(chunk, data=result["data"]) or {}
         response = {
             "project_id": project_id,
             "chunk": chunk,
