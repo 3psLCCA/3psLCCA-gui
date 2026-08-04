@@ -27,6 +27,7 @@ they only accumulate within whichever single script imported this module.
 """
 
 import argparse
+import http.client
 import json
 import time
 import urllib.error
@@ -38,9 +39,22 @@ _pass = 0
 _fail = 0
 
 
-def call(method: str, path: str, token: str | None = None, body: dict | list | None = None):
+def call(
+    method: str,
+    path: str,
+    token: str | None = None,
+    body: dict | list | None = None,
+    timeout: float = 15.0,
+):
     """Returns (status_code, parsed_json_body). Never raises on HTTP error
     status - the caller decides what's expected.
+
+    `timeout` defaults to a generous 15s for ordinary calls, but callers that
+    are about to trigger a modal GUI popup blocking on a human (e.g.
+    /<project_id>/get_tokens) should pass a much larger value - the server
+    itself waits up to ~120s for the user to click Allow/Deny, and a client
+    timeout shorter than that would abandon the request while the dialog is
+    still open.
 
     Not every error response is guaranteed to be JSON: a method this app's
     routes don't register for a given URL (e.g. DELETE) falls through to
@@ -54,10 +68,12 @@ def call(method: str, path: str, token: str | None = None, body: dict | list | N
     if token:
         req.add_header("X-API-Token", token)
     try:
-        with urllib.request.urlopen(req) as resp:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
             status, raw = resp.status, resp.read()
     except urllib.error.HTTPError as e:
         status, raw = e.code, e.read()
+    except (urllib.error.URLError, TimeoutError, OSError, ValueError, http.client.InvalidURL) as e:
+        return -1, {"_client_timeout": True, "_raw": str(e)}
     try:
         return status, json.loads(raw.decode("utf-8"))
     except json.JSONDecodeError:
