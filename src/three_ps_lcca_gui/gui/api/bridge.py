@@ -56,11 +56,72 @@ class ApiBridge(QObject):
                 result = self._open_project(project_id)
             elif method == "create_project":
                 result = self._create_project(payload)
+            elif method == "get_tokens":
+                result = self._get_tokens(project_id)
             else:
                 result = {"error": f"unknown_method:{method}"}
         except Exception as e:
             result = {"error": str(e)}
         result_q.put(result)
+
+    def _get_tokens(self, project_id: str) -> dict:
+        win = self._find_window(project_id)
+        if win is None:
+            return {"error": "project_not_open"}
+
+        from three_ps_lcca_gui.gui.api import tokens
+
+        # One-time token delivery defense: once handed out over HTTP once,
+        # every later call is rejected outright - no popup shown.
+        if tokens.is_delivered(project_id):
+            return {
+                "error": "token_already_delivered",
+                "message": (
+                    "The API token was already delivered once for this project. "
+                    "Open File -> API Access in the app to view and copy the token."
+                ),
+            }
+
+        # Anti-flood: caps how many times a script can make this dialog pop
+        # up in one session, without any lingering "denied forever" state -
+        # denying just fails this one request; the next ask still prompts,
+        # up to the cap.
+        if not tokens.can_prompt(project_id):
+            return {
+                "error": "too_many_requests",
+                "message": (
+                    "Too many API access requests for this project this session. "
+                    "Use File -> API Access in the app to grant access manually."
+                ),
+            }
+
+        # A minimized/background project window would otherwise leave its
+        # modal child dialog effectively invisible - restore and raise it
+        # before showing the prompt so there's actually something on
+        # screen for the user to click.
+        if win.isMinimized():
+            win.showNormal()
+        win.raise_()
+        win.activateWindow()
+
+        from three_ps_lcca_gui.gui.components.api_access_prompt import ApiAccessPrompt
+        display_name = win.controller.active_display_name or project_id
+        dlg = ApiAccessPrompt(display_name, parent=win)
+        dlg.exec()
+
+        if dlg.result_allowed:
+            token = tokens.ensure_token(project_id)
+            tokens.mark_delivered(project_id)
+            return {"ok": True, "token": token}
+        else:
+            return {
+                "error": "denied",
+                "message": (
+                    "API access was denied for this request. If this was a "
+                    "mistake, open File -> API Access in the app to get the "
+                    "key manually."
+                ),
+            }
 
     def _find_window(self, project_id: str):
         for win in self.manager.windows:

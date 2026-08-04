@@ -1,4 +1,4 @@
-﻿import os
+import os
 
 from PySide6.QtCore import Qt, QRect, QSize, QEvent, QPoint, QTimer, QStandardPaths
 from PySide6.QtWidgets import (

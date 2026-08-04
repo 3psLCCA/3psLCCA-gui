@@ -682,6 +682,35 @@ def _create_app(bridge: ApiBridge) -> Flask:
             ),
         })
 
+    @app.route("/<project_id>/get_tokens", methods=["GET", "POST"])
+    def get_project_tokens(project_id):
+        # Fast-path checks that never touch the GUI: already delivered once,
+        # or this project has hit its per-session popup cap.
+        if tokens.is_delivered(project_id):
+            return jsonify({
+                "error": "token_already_delivered",
+                "message": "The API token was already delivered once for this project. Open File -> API Access in the app to view and copy the token.",
+                **_usage_info()
+            }), 403
+
+        # bridge.call()'s default 10s timeout is far too short for a modal
+        # popup waiting on a human - give it a lot more slack, otherwise this
+        # route would return {"error": "timeout"} while the dialog is still
+        # open, and the click that eventually comes has no one left to
+        # receive its result.
+        result = bridge.call("get_tokens", project_id, "", timeout=120.0)
+
+        if "error" in result:
+            status_code = 400
+            if result["error"] == "project_not_open":
+                status_code = 404
+            elif result["error"] in ("denied", "token_already_delivered"):
+                status_code = 403
+            elif result["error"] == "too_many_requests":
+                status_code = 429
+            return jsonify({**result, **_usage_info()}), status_code
+        return jsonify(result)
+
     @app.get("/<project_id>/<chunk>")
     def get_chunk_data(project_id, chunk):
         if chunk not in CHUNK_PAGE_MAP:

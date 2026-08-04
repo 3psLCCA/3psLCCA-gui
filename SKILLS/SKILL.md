@@ -32,10 +32,36 @@ This skill documents how to interact with the local HTTP API exposed by the runn
 ## 2. Authentication
 
 * **Header**: `X-API-Token: <token>` (required for all data and catalog endpoints).
-* **Not required for**: `GET /`, `GET /help`, `GET /projects`, `GET /projects/active`, `GET /projects/new`, `POST /projects/open`, `POST /projects/new`.
-* **Obtaining Token**: Ask the user to retrieve it from the desktop app via **File > API Access** (with a project open). The dialog shows the token with Generate/Regenerate/Revoke controls — the API itself never returns a token, by design, so a human stays in the loop for data access.
+* **Not required for**: `GET /`, `GET /help`, `GET /projects`, `GET /projects/active`, `GET /projects/new`, `POST /projects/open`, `POST /projects/new`, `GET`/`POST /{project_id}/get_tokens`.
+* **Obtaining a Token — try the automatic handshake first**: Call `GET /{project_id}/get_tokens`. This shows an Allow/Deny popup in the desktop app — a human has to click something, so expect the call to block for a while (it can take up to ~2 minutes; don't treat a slow response as a hang). Only fall back to asking the user to paste a token manually if this fails.
+
+  | Result | Status | What it means |
+  | :--- | :--- | :--- |
+  | User clicked Allow | `200` | `{"ok": true, "token": "..."}` — use it directly. |
+  | Project isn't open | `404` | `project_not_open` — open it first, then retry once. |
+  | User clicked Deny / closed the popup | `403` | `denied` — that one request was refused; asking again will show the popup again (up to the cap below). |
+  | Already handed out once this session | `403` | `token_already_delivered` — this project's token was already sent over HTTP once; it will not be sent again automatically. |
+  | Asked (and denied) too many times this session | `429` | `too_many_requests` — the popup cap for this project was hit; no more automatic popups until the project is closed and reopened. |
+
+  This is a **one-shot** handshake, not something to poll or retry in a loop — one attempt, then fall back.
+
+  ```python
+  import urllib.request, urllib.error, json
+
+  def get_token(project_id: str, base_url="http://127.0.0.1:8765") -> str:
+      try:
+          with urllib.request.urlopen(f"{base_url}/{project_id}/get_tokens", timeout=120) as resp:
+              return json.loads(resp.read())["token"]
+      except urllib.error.HTTPError as e:
+          body = json.loads(e.read())
+          print(f"Automatic token request failed ({e.code}): {body.get('error')} - {body.get('message', '')}")
+          # Fall back: ask the user directly - do not retry get_tokens in a loop.
+          return input(f"Paste the API token for {project_id} (from File > API Access): ").strip()
+  ```
+
+  If the automatic call fails for any reason above, ask the user to retrieve it from the desktop app via **File > API Access** (with the project open) and paste it — the dialog there shows the token with Generate/Regenerate/Revoke controls, and is always available as a manual fallback regardless of what `/get_tokens` returned.
 * **Reset Behavior**: Tokens live in memory only — they reset on every app restart and clear when the project window closes. A token that worked yesterday will 401 today if the app was restarted since.
-* **On `401 Unauthorized`**: Don't just retry. First call `GET /projects/active`. If the project isn't listed, its window was closed and the old token is gone for good — reopen it via `POST /projects/open` and ask the user for the fresh token. If it is listed, the token is simply stale or mistyped — ask the user to re-check it.
+* **On `401 Unauthorized`**: Don't just retry. First call `GET /projects/active`. If the project isn't listed, its window was closed and the old token is gone for good — reopen it via `POST /projects/open` and get a fresh token (try `/get_tokens` again, or ask the user). If it is listed, the token is simply stale or mistyped — ask the user to re-check it.
 
 ---
 
@@ -243,6 +269,9 @@ Errors are returned as JSON: `{"error": "<code>", "details"?: [...], "documentat
 | 404 | `project_not_open` | Project exists but isn't open in the app. | `POST /projects/open`, then retry once it's finished opening. |
 | 404 | `not_found` | Unknown route or page name. | Check `"available_pages"` in the response and `GET /help`. |
 | 404 | `not_supported` | Chunk doesn't support `add_from_catalog` (only `str_*` chunks do). | Use `POST /{project_id}/{chunk}` with `"catalog_item"` or `"values"` instead. |
+| 403 | `denied` | User clicked Deny (or closed) the `/get_tokens` popup for this request. | Ask again for a fresh popup, or fall back to File > API Access. |
+| 403 | `token_already_delivered` | `/get_tokens` already handed this project's token out once this session. | Ask the user for it via File > API Access instead — it won't be resent automatically. |
+| 429 | `too_many_requests` | `/get_tokens` popup cap hit for this project this session. | Ask the user for it via File > API Access instead of retrying. |
 
 **Troubleshooting flow:**
 1. **401 Unauthorized** — First `GET /projects/active` (no token needed). If your project isn't in that list, its window was closed: tokens are cleared on close and a new one is generated on reopen, so the old one will never work again — `POST /projects/open`, then ask the user for the fresh token via File > API Access. If the project *is* listed, the token itself is stale or mistyped — ask the user for the current one.
@@ -256,6 +285,6 @@ Errors are returned as JSON: `{"error": "<code>", "details"?: [...], "documentat
 
 1. `GET http://127.0.0.1:8765/projects` — find your `project_id` (no token needed).
 2. If the project isn't open yet: `POST http://127.0.0.1:8765/projects/open` with `{"project_id": "..."}`, then wait/poll until it is.
-3. Get the project's API token from a human: in the desktop app, File > API Access (tokens are never returned by the API itself).
+3. Get the project's API token: try `GET http://127.0.0.1:8765/{project_id}/get_tokens` first (a human clicks Allow/Deny in the app; expect it to block a bit). If that doesn't return a token for any reason (denied, already delivered, capped, or not open), fall back to asking a human for it via File > API Access.
 4. `GET http://127.0.0.1:8765/{project_id}/{page}` with header `X-API-Token: <token>` — the response contains both the data and the full field schema (types, options, ranges, locked flags).
 5. `POST` the same URL with only the fields you want to change — omitted fields keep their current value.

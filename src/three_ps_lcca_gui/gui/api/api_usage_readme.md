@@ -35,6 +35,8 @@ Two kinds of pages exist, distinguishable by what `GET` returns:
 - [Discovery - start here with zero prior context](#discovery--start-here-with-zero-prior-context)
 - [Project management - list, open, create](#project-management--list-open-create)
 - [Getting the URL and token](#getting-the-url-and-token)
+  - [GET/POST /\<project_id\>/get_tokens](#getpost-project_idget_tokens---ask-for-a-token-programmatically)
+  - [The manual fallback: File → API Access](#the-manual-fallback-file--api-access)
 - [Authentication](#authentication)
 - [Endpoints](#endpoints)
   - [GET /\<project_id\>/bridge_data](#get-project_idbridge_data)
@@ -156,6 +158,73 @@ process can open a window" and "something can read/write project data."
 ---
 
 ## Getting the URL and token
+
+### `GET`/`POST /<project_id>/get_tokens` - ask for a token programmatically
+
+Unauthenticated (it's how you get authenticated in the first place). The
+first time a project is asked this way in a running session, a human sees
+an Allow/Deny popup in the GUI - nothing is handed out silently:
+
+```bash
+curl http://127.0.0.1:8765/proj_a1b2c3d4/get_tokens
+```
+
+| Result | Status | Body |
+|---|---|---|
+| Project not open | `404` | `{"error": "project_not_open"}` |
+| User clicked Deny (or closed the popup) | `403` | `{"error": "denied", "message": "..."}` |
+| Already handed out once this session | `403` | `{"error": "token_already_delivered", "message": "..."}` |
+| Asked (and been denied) too many times this session | `429` | `{"error": "too_many_requests", "message": "..."}` |
+| User clicked Allow | `200` | `{"ok": true, "token": "<token>"}` |
+
+The token is only ever delivered this way **once** per project per session -
+this is a one-shot handshake, not a login you can repeat. If it fails for any
+reason (denied, already delivered, capped, or the project isn't open), fall
+back to a human copying it from **File → API Access** in the app instead of
+retrying the endpoint in a loop.
+
+A minimal client that tries the automatic handshake first and falls back to
+asking a human to paste the token:
+
+```python
+import urllib.request
+import urllib.error
+import json
+
+BASE_URL = "http://127.0.0.1:8765"
+
+
+def get_token(project_id: str) -> str:
+    url = f"{BASE_URL}/{project_id}/get_tokens"
+    try:
+        with urllib.request.urlopen(url, timeout=120) as resp:
+            body = json.loads(resp.read())
+            return body["token"]
+    except urllib.error.HTTPError as e:
+        body = json.loads(e.read())
+        print(f"Automatic token request failed ({e.code}): {body.get('error')}")
+        print(body.get("message", ""))
+
+    # Fall back to a human: open File -> API Access in the app and paste
+    # the token shown there.
+    return input(f"Paste the API token for {project_id} manually: ").strip()
+
+
+token = get_token("proj_a1b2c3d4")
+req = urllib.request.Request(
+    f"{BASE_URL}/proj_a1b2c3d4/bridge_data",
+    headers={"X-API-Token": token},
+)
+with urllib.request.urlopen(req) as resp:
+    print(json.loads(resp.read()))
+```
+
+The `urlopen` call above blocks until the popup is answered (or the request
+times out) - that's expected, since a human has to click something. Don't
+poll `/get_tokens` in a tight loop; one attempt, then fall back to manual
+entry, as shown above.
+
+### The manual fallback: File → API Access
 
 With a project open in the GUI: **File → API Access**. The dialog shows:
 
