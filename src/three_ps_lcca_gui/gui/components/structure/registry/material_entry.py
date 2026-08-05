@@ -24,6 +24,7 @@ _REQUIRED_ITEM_KEYS = (
     "rate",
     "rate_src",
     "carbon_emission",
+    "carbon_emission_units",
     "carbon_emission_units_den",
     "conversion_factor",
     "carbon_emission_src",
@@ -32,6 +33,7 @@ _ITEM_DEFAULTS = {
     "rate": None,
     "rate_src": None,
     "carbon_emission": None,
+    "carbon_emission_units": None,
     "carbon_emission_units_den": None,
     "conversion_factor": None,
     "carbon_emission_src": None,
@@ -49,6 +51,37 @@ def _validate_item(item: dict) -> bool:
     for key, default in _ITEM_DEFAULTS.items():
         item.setdefault(key, default)
     return True
+
+
+def resolve_carbon_denom(item: dict) -> str | None:
+    """
+    Return the bare carbon-emission denominator unit (e.g. "kg") for a raw
+    SOR/database item, regardless of which Excel column it came from.
+
+    Source data has two distinct fields, kept separate (never aliased onto
+    each other) because they come from two different, deliberately named
+    Excel columns:
+      - "carbon_emission_units_den": always the bare denominator, e.g. "kg".
+      - "carbon_emission_units": the older/ambiguous column - historically
+        filled with the full ratio (e.g. "kgCO2/kg") by data preparers
+        reading the name at face value. Take the segment after the last "/"
+        so a full ratio still resolves to the correct bare unit; a value
+        with no "/" is already bare and passes through unchanged.
+    "_den" wins when both are present (it's the unambiguous one).
+
+    This is the canonical implementation - material_dialog.py imports it
+    from here rather than keeping its own copy.
+    """
+    den = item.get("carbon_emission_units_den")
+    if den not in (None, "", 0):
+        return str(den).strip()
+
+    units = item.get("carbon_emission_units")
+    if units not in (None, "", 0):
+        units = str(units).strip()
+        return units.rsplit("/", 1)[-1].strip() if "/" in units else units
+
+    return None
 
 
 def build_excel_snapshot(values_dict: dict) -> dict:
@@ -99,7 +132,7 @@ def carbon_data_available(dict_b: dict) -> bool:
     deciding whether to honor an explicit include_in_carbon_emission=true."""
     return (
         _valid_carbon_num(dict_b.get("carbon_emission"))
-        and _valid(dict_b.get("carbon_emission_units_den"))
+        and _valid(resolve_carbon_denom(dict_b))
         and _valid_carbon_num(dict_b.get("conversion_factor"))
     )
 
@@ -133,8 +166,8 @@ def convert_sor_item_to_material(dict_b: dict) -> dict:
         "rate_source": dict_b.get("rate_src", "") if _valid(dict_b.get("rate_src")) else "",
         "carbon_emission": dict_b.get("carbon_emission") if _valid(dict_b.get("carbon_emission")) else None,
         "carbon_unit": (
-            f"kgCO₂e/{dict_b.get('carbon_emission_units_den')}"
-            if _valid(dict_b.get("carbon_emission_units_den"))
+            f"kgCO₂e/{resolve_carbon_denom(dict_b)}"
+            if _valid(resolve_carbon_denom(dict_b))
             else None
         ),
         "carbon_emission_src": dict_b.get("carbon_emission_src", "") if _valid(dict_b.get("carbon_emission_src")) else "",

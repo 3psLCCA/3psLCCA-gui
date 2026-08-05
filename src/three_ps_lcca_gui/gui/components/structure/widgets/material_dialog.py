@@ -48,6 +48,7 @@ from ...utils.unit_resolver import get_unit_info as _get_unit_info_impl
 from ...utils.doc_link import doc_inline, doc_label
 from ..registry.material_catalog import list_databases
 from ..registry.search_engine import MaterialSearchEngine, AdvancedSearchEngine, _component_matches
+from ..registry.material_entry import resolve_carbon_denom
 
 import math
 import os
@@ -470,6 +471,7 @@ _REQUIRED_ITEM_KEYS = (
     "rate",
     "rate_src",
     "carbon_emission",
+    "carbon_emission_units",
     "carbon_emission_units_den",
     "conversion_factor",
     "carbon_emission_src",
@@ -478,6 +480,7 @@ _ITEM_DEFAULTS = {
     "rate": None,
     "rate_src": None,
     "carbon_emission": None,
+    "carbon_emission_units": None,
     "carbon_emission_units_den": None,
     "conversion_factor": None,
     "carbon_emission_src": None,
@@ -524,9 +527,11 @@ def convert_sor_item_to_material(dict_b: dict) -> dict:
     def _valid(val):
         return val not in (None, "", 0, 0.0)
 
-    carbon_eligible = all(
-        _valid(dict_b.get(k))
-        for k in ("carbon_emission", "carbon_emission_units_den", "conversion_factor")
+    _denom = resolve_carbon_denom(dict_b)
+    carbon_eligible = (
+        _valid(dict_b.get("carbon_emission"))
+        and _valid(_denom)
+        and _valid(dict_b.get("conversion_factor"))
     )
 
     raw_key = dict_b.get("db_key") or ""
@@ -542,11 +547,7 @@ def convert_sor_item_to_material(dict_b: dict) -> dict:
         "rate": dict_b.get("rate") if _valid(dict_b.get("rate")) else None,
         "rate_source": dict_b.get("rate_src", "") if _valid(dict_b.get("rate_src")) else "",
         "carbon_emission": dict_b.get("carbon_emission") if _valid(dict_b.get("carbon_emission")) else None,
-        "carbon_unit": (
-            f"kgCO₂e/{dict_b.get('carbon_emission_units_den')}"
-            if _valid(dict_b.get("carbon_emission_units_den"))
-            else None
-        ),
+        "carbon_unit": f"kgCO₂e/{_denom}" if _valid(_denom) else None,
         "carbon_emission_src": dict_b.get("carbon_emission_src", "") if _valid(dict_b.get("carbon_emission_src")) else "",
         "conversion_factor": dict_b.get("conversion_factor") if _valid(dict_b.get("conversion_factor")) else None,
         "scrap_rate": None,
@@ -1688,7 +1689,7 @@ class MaterialDialog(QDialog):
                     )
 
                     carbon = item.get("carbon_emission")
-                    denom = item.get("carbon_emission_units_den")
+                    denom = resolve_carbon_denom(item)
                     carbon_available = carbon not in ("", None) and denom not in ("", None)
                     self._sor_carbon_available = carbon_available
                     if carbon_available:
@@ -1816,7 +1817,7 @@ class MaterialDialog(QDialog):
                 self.src_in.setText(str(src))
 
             carbon = item.get("carbon_emission")
-            denom = item.get("carbon_emission_units_den")
+            denom = resolve_carbon_denom(item)
             carbon_available = carbon not in ("", None) and denom not in ("", None)
             self._sor_carbon_available = carbon_available
 
@@ -1985,7 +1986,7 @@ class MaterialDialog(QDialog):
                 pass
 
         # Carbon denominator unit
-        orig_denom = orig.get("carbon_emission_units_den", "")
+        orig_denom = resolve_carbon_denom(orig) or ""
         if orig_denom not in self._DB_NA:
             if self.carbon_denom_cb.currentData() != orig_denom:
                 modified.append("carbon_emission_units_den")

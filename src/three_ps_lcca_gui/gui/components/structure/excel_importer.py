@@ -69,6 +69,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtWidgets import QButtonGroup, QRadioButton, QGroupBox
 from three_ps_lcca_gui.gui.themes import get_token
 from .widgets.material_dialog import build_excel_snapshot
+from .registry.material_entry import resolve_carbon_denom
 import sys
 from ..utils.table_widgets import round_table_viewport
 from ..utils.unit_resolver import (
@@ -118,7 +119,7 @@ CID_TO_INTERNAL: dict[str, str] = {
     "rate": "rate",
     "rate_src": "rate_src",
     "carbon_emission_factor": "carbon_emission",
-    "carbon_emission_units": "carbon_emission_units_den",
+    "carbon_emission_units": "carbon_emission_units",
     "carbon_emission_units_den": "carbon_emission_units_den",
     "conversion_factor": "conversion_factor",
     "carbon_emission_src": "carbon_emission_src",
@@ -462,13 +463,38 @@ def verify_schema(parsed: dict[str, list[dict]]) -> dict[str, list[dict]]:
             # Carbon emission present but missing denominator
             ef_str = record.get("carbon_emission", "")
             den = record.get("carbon_emission_units_den", "")
-            if ef_str and not den:
+            units = record.get("carbon_emission_units", "")
+            if ef_str and not den and not units:
                 warns.append(
-                    "carbon_emission provided but carbon_emission_units_den is missing"
+                    "carbon_emission provided but neither carbon_emission_units_den "
+                    "nor carbon_emission_units is filled in"
+                )
+
+            # carbon_emission_units_den is the bare-denominator column (e.g. "kg") -
+            # it must NEVER carry a full "numerator/denominator" ratio. A value
+            # containing "co2" here means the row belongs in carbon_emission_units
+            # instead - reject rather than silently importing a corrupted unit.
+            if den and "co2" in str(den).lower().replace("₂", "2"):
+                errs.append(
+                    f"'carbon_emission_units_den' must be a bare denominator "
+                    f"(e.g. 'kg'), not a full ratio - got '{den}'. Use "
+                    f"'carbon_emission_units' for the full 'kgCO2e/<unit>' string."
+                )
+
+            # carbon_emission_units is the full-ratio column - it must always
+            # start with the fixed numerator (kgCO2/kgCO2e). Anything else is
+            # either a bare unit typed in the wrong column or garbage - reject
+            # rather than guessing.
+            if units and "co2" not in str(units).lower().replace("₂", "2"):
+                errs.append(
+                    f"'carbon_emission_units' must be a full ratio starting with "
+                    f"'kgCO2e/' (e.g. 'kgCO2e/kg') - got '{units}', which doesn't "
+                    f"contain 'CO2'. If this is meant to be a bare denominator, use "
+                    f"'carbon_emission_units_den' instead."
                 )
 
             # EC9: carbon EF = 0 but denominator is filled
-            if ef_str and den:
+            if ef_str and (den or units):
                 try:
                     if float(ef_str) == 0:
                         warns.append(
@@ -527,7 +553,7 @@ def record_to_material_dict(record: dict) -> dict:
 
     raw_unit = record.get("unit", "").strip()
     carbon_ef = _float_or_none("carbon_emission")
-    carbon_denom = record.get("carbon_emission_units_den", "").strip()
+    carbon_denom = resolve_carbon_denom(record) or ""
     scrap = _float_or_none("scrap_rate")
     recovery = _float_or_none("recovery_pct")
     has_carbon = (carbon_ef or 0) > 0 and bool(carbon_denom)
@@ -932,6 +958,15 @@ class ImportComponentTable(QTableWidget):
             if field == "_issues":
                 item = QTableWidgetItem(issues_short)
                 item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+            elif field == "carbon_emission_units_den":
+                # The row's carbon denom may have landed in either field -
+                # display whichever one resolve_carbon_denom() finds so a
+                # value entered via "carbon_emission_units" (the full-ratio
+                # column) doesn't show as a blank cell here even though it
+                # will save correctly. Edits still write back to this
+                # canonical field only (see _on_item_changed).
+                item = QTableWidgetItem(resolve_carbon_denom(record) or "")
+                item.setData(Qt.UserRole, field)
             else:
                 item = QTableWidgetItem(str(record.get(field, "") or ""))
                 item.setData(Qt.UserRole, field)
