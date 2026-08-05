@@ -1,4 +1,4 @@
-﻿"""
+"""
 excel_importer.py
 =================
 Excel → Material import pipeline.
@@ -71,7 +71,7 @@ from three_ps_lcca_gui.gui.themes import get_token
 from .widgets.material_dialog import build_excel_snapshot
 from .registry.material_entry import resolve_carbon_denom
 import sys
-from ..utils.table_widgets import round_table_viewport
+from ..utils.table_widgets import round_table_viewport, WordWrapHeaderView
 from ..utils.unit_resolver import (
     get_unit_info as _gui,
     get_known_units as _gku,
@@ -823,6 +823,7 @@ class ImportComponentTable(QTableWidget):
 
     def __init__(self, component_name: str, rows: list[dict], parent=None):
         super().__init__(parent)
+        self.setHorizontalHeader(WordWrapHeaderView(Qt.Horizontal, parent=self))
         round_table_viewport(self)
         self.component_name = component_name
         self._rows = rows
@@ -846,9 +847,12 @@ class ImportComponentTable(QTableWidget):
                     f"Excel column: CID#{cid_name}"
                 )
 
+        self.horizontalHeader().setVisible(True)
+        self.horizontalHeader().setFixedHeight(32)
         self.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
         self.horizontalHeader().setSectionResizeMode(_CB_COL, QHeaderView.Fixed)
         self.horizontalHeader().setStretchLastSection(False)
+        self.horizontalHeader().setMinimumSectionSize(60)
         self.verticalHeader().setDefaultSectionSize(32)
         self.verticalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
         self.setWordWrap(True)
@@ -1076,9 +1080,12 @@ class ImportComponentTable(QTableWidget):
     def _update_height(self):
         """Let the layout engine know our preferred height changed."""
         self.updateGeometry()
+        self.setFixedHeight(self.sizeHint().height())
 
     def sizeHint(self):
-        header_h = self.horizontalHeader().height() or 35
+        header_h = self.horizontalHeader().height()
+        if header_h < 30:
+            header_h = 35
         # Sum actual row heights because they can wrap/resize
         rows_h = sum(self.rowHeight(i) for i in range(self.rowCount()))
         return QSize(super().sizeHint().width(), header_h + rows_h + 4)
