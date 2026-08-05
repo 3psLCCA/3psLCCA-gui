@@ -437,6 +437,16 @@ class TrafficEmissions(ScrollableForm):
         # ── Extract + normalize values ─────────────────────────────────────
         raw_mode = traffic.get("mode")
         traffic_mode = str(raw_mode or "").strip().upper()
+        
+        # Fallback if traffic_mode is empty: check bridge_data for India
+        if not traffic_mode:
+            print("going for bridge data")
+            bridge = self.controller.engine.fetch_chunk("bridge_data") or {}
+            project_country = str(bridge.get("project_country") or "").strip().upper()
+            if project_country == "INDIA":
+                traffic_mode = "INDIA"
+        
+        print(f"checking mode : mode is {traffic_mode}")
         reroute = float(traffic.get("additional_reroute_distance_km", 0.0))
 
         can_calculate = traffic_mode == "INDIA"
