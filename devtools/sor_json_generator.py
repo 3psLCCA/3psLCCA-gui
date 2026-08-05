@@ -14,6 +14,7 @@ Output format (array of section objects, one per sheet):
           "rate": 239,
           "rate_src": "...",
           "carbon_emission": null | <float>,
+          "carbon_emission_units": null | "<unit>",
           "carbon_emission_units_den": null | "<unit>",
           "conversion_factor": null | <float>,
           "carbon_emission_src": null | "IFC" | "ICE" | ...,
@@ -40,7 +41,7 @@ Column format expected in Excel (same as excel_importer.py):
   Row 1 (or first row with CID# headers):
     CID#Name*, CID#Unit*, CID#Rate*, CID#Component,
     CID#ID (optional), CID#Quantity, CID#Rate_Src,
-    CID#Carbon_Emission_Factor, CID#Carbon_Emission_units,
+    CID#Carbon_Emission_Factor, CID#Carbon_Emission_units, CID#Carbon_Emission_units_Den,
     CID#Conversion_Factor, CID#Carbon_Emission_Src,
     CID#Description (optional)
   (* = required; all other columns are optional)
@@ -92,7 +93,7 @@ CID_TO_INTERNAL: dict[str, str] = {
     "rate": "rate",
     "rate_src": "rate_src",
     "carbon_emission_factor": "carbon_emission",
-    "carbon_emission_units": "carbon_emission_units_den",
+    "carbon_emission_units": "carbon_emission_units",
     "carbon_emission_units_den": "carbon_emission_units_den",
     "conversion_factor": "conversion_factor",
     "carbon_emission_src": "carbon_emission_src",
@@ -326,6 +327,33 @@ def build_sor_json(parsed: dict[str, list[dict]]) -> list[dict]:
                 print(f"  [warn] skipping '{name}': non-numeric rate '{rate_str}'")
                 continue
 
+            # carbon_emission_units_den must be a bare denominator (e.g. "kg") -
+            # never a full ratio. A value containing "co2" here means it was
+            # typed in the wrong column - reject rather than baking a corrupted
+            # unit into the generated JSON (this is exactly how the shipped SOR
+            # databases got "kgCO2e/kgCO2/kg"-style corruption in the past).
+            den = record.get("carbon_emission_units_den", "").strip()
+            if den and "co2" in den.lower().replace("₂", "2"):
+                print(
+                    f"  [warn] skipping '{name}': carbon_emission_units_den "
+                    f"must be a bare denominator (e.g. 'kg'), not a full ratio "
+                    f"- got '{den}'. Put the full ratio in carbon_emission_units "
+                    f"instead."
+                )
+                continue
+
+            # carbon_emission_units is the full-ratio column - it must always
+            # start with the fixed numerator (kgCO2/kgCO2e).
+            units = record.get("carbon_emission_units", "").strip()
+            if units and "co2" not in units.lower().replace("₂", "2"):
+                print(
+                    f"  [warn] skipping '{name}': carbon_emission_units must be "
+                    f"a full ratio starting with 'kgCO2e/' (e.g. 'kgCO2e/kg') - "
+                    f"got '{units}', which doesn't contain 'CO2'. Use "
+                    f"carbon_emission_units_den for a bare denominator instead."
+                )
+                continue
+
             raw_component = record.get("component", "").strip()
             component_val = _parse_component(raw_component) if raw_component else "Uncategorised"
 
@@ -342,6 +370,7 @@ def build_sor_json(parsed: dict[str, list[dict]]) -> list[dict]:
                 "rate": int(rate_num) if rate_num == int(rate_num) else rate_num,
                 "rate_src": _make_field(record.get("rate_src", "").strip()),
                 "carbon_emission": _make_field(record.get("carbon_emission", "")),
+                "carbon_emission_units": _make_field(record.get("carbon_emission_units", "")),
                 "carbon_emission_units_den": _make_field(record.get("carbon_emission_units_den", "")),
                 "conversion_factor": _make_field(record.get("conversion_factor", "")),
                 "carbon_emission_src": _make_field(record.get("carbon_emission_src", "")),
