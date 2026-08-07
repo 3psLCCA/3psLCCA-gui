@@ -8,15 +8,16 @@ currently open.
 Routes are fully generic (`/<project_id>/<page>` works for whatever's registered).
 Registered today: **Bridge Data** (`bridge_data`), **General Information**
 (`general_info`), **Financial Data** (`financial_data`), **Maintenance and Repair**
-(`maintenance_data`), **Demolition** (`demolition_data`), and the four
+(`maintenance_data`), **Demolition** (`demolition_data`), the four
 **Construction Works Data** table chunks - `str_foundation`, `str_sub_structure`,
-`str_super_structure`, `str_misc` (plus the read-only `str_component_registry`).
-Adding another page is a small, self-contained change - see
+`str_super_structure`, `str_misc` (plus the read-only `str_component_registry`) -
+and **Social Cost of Carbon** (`social_cost_data`, part of the Carbon Emissions
+Data page). Adding another page is a small, self-contained change - see
 [Extending to more pages](#extending-to-more-pages). The examples in this doc use
 `bridge_data`, but auth, locked fields, and error shapes work identically for every
 registered page.
 
-Two kinds of pages exist, distinguishable by what `GET` returns:
+Three kinds of pages exist, distinguishable by what `GET` returns:
 
 - **Form pages** (Bridge Data, General Information, Financial Data, Maintenance,
   Demolition) return a flat `"fields"` array and use top-level merge semantics -
@@ -27,6 +28,12 @@ Two kinds of pages exist, distinguishable by what `GET` returns:
   rather than flat key/value pairs - see
   [Construction Works Data](#construction-works-data-table-pages) below. The
   `str_component_registry` chunk is read-only (`GET` only; `POST` returns `405`).
+- **Nested-object pages** (`social_cost_data`) also return a `"schema"` object (not
+  `"fields"` - a top-level `"fields"` key means the flat form shape, so a page with
+  real nested data uses a different key for its field groups), but use ordinary
+  merge/PATCH semantics like form pages, just one level deeper: nested sub-objects
+  (e.g. `ricke`, `custom`) are merged key-by-key, not replaced wholesale - see
+  [Social Cost of Carbon](#social-cost-of-carbon-social_cost_data) below.
 
 ---
 
@@ -49,6 +56,7 @@ Two kinds of pages exist, distinguishable by what `GET` returns:
   - [POST .../add_from_catalog](#post-project_idchunkadd_from_catalog)
   - [POST .../add_manual](#post-project_idchunkadd_manual)
   - [POST .../trash](#post-project_idchunktrash)
+- [Social Cost of Carbon (social_cost_data)](#social-cost-of-carbon-social_cost_data)
 - [Material catalog search](#material-catalog-search)
 - [Image upload fields](#image-upload-fields)
 - [Disabling the API](#disabling-the-api)
@@ -679,6 +687,79 @@ one-way shortcut; to **restore** an entry, use the main endpoint:
 
 `str_component_registry` is bookkeeping (which components exist per chunk) - `GET`
 only, `POST` returns `405 read_only_chunk`.
+
+---
+
+## Social Cost of Carbon (`social_cost_data`)
+
+The Social Cost of Carbon tab (part of the Carbon Emissions Data page) has two
+mutually exclusive calculation modes, selected by `"source"`:
+
+```json
+{
+  "source": "K. Ricke et al. (Country-Level)",
+  "ricke": { "iso3": "IND", "ssp": "...", "rcp": "...", "...": "..." },
+  "custom": { "scc_value": 5.2, "source": "Internal guidance note" },
+  "result": { "selected_mode": "...", "cost_of_carbon_local": 18.88, "currency": "INR", "unit": "INR/kgCO₂e" }
+}
+```
+
+Both `"ricke"` and `"custom"` are **always stored**, regardless of which is
+active - switching `"source"` back and forth never loses the other mode's inputs.
+`"result"` is computed **server-side** on every write from whichever mode ends up
+active after that write; sending it directly is rejected with `400`.
+
+`GET` returns a `"schema"` object (see the note on nested-object pages above) with
+a `"field_groups"` key (`source`, `ricke`, `custom`, `result`), a `"source_note"`
+explaining what `"source"` means (a mode selector, not a citation field - that's
+`custom.source`), an `"update_semantics"` block, and worked example bodies for both
+modes.
+
+`POST` uses ordinary merge/PATCH semantics, one level deeper than the form pages:
+send any subset of `"source"`/`"ricke"`/`"custom"` and omitted keys keep their
+current value - `"ricke"`/`"custom"` are themselves merged key-by-key too, so a
+patch touching only `custom.scc_value` never clobbers `custom.comments` or
+anything in `ricke`:
+
+```bash
+curl -X POST http://127.0.0.1:8765/proj_a1b2c3d4/social_cost_data \
+  -H "X-API-Token: <token>" \
+  -d '{ "source": "Custom / Manual Override",
+        "custom": { "scc_value": 5.2, "source": "Internal guidance note" } }'
+```
+
+Required fields depend on the **active** mode only:
+
+- `"source": "Custom / Manual Override"` - nothing is required (matches the GUI).
+- `"source": "K. Ricke et al. (Country-Level)"` - 7 of the 8 `ricke.*` fields
+  (`ssp`, `rcp`, `dmg_func`, `dmg_params`, `climate_uncertainty`, `discounting`,
+  `percentile`) must be filled, **plus** the resulting combination must resolve to
+  a real row in the underlying SCC database - a combination with no data (or that
+  hits a malformed cell in that database) is rejected with `400` naming the
+  problem, not silently saved with a cost of `0`.
+
+`ricke.iso3` is the 8th field and is special: it's **usually auto-set and
+locked**, mirroring the GUI (where this combo box is disabled once the project's
+own country is found in the SCC database) - omit it entirely in the normal case.
+It only becomes caller-editable, defaulting to `"WLD"` (global aggregate), when
+the project's own country has no data in this specific database. Any value you
+send for it while it's locked is silently ignored, not an error. Its schema entry
+does **not** enumerate the ~170 valid codes (that list would dominate this
+chunk's schema for a field you almost never set yourself) - just a `"note"`
+explaining the above; an actually-unusable code is caught by the same
+no-data-in-the-database check, not a separate enum check.
+
+```json
+{ "source": "K. Ricke et al. (Country-Level)",
+  "ricke": { "ssp": "SSP1 (Sustainability)", "rcp": "RCP4.5 (≈ +2.5°C in 2100)",
+             "dmg_func": "BHM LR (Long Run)", "dmg_params": "Bootstrap (Full Uncertainty)",
+             "climate_uncertainty": "Expected (Central Projections)",
+             "discounting": "Growth-adjusted (prtp=1%, η=0.7)", "percentile": "50.0% (Central)",
+             "usd_to_local_rate": 83.0, "cpi_ratio": 1.1 } }
+```
+
+Not supported on this chunk (`404 not_supported`): `add_from_catalog`,
+`add_manual`, `trash` - those are `str_*`-only shortcuts.
 
 ---
 

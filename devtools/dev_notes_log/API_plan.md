@@ -19,7 +19,7 @@ implementation plan for every remaining GUI page.
 | Demolition                | `Demolition`          | `demolition_data`            | ✅ done |
 | Traffic Data              | `TrafficData`         | `traffic_and_road_data`      | planned — Tier B |
 | Construction Works Data   | `StructureTabView`    | `str_super_structure`, `str_sub_structure`, `str_foundation`, `str_misc` (read-only: `str_component_registry`; internal: `str_summary`) | ✅ done (Tier C) |
-| Carbon Emissions Data     | `CarbonEmissionTabView` | `social_cost_data` ✅ done; `transport_emissions_data`, `machinery_emissions_data`, `diversion_emissions` still planned — Tier C (internal: `transport_data`; `material_emissions_data` **not exposed** — see note below) | in progress — Tier C |
+| Carbon Emissions Data     | `CarbonEmissionTabView` | `social_cost_data` ✅ done; `machinery_emissions_data` ✅ done; `transport_emissions_data`, `diversion_emissions` still planned — Tier C (internal: `transport_data`; `material_emissions_data` **not exposed** — see note below) | in progress — Tier C |
 | Recycling                 | `Recycling`           | **no API of its own** — controlled entirely via `str_*` entry writes (see note below) | — |
 | Results                   | `OutputsPage`         | `outputs_data`               | planned — Tier D (read-only) |
 | *(app-level)* Material catalog search | — (`MaterialSearchEngine`, no widget) | — (reads SOR JSON databases, not chunks) | ✅ done (Tier E, read-only, no Qt) |
@@ -301,7 +301,7 @@ Each tab of `CarbonEmissionTabView` owns its own chunk; register each individual
 |---|---|---|
 | `diversion_emissions` | `TrafficEmissions` | Standard BaseDataWidget with `DIRECT_FIELDS` FieldDefs → register like Tier A but `page_name` resolution goes through the tab view — use `refresh_via_signal` path instead. |
 | `social_cost_data` | `SCCWidget` | ✅ **done** — see below. |
-| `machinery_emissions_data` | `MachineryEmissions` | `LUMPSUM_ELEC_FIELDS`/`LUMPSUM_FUEL_FIELDS` FieldDefs + per-machine table → FieldDefs plus a `schema` block for the table; custom validator/merge. |
+| `machinery_emissions_data` | `MachineryEmissions` | ✅ **done** — see below. |
 | `transport_emissions_data` | `TransportEmissions` | Table of transport legs; hand-written `schema`; custom validator/merge. It also stages the internal `transport_data` chunk — that one stays unregistered or `read_only`. |
 | `material_emissions_data` | `MaterialEmissions` | **Not exposed** — derived view over `str_*` entries; see decision note below. |
 
@@ -355,6 +355,59 @@ Implementation in `gui/api/pages/carbon_emission.py`:
   against two dedicated India/Singapore throwaway projects with hardcoded exact
   expected SCC values, and the multi-window controller bug (see architecture recap
   above) as an explicit regression check.
+
+**`machinery_emissions_data` — done.** Same Tier C shape as `social_cost_data`
+(`field_defs=None`, `refresh_via_signal=True`, `widget_map["Carbon Emissions
+Data"]` only gives the tab-view container). Implementation in
+`gui/api/pages/machinery_emissions.py`:
+
+- **Shape**: `{mode, remarks, lumpsum: {...6 keys}, detailed: {rows: [...]},
+  total_kgCO2e, diesel_subtotal_kgCO2e?, electricity_subtotal_kgCO2e?}` — two
+  mutually exclusive modes selected by `mode` (`"detailed"` table vs.
+  `"lumpsum"` aggregate); both sub-objects are always stored so switching
+  modes never loses the inactive one's inputs. The subtotal keys are present
+  only in detailed mode — explicitly popped on a switch to lumpsum so a
+  caller never sees stale numbers left over from a previous detailed-mode
+  save. `total_kgCO2e` (+ subtotals) is server-computed and rejected if
+  written directly.
+- **Detailed rows are row-granular, not id-based**: the GUI's own table has no
+  persistent row id — `_open_edit_dialog`/`_delete_row` in
+  `machinery_emissions.py` both address rows by on-screen position — so the
+  API does the same rather than inventing id semantics the GUI doesn't have.
+  `POST {"detailed": {"rows": [row_patch]}}` takes **exactly one** row_patch
+  per request (same "no bulk" rule as Construction Works Data's entry-patch
+  endpoint): a patch WITH `row_index` edits that row (partial — only sent
+  fields change) or, with `delete: true`, removes it; a patch WITHOUT
+  `row_index` appends a new row, defaulting omitted fields the same way the
+  GUI's "+ Add Equipment" button does. The 6 row fields
+  (`name`/`source`/`rate`/`hrs`/`days`/`ef`) are exactly the GUI's own "Edit
+  Equipment" dialog fields (`_EditRowDialog`) — reused as the validation
+  contract, not reinvented. `row_index` is only stable until the next
+  add/delete, documented in the schema.
+- **GUI refresh**: `refresh_widget` hook finds the `MachineryEmissions` tab
+  and calls its own `on_refresh()` (already existed for this exact purpose —
+  no widget-side changes needed, unlike `social_cost_data`'s RickeWidget,
+  `MachineryEmissions.load_data()` drives its total labels through a direct
+  call at the end, not a signal-blocked one, so no extra repaint step was
+  needed).
+- **Bug found + fixed during testing**: the per-key validation loops for
+  `lumpsum` and detailed row patches iterated every key in the payload
+  (including ones already flagged as "unrecognized") and indexed the known-
+  fields dict by that key directly — an unrecognized key raised a raw
+  `KeyError` (surfaced to the caller as a generic 500-style `{"error":
+  "'<key>'"}` instead of a clean `400 invalid_field_values`). Fixed by
+  skipping keys not in the known-fields dict in that loop (they're already
+  reported via the separate `unknown` check). Caught by the test suite's
+  4g/4o checks, not manual testing — a good example of why the "send an
+  unrecognized key" case belongs in the exhaustive suite for every future
+  Tier C page, not just the obvious happy-path checks.
+- **Tests**: `devtools/test apis/machinery_emissions_data.test.py` —
+  exhaustive, covers schema shape, the full validation matrix (including the
+  bulk-row and delete-combined-with-edit rejections above), row add/edit/
+  delete round trips, merge/PATCH nesting, the mode-switch subtotal-key
+  hygiene check, injection-string storage, and the not_supported shortcuts.
+  Single project is enough (no country-dependent behavior, unlike
+  `social_cost_data`'s iso3 lock).
 
 **Material emissions: no API — decision.** `material_emissions_data` holds no
 editable data (`MaterialEmissions.get_data()` stores only a derived summary
