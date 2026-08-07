@@ -58,6 +58,8 @@ class ApiBridge(QObject):
                 result = self._create_project(payload)
             elif method == "get_tokens":
                 result = self._get_tokens(project_id)
+            elif method == "validate_all":
+                result = self._validate_all(project_id)
             else:
                 result = {"error": f"unknown_method:{method}"}
         except Exception as e:
@@ -122,6 +124,82 @@ class ApiBridge(QObject):
                     "key manually."
                 ),
             }
+
+    def _validate_all(self, project_id: str) -> dict:
+        """Powers GET /{project_id}/validate - actually operates the
+        Results page's "Calculate" button (ProjectWindow._run_calculate(),
+        the exact slot self.btn_calculate.clicked is wired to), not a
+        reimplementation of it, so the open GUI window's Results page
+        updates exactly like a native click would: an error/warning report
+        if anything's wrong, or a success indicator plus the real
+        calculation (OutputsPage.run_calculation() launches that on its own
+        QThread and returns immediately - non-blocking, so this call itself
+        stays fast; the Results view then updates itself asynchronously off
+        _on_calc_finished() same as always) if the project is clean, and
+        either way the visible content_stack navigates to the Results page
+        and the sidebar selection follows, same as a human click.
+
+        _run_calculate() itself returns nothing (it's a GUI slot, not a
+        query) - the errors/warnings this route's JSON response needs are
+        computed here via the same per-page validate() aggregation
+        OutputsPage.run_validation() uses internally, run BEFORE calling
+        _run_calculate() so this response reflects the exact state that
+        real call is about to (re-)validate. validate() is a pure read of
+        already-current in-memory field state (no engine write, no dialog),
+        so computing it here first and letting _run_calculate() compute the
+        identical thing again internally is redundant but harmless - not a
+        race, since both run synchronously on this same main-thread call."""
+        win = self._find_window(project_id)
+        if win is None:
+            return {"error": "project_not_open"}
+
+        from three_ps_lcca_gui.gui.components.utils.form_builder.form_definitions import ValidationStatus
+
+        for name in win._page_names:
+            win._get_or_create_widget(name)
+        win.outputs_page.register_pages(win.widget_map)
+
+        all_errors: dict = {}
+        all_warnings: dict = {}
+        for name, page in win.outputs_page._pages.items():
+            res = page.validate()
+            if isinstance(res, dict):
+                if res.get("errors"):
+                    all_errors[name] = res["errors"]
+                if res.get("warnings"):
+                    all_warnings[name] = res["warnings"]
+            else:
+                status, issues = res
+                if status == ValidationStatus.ERROR:
+                    all_errors[name] = issues
+                elif status == ValidationStatus.WARNING:
+                    all_warnings[name] = issues
+
+        # The real button handler - updates the open window's Results page
+        # (error/warning report, or success + async calculation) exactly
+        # like a native click, and navigates the visible window there.
+        win._run_calculate()
+
+        # Maps each page name in errors/warnings to the chunk id(s) an API
+        # caller would GET/POST to actually fix something on that page - a
+        # page name alone (e.g. "Carbon Emissions Data") isn't directly
+        # callable, and one page can span several chunks (that one spans
+        # five: social_cost_data, machinery_emissions_data, etc.). Built
+        # from the same registry every other endpoint is generic over, so
+        # it never goes stale as pages/chunks are added.
+        page_chunks: dict[str, list[str]] = {}
+        for chunk_name, entry in CHUNK_PAGE_MAP.items():
+            page_chunks.setdefault(entry["page_name"], []).append(chunk_name)
+        for chunk_list in page_chunks.values():
+            chunk_list.sort()
+
+        return {
+            "ok": True,
+            "valid": not all_errors,
+            "errors": all_errors,
+            "warnings": all_warnings,
+            "page_chunks": {name: page_chunks.get(name, []) for name in set(all_errors) | set(all_warnings)},
+        }
 
     def _find_window(self, project_id: str):
         """Every bridge method resolves its target window through here first

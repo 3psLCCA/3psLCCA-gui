@@ -234,6 +234,41 @@ def _help_payload() -> dict:
                 ),
             },
             {
+                "method": "GET",
+                "path": "/{project_id}/validate",
+                "auth_required": True,
+                "summary": (
+                    "Actually operates the GUI's own \"Calculate\" button - "
+                    "the open project window's Results page updates exactly "
+                    "like a native click (error/warning report, or a success "
+                    "indicator plus the real calculation, which runs "
+                    "asynchronously and does not block this response). "
+                    "Never changes any stored chunk data - only Results-page "
+                    "cache/UI state, same as clicking the button yourself."
+                ),
+                "response": (
+                    "{\"project_id\", \"valid\": bool, "
+                    "\"errors\": {<page name>: [msg, ...]}, "
+                    "\"warnings\": {<page name>: [msg, ...]}, "
+                    "\"page_chunks\": {<page name>: [chunk id, ...]}}. ERRORS "
+                    "must be resolved - they block calculation (\"valid\": "
+                    "true means zero errors across every page). WARNINGS "
+                    "never block anything - advisory only. \"page_chunks\" "
+                    "maps each page name appearing in errors/warnings to the "
+                    "chunk id(s) to GET/POST to fix it (a page name alone "
+                    "isn't directly callable, and one page can span several "
+                    "chunks). Pages with neither an error nor a warning are "
+                    "omitted everywhere. If \"valid\" is true, the "
+                    "calculation was also just kicked off on the open window "
+                    "(non-blocking) - this response reflects the validation "
+                    "state at call time, not the calculation's own result."
+                ),
+                "example": (
+                    f"curl {base}/proj_a1b2c3d4/validate "
+                    "-H 'X-API-Token: <token>'"
+                ),
+            },
+            {
                 "method": "POST",
                 "path": "/{project_id}/{chunk}/add_from_catalog",
                 "auth_required": True,
@@ -710,6 +745,52 @@ def _create_app(bridge: ApiBridge) -> Flask:
                 status_code = 429
             return jsonify({**result, **_usage_info()}), status_code
         return jsonify(result)
+
+    @app.get("/<project_id>/validate")
+    def validate_project(project_id):
+        # Actually operates the GUI's own "Calculate" button (see
+        # ApiBridge._validate_all()) - the open project window's Results
+        # page updates exactly like a native click: an error/warning report
+        # if anything's wrong, or a success indicator plus the real
+        # calculation (non-blocking - runs on its own thread) if the
+        # project is clean. This route's own JSON response never waits on
+        # that calculation; it reports the errors/warnings computed at the
+        # moment of the call. Not chunk-scoped (no <chunk> segment) - it
+        # walks every registered page at once, so it's declared as its own
+        # literal route rather than going through CHUNK_PAGE_MAP like every
+        # other project data endpoint.
+        provided = request.headers.get("X-API-Token")
+        if not tokens.check_token(project_id, provided):
+            return jsonify({"error": "unauthorized", **_usage_info()}), 401
+
+        result = bridge.call("validate_all", project_id, "", timeout=30.0)
+        if "error" in result:
+            if result["error"] == "project_not_open":
+                return jsonify({**result, **_not_found_info()}), 404
+            return jsonify({**result, **_usage_info()}), 400
+
+        return jsonify({
+            "project_id": project_id,
+            "valid": result["valid"],
+            "errors": result["errors"],
+            "warnings": result["warnings"],
+            "page_chunks": result["page_chunks"],
+            "note": (
+                "Errors NEED TO BE RESOLVED - they block calculation entirely, "
+                "same as the GUI (\"valid\": true means zero errors across "
+                "every page). Warnings do NOT block anything - they CAN JUST "
+                "BE CHECKED in this JSON response and left as-is if "
+                "acceptable; nothing further is required for them. "
+                "errors/warnings are keyed by page name (e.g. \"Bridge Data\"), "
+                "each a list of human-readable messages - same aggregate check "
+                "the GUI's own \"Calculate\" button runs before computing "
+                "results. \"page_chunks\" maps each page name that appears "
+                "above to the chunk id(s) to GET/POST to actually fix it (a "
+                "page name alone isn't directly callable, and one page can "
+                "span several chunks - e.g. \"Carbon Emissions Data\" is "
+                "social_cost_data, machinery_emissions_data, and others)."
+            ),
+        })
 
     @app.get("/<project_id>/<chunk>")
     def get_chunk_data(project_id, chunk):
