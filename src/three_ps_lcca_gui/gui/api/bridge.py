@@ -124,8 +124,38 @@ class ApiBridge(QObject):
             }
 
     def _find_window(self, project_id: str):
+        """Every bridge method resolves its target window through here first
+        - the one place to fix a real bug this API's own testing surfaced:
+        gui/components/utils/common_requested_data.py backs get_currency() /
+        get_project_iso3() / etc. with a single process-wide "active
+        controller" global, set only once per window at creation
+        (ProjectManager._create_window()) and never updated when a
+        different, already-open window is what's actually being acted on.
+        With 2+ project windows open, any of those helpers could silently
+        return a DIFFERENT project's data than the one this request targets
+        (confirmed live: gui/api/pages/carbon_emission.py's iso3 auto-lock
+        and currency lookup would read the wrong project's country/currency).
+        Re-syncing the global to this request's own window/controller here -
+        the one place every bridge method already resolves it - fixes every
+        current and future page's use of those helpers for anything reached
+        through the API, without touching the registry/hook contract or any
+        individual page. Safe without locking: Qt delivers this signal's
+        queued connection (see __init__'s Qt.QueuedConnection) one at a time
+        on the main thread, and bridge.call() blocks its caller until this
+        whole handler returns, so no second request's window can be
+        resolved (and re-sync this same global) while this one is still
+        using it.
+
+        This does NOT fix the same bug for purely GUI-driven reads (e.g. a
+        user manually clicking between multiple open project windows with
+        no API involved) - that still needs a fix on the GUI side (e.g.
+        ProjectWindow re-asserting itself as the active controller on
+        focus/show), tracked separately.
+        """
         for win in self.manager.windows:
             if win.project_id == project_id:
+                from three_ps_lcca_gui.gui.components.utils.common_requested_data import set_controller
+                set_controller(win.controller)
                 return win
         return None
 

@@ -1171,6 +1171,27 @@ class ProjectWindow(QMainWindow):
         dlg = BlobManagerDialog(self.controller, parent=self)
         dlg.exec()
 
+    # ── Focus ─────────────────────────────────────────────────────────────────
+
+    def changeEvent(self, event):
+        """Re-asserts this window's controller as common_requested_data's
+        active one whenever this window becomes the OS-active window
+        (click, alt-tab, or ProjectManager.open_project()'s
+        activateWindow() call on an already-open project) - that module
+        backs get_currency()/get_project_iso3()/etc. with a single
+        process-wide global, set only once per window at creation
+        (ProjectManager._create_window()) and otherwise never updated, so
+        with 2+ project windows open those helpers could silently return a
+        DIFFERENT (whichever was created most recently) project's data
+        instead of this window's own - confirmed live via manual testing.
+        gui/api/bridge.py's _find_window() has the equivalent fix for
+        API-triggered reads; this is the GUI-side half, for when a human
+        just clicks between windows with no API involved."""
+        super().changeEvent(event)
+        if event.type() == QEvent.ActivationChange and self.isActiveWindow() and self.controller:
+            from three_ps_lcca_gui.gui.components.utils.common_requested_data import set_controller
+            set_controller(self.controller)
+
     # ── Close ─────────────────────────────────────────────────────────────────
 
     def closeEvent(self, event):

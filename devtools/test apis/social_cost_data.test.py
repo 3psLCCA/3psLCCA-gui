@@ -44,41 +44,45 @@ Project/token setup for the primary project is shared via _common.py in
 this same folder - see that module's docstring for the --project-id/--token
 flags and the interactive numbered project picker.
 
-KNOWN PRE-EXISTING BUG (documented here 2026-08-07, not yet fixed) - section
-8's concurrency checks (8c/8d/8e) are EXPECTED TO FAIL whenever a second
-project window has been created in the running app process AFTER the one
-they're testing against:
+PRE-EXISTING BUG, FOUND AND FIXED HERE (2026-08-07) - section 8's
+concurrency checks (8c/8d/8e) exist specifically to catch this class of
+regression:
 
   gui/components/utils/common_requested_data.py backs get_currency() /
   get_project_country() / get_project_iso3() (and ~12 other get_*() helpers)
   with a SINGLE module-level global `_controller`. The only call site that
-  ever sets it is ProjectManager._create_window() in project_manager.py -
+  ever set it was ProjectManager._create_window() in project_manager.py -
   fired once when a project's window is first created in this app process.
   ProjectManager.open_project()'s "already open, just focus it" branch
-  (existing.show_project_view()/.raise_()/.activateWindow()) does NOT call
-  set_controller() again. So the global is permanently pinned to whichever
-  window was created MOST RECENTLY in the process's lifetime - not "the
-  project this request is for", despite every one of these helpers being
-  callable with zero arguments as if it were. With two windows open, EVERY
-  get_*() call from EITHER window's code silently reads the OTHER (most-
-  recently-created) window's data instead, including from this API's own
-  "ricke.iso3" auto-lock (_resolve_iso3() in gui/api/pages/carbon_emission.py)
-  and currency lookup (_result_for()) - this is not something introduced by
-  the social_cost_data endpoint, it's an existing app-wide bug this endpoint
-  happens to expose clearly via a scriptable test. Affects real GUI code
-  too (currency suffixes, country-lock combos, etc. on any widget using
-  common_requested_data), not just this API - one window open at a time
-  (the common case) never shows the bug, which is presumably why it's gone
-  unnoticed.
+  (existing.show_project_view()/.raise_()/.activateWindow()) never called
+  set_controller() again. So with two project windows open, the global
+  stayed pinned to whichever was created MOST RECENTLY, and EVERY get_*()
+  call from EITHER window's code - including this API's own "ricke.iso3"
+  auto-lock (_resolve_iso3() in gui/api/pages/carbon_emission.py) and
+  currency lookup (_result_for()) - could silently read the OTHER window's
+  data instead of its own. Not introduced by social_cost_data; a pre-
+  existing app-wide bug (affects real GUI code too - currency suffixes,
+  country-lock combos, etc. on any widget using common_requested_data) that
+  this endpoint's own multi-window testing happened to expose clearly.
 
-  Section 8's checks are left asserting the CORRECT desired behavior (not
-  weakened to match the bug), so they stay a red/failing regression signal
-  until common_requested_data is made per-window-aware - fixing that is a
-  real refactor (every get_*() call site would need a controller/project
-  reference instead of relying on the shared global), out of scope for this
-  test file. If 8c/8d/8e fail and section 0-7's country-agnostic checks all
-  pass, this is almost certainly why - it is not a signal that
-  social_cost_data's own validate/merge/lock logic broke.
+  Fixed in two places:
+    - gui/api/bridge.py's ApiBridge._find_window() now re-syncs the global
+      to the resolved window's own controller before any chunk-specific
+      hook runs - every bridge method resolves its target window through
+      here, so this fixes every current and future page's API-triggered
+      reads generically, with no registry/hook-contract or per-page changes.
+    - gui/project_window.py's ProjectWindow.changeEvent() now re-asserts
+      itself as the active controller on OS-level window activation (click,
+      alt-tab), fixing the equivalent GUI-only case (a human clicking
+      between windows with no API involved) - not exercised by this script
+      (no way to drive OS window focus from an HTTP test), verify that path
+      manually if it's ever in question again.
+
+  Section 8's checks assert the CORRECT desired behavior and passed cleanly
+  (twice in a row, for determinism) against the fixed code. If 8c/8d/8e
+  start failing again in the future, treat it as this exact regression
+  resurfacing, not a break in social_cost_data's own validate/merge/lock
+  logic - re-check bridge.py's _find_window() first.
 """
 
 import json
@@ -250,9 +254,20 @@ ok("example_post_body_custom has a 'custom' key with scc_value",
 # 3. GET baseline data shape
 # ============================================================================
 step("3. GET social_cost_data - baseline data shape")
+# A genuinely fresh, never-saved-to project legitimately returns {} here (no
+# keys at all) - the four sub-keys only exist once something has actually
+# been written (matches the GUI: SCCWidget.get_data_dict() only produces
+# them when called, which happens on save, not just on page construction).
+# So "data has each key" is only asserted for a project already known to
+# have prior social_cost_data state - otherwise just confirm GET succeeds
+# with SOME dict (possibly empty) and don't assert individual keys.
 data = scd.get("data", {})
-for key in ("source", "ricke", "custom", "result"):
-    ok(f"data has {key!r}", key in data)
+if data:
+    for key in ("source", "ricke", "custom", "result"):
+        ok(f"data has {key!r}", key in data)
+else:
+    print("  data is {} (fresh/never-saved project) - skipping per-key checks, that's expected")
+ok("data is a dict either way", isinstance(data, dict))
 baseline = get_data(project_id, TOKEN)
 
 
@@ -451,9 +466,11 @@ ok("GET social_cost_data -> data unaffected by any of the misrouted shortcut cal
 # whether the .pkl changed before assuming the API logic broke.
 # ============================================================================
 step("8. Setting up dedicated India (Ricke-covered) and Singapore (not covered) projects")
-print("  NOTE: 8c/8d/8e below can fail due to a KNOWN PRE-EXISTING bug, not a "
-      "regression in social_cost_data itself - see this file's module docstring "
-      "('KNOWN PRE-EXISTING BUG') before treating a failure here as a real break.")
+print("  NOTE: 8c/8d/8e guard against a real, previously-found multi-window "
+      "global-controller bug (fixed in bridge.py's _find_window() - see this "
+      "file's module docstring, 'PRE-EXISTING BUG, FOUND AND FIXED HERE') - "
+      "a failure here means that regression resurfaced, not a break in "
+      "social_cost_data's own logic.")
 if args.ricke_project_id:
     print(f"  reusing --ricke-project-id {args.ricke_project_id}")
     if not ok("India-project (--ricke-project-id) is reachable",
@@ -504,10 +521,18 @@ if india is not None:
 if singapore is not None:
     sgp_id, sgp_token, _ = singapore
 
-    step("8c. Singapore (not in Ricke DB): full combo, iso3 OMITTED -> falls back to WLD, exact expected cost")
+    step("8c. Singapore (not in Ricke DB): full combo, iso3 EXPLICITLY CLEARED -> falls back to WLD, exact expected cost")
+    # This project persists across reruns of this script (--sgp-project-id
+    # reuse) and 8e below deliberately leaves iso3 set to a real value
+    # ("GBR") at the end of its own run - so simply OMITTING "iso3" here
+    # would just preserve whatever a PRIOR run left behind (correct
+    # _resolve_iso3 behavior, not a bug) rather than exercising the "unset"
+    # fallback this check is actually about. Explicitly clear it to the
+    # GUI's own unset-combo placeholder first, same fix as section 4p.
     status, r = call("POST", f"/{sgp_id}/social_cost_data", token=sgp_token,
                       body={"source": _SOURCE_RICKE,
-                            "ricke": {**_GOOD_RICKE_BASE, "usd_to_local_rate": 1.35, "cpi_ratio": 1.1}})
+                            "ricke": {**_GOOD_RICKE_BASE, "iso3": "-- select --",
+                                      "usd_to_local_rate": 1.35, "cpi_ratio": 1.1}})
     ok("POST -> 200", status == 200, detail=str(r))
     ok("ricke.iso3 fell back to 'WLD' (not locked - Singapore has no SCC DB row)",
        r.get("data", {}).get("ricke", {}).get("iso3") == "WLD")
