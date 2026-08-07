@@ -24,3 +24,4 @@ from . import financial_data  # noqa: F401
 from . import maintenance  # noqa: F401
 from . import demolition  # noqa: F401
 from . import structure  # noqa: F401
+from . import carbon_emission  # noqa: F401

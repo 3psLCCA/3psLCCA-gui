@@ -29,9 +29,23 @@ they only accumulate within whichever single script imported this module.
 import argparse
 import http.client
 import json
+import sys
 import time
 import urllib.error
 import urllib.request
+
+# Windows' default console codepage (cp1252) can't encode plenty of
+# characters this app's own data legitimately contains (kgCO2e's subscript,
+# degree signs, eta in SCC discounting labels, etc.) - without this, a
+# print() of a real API response/error containing one of those crashes the
+# whole test run with UnicodeEncodeError instead of reporting a clean
+# [FAIL]. reconfigure() is a no-op (silently ignored) on stdout streams
+# that don't support it (rare, but be defensive rather than raise here).
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
 
 BASE_URL = "http://127.0.0.1:8765"
 
