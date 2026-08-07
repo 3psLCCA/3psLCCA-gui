@@ -19,7 +19,7 @@ implementation plan for every remaining GUI page.
 | Demolition                | `Demolition`          | `demolition_data`            | ✅ done |
 | Traffic Data              | `TrafficData`         | `traffic_and_road_data`      | planned — Tier B |
 | Construction Works Data   | `StructureTabView`    | `str_super_structure`, `str_sub_structure`, `str_foundation`, `str_misc` (read-only: `str_component_registry`; internal: `str_summary`) | ✅ done (Tier C) |
-| Carbon Emissions Data     | `CarbonEmissionTabView` | `transport_emissions_data`, `machinery_emissions_data`, `diversion_emissions`, `social_cost_data` (internal: `transport_data`; `material_emissions_data` **not exposed** — see note below) | planned — Tier C |
+| Carbon Emissions Data     | `CarbonEmissionTabView` | `social_cost_data` ✅ done; `transport_emissions_data`, `machinery_emissions_data`, `diversion_emissions` still planned — Tier C (internal: `transport_data`; `material_emissions_data` **not exposed** — see note below) | in progress — Tier C |
 | Recycling                 | `Recycling`           | **no API of its own** — controlled entirely via `str_*` entry writes (see note below) | — |
 | Results                   | `OutputsPage`         | `outputs_data`               | planned — Tier D (read-only) |
 | *(app-level)* Material catalog search | — (`MaterialSearchEngine`, no widget) | — (reads SOR JSON databases, not chunks) | ✅ done (Tier E, read-only, no Qt) |
@@ -46,6 +46,37 @@ endpoints (not chunk-addressed).
 - `gui/api/tokens.py` — per-project in-memory bearer tokens (`X-API-Token`).
 - `gui/api/image_upload.py` — `upload_img` fields accept base64 or an http(s) URL.
 - UI: File → API Access dialog; Settings → "Enable local API server".
+- `ApiBridge._find_window()` (`bridge.py`) also re-syncs
+  `common_requested_data`'s single process-wide "active controller" global to the
+  resolved window's own controller before any chunk-specific hook runs (fixed
+  2026-08-07 — see "Multi-window controller bug" below). Any future hook that calls
+  `get_currency()`/`get_project_country()`/`get_project_iso3()`/etc. with no
+  arguments gets the right project's data for free through this, same as every
+  existing bridge method — no extra wiring needed per page.
+
+### Multi-window controller bug (found + fixed 2026-08-07)
+
+`gui/components/utils/common_requested_data.py` backs ~15 zero-argument `get_*()`
+helpers (`get_currency`, `get_project_country`, `get_project_iso3`, `get_bridge_data`,
+…) with a single module-level `_controller` global. It was only ever set once, in
+`ProjectManager._create_window()` — never updated when an already-open window is
+merely refocused — so with 2+ project windows open, any of these helpers (from
+either window's code, GUI or API-triggered) could silently return the wrong
+project's data. Caught by `social_cost_data`'s own multi-window regression tests
+(section 8 of `devtools/test apis/social_cost_data.test.py`) during its `ricke.iso3`
+auto-lock work. Fixed in two places:
+
+- `gui/api/bridge.py`'s `ApiBridge._find_window()` — every bridge method resolves
+  its target window through here first, so re-syncing the global there fixes every
+  API-triggered read generically, with no registry/hook-contract or per-page changes.
+- `gui/project_window.py`'s `ProjectWindow.changeEvent()` — re-asserts itself on
+  OS-level window activation (click, alt-tab), fixing the equivalent pure-GUI case
+  (not exercisable from an HTTP test; verify manually if ever in question again).
+
+Any future Tier B/C page whose validator/merge/schema logic calls one of these
+`get_*()` helpers is now safe by construction, as long as it runs inside a bridge
+call (validate_payload/merge_payload/refresh_widget hooks all do) — no need to
+thread a controller through by hand.
 
 ## Prerequisite: registry extensions (one-time, before Tiers B–D)
 
@@ -269,10 +300,61 @@ Each tab of `CarbonEmissionTabView` owns its own chunk; register each individual
 | Chunk | Tab widget | Shape / notes |
 |---|---|---|
 | `diversion_emissions` | `TrafficEmissions` | Standard BaseDataWidget with `DIRECT_FIELDS` FieldDefs → register like Tier A but `page_name` resolution goes through the tab view — use `refresh_via_signal` path instead. |
-| `social_cost_data` | `SCCWidget` | Small form (`_SELECTOR_FIELDS`) + SCC database selection; register FieldDefs; `refresh_via_signal`. |
+| `social_cost_data` | `SCCWidget` | ✅ **done** — see below. |
 | `machinery_emissions_data` | `MachineryEmissions` | `LUMPSUM_ELEC_FIELDS`/`LUMPSUM_FUEL_FIELDS` FieldDefs + per-machine table → FieldDefs plus a `schema` block for the table; custom validator/merge. |
 | `transport_emissions_data` | `TransportEmissions` | Table of transport legs; hand-written `schema`; custom validator/merge. It also stages the internal `transport_data` chunk — that one stays unregistered or `read_only`. |
 | `material_emissions_data` | `MaterialEmissions` | **Not exposed** — derived view over `str_*` entries; see decision note below. |
+
+**`social_cost_data` — done.** `widget_map["Carbon Emissions Data"]` only ever
+returns the `CarbonEmissionTabView` container (no `get_data_dict()`/`load_data_dict()`
+of its own), so this registers Tier C style like the others (`field_defs=None`,
+`refresh_via_signal=True`), not the FieldDef-form path originally sketched above.
+Implementation in `gui/api/pages/carbon_emission.py`:
+
+- **Shape**: `{source, ricke: {...}, custom: {...}, result: {...}}` — two mutually
+  exclusive modes selected by `source`; both `ricke`/`custom` sub-objects are always
+  stored (switching modes doesn't lose the inactive one's inputs); `result` is
+  server-computed and rejected if written directly.
+- **Validation**: only the *active* mode's fields are required (Custom has none
+  required, matching the GUI). A Ricke-mode combination that resolves to no row in
+  the underlying SCC pickle DB (`cscc_db.pkl`) is rejected with a clear error — this
+  includes a real pre-existing dataset quirk (some "no data" cells are stored as the
+  literal string `"NA"` instead of `NaN`, which raises instead of cleanly reporting
+  "no row" for `discounting="Fixed 3%"/"Fixed 5%"`; confirmed dataset-wide, not
+  country-specific). The validity check and the saved-result computation both run
+  through the same function (`_ricke_cost()`), not two independently-maintained
+  code paths.
+- **`ricke.iso3` auto-lock**: mirrors `RickeWidget._apply_country_lock()` exactly —
+  auto-set and locked (caller overrides silently ignored) when the project's own
+  country has data in the SCC DB, otherwise caller-editable and defaults to `WLD`.
+  Token-friendly by design: the schema does **not** enumerate the ~170-code options
+  list for this field (it did originally; removed after review — see "token
+  budget" note below), just a `note` explaining the auto behavior; validity is
+  still fully enforced via the same `_ricke_cost()` combination check, not an
+  enum check.
+- **GUI refresh**: `refresh_widget` hook finds the `SCCWidget` tab and calls its
+  `refresh_from_engine()` — reused, not reimplemented. One extra step was needed
+  beyond that: `refresh_from_engine()` reloads field values but (because
+  `load_data_dict()` blocks widget signals while setting them) doesn't itself
+  retrigger `RickeWidget._print_ricke_cost()`, the method that repaints the
+  displayed SCC value/range labels — so the hook also calls that explicitly,
+  scoped to the API write path only (no change to `RickeWidget` itself).
+- **Token-budget lesson for remaining Tier C pages**: a hand-written `schema` must
+  not use `"fields"` as its top-level key — `server.py`'s GET route treats a
+  top-level `"fields"` key as the FieldDef-flat-list shape and forwards *only* that
+  key, silently dropping `description`/`update_semantics`/examples/everything else
+  (this endpoint's `schema` originally used `"fields"` and hit exactly this before a
+  test caught it). Use a different name (`field_groups` here) for a nested/grouped
+  field schema. Also avoid enumerating large option lists in a schema when the field
+  is normally auto-derived/locked — put a short `note` there instead and let the
+  real validation (against the live list) happen server-side; only surface the full
+  list in the error message on an actual violation, not on every GET.
+- **Tests**: `devtools/test apis/social_cost_data.test.py` — exhaustive, covers
+  schema shape/token-budget regressions, the full validation matrix, merge/PATCH
+  nesting semantics, custom-mode round trip, the `iso3` lock/fallback behavior
+  against two dedicated India/Singapore throwaway projects with hardcoded exact
+  expected SCC values, and the multi-window controller bug (see architecture recap
+  above) as an explicit regression check.
 
 **Material emissions: no API — decision.** `material_emissions_data` holds no
 editable data (`MaterialEmissions.get_data()` stores only a derived summary
@@ -454,9 +536,10 @@ the window appears, `general_info` shows the locked country/currency; `POST
 6. **Tier C**: structure chunks (including the carbon/recyclability entry rules —
    that single write path covers Material Emissions and Recycling, which have no
    API of their own) → remaining carbon chunks (`diversion_emissions`,
-   `social_cost_data`, `machinery_emissions_data`, `transport_emissions_data`).
-   Ship Tier E before/with the structure chunks, since search → insert-row is the
-   workflow that makes writable `str_*` chunks usable to an agent.
+   ~~`social_cost_data`~~ ✅ done, `machinery_emissions_data`,
+   `transport_emissions_data`). Ship Tier E before/with the structure chunks, since
+   search → insert-row is the workflow that makes writable `str_*` chunks usable to
+   an agent.
 
 Each step is independently shippable; `api_usage_readme.md` gets its
 `available_pages` list and any new schema conventions updated per step.
