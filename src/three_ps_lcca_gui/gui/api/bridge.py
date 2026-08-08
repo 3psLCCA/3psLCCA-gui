@@ -37,34 +37,84 @@ class ApiBridge(QObject):
         except queue.Empty:
             return {"error": "timeout"}
 
+    # Methods that mutate a project (or recompute/lock it, in validate_all's
+    # case) - gated below on the project NOT being locked, in one place,
+    # rather than each handler checking for itself. "get"/"get_tokens"/
+    # "list_projects"/"open_project"/"create_project"/"unlock" are
+    # deliberately excluded: reads always work while locked (same as the
+    # GUI - locked fields are disabled, not hidden), and "unlock" is the
+    # only way OUT of the locked state, so it can never itself be blocked
+    # by it.
+    _WRITE_METHODS = {"update", "add_from_catalog", "add_manual", "trash_by_id", "validate_all"}
+
     # ── Runs on the Qt main thread ──────────────────────────────────────────
     def _handle(self, method: str, project_id: str, chunk: str, payload, result_q: queue.Queue):
         try:
-            if method == "get":
-                result = self._get(project_id, chunk)
-            elif method == "update":
-                result = self._update(project_id, chunk, payload)
-            elif method == "add_from_catalog":
-                result = self._add_from_catalog(project_id, chunk, payload)
-            elif method == "add_manual":
-                result = self._add_manual(project_id, chunk, payload)
-            elif method == "trash_by_id":
-                result = self._trash_by_id(project_id, chunk, payload)
-            elif method == "list_projects":
-                result = self._list_projects()
-            elif method == "open_project":
-                result = self._open_project(project_id)
-            elif method == "create_project":
-                result = self._create_project(payload)
-            elif method == "get_tokens":
-                result = self._get_tokens(project_id)
-            elif method == "validate_all":
-                result = self._validate_all(project_id)
+            if method in self._WRITE_METHODS:
+                win = self._find_window(project_id)
+                if win is None:
+                    result = {"error": "project_not_open"}
+                elif win._frozen:
+                    # Mirrors every page widget's own freeze(True) - a locked
+                    # project's fields are disabled for editing in the GUI
+                    # (protects a completed calculation from silent
+                    # invalidation), and every mutating API route honors the
+                    # same rule in this one place rather than each writing
+                    # straight past it through the controller. POST
+                    # /{project_id}/unlock first.
+                    result = {"error": "project_locked"}
+                else:
+                    result = self._dispatch(method, project_id, chunk, payload)
             else:
-                result = {"error": f"unknown_method:{method}"}
+                result = self._dispatch(method, project_id, chunk, payload)
         except Exception as e:
             result = {"error": str(e)}
         result_q.put(result)
+
+    def _dispatch(self, method: str, project_id: str, chunk: str, payload) -> dict:
+        if method == "get":
+            return self._get(project_id, chunk)
+        elif method == "update":
+            return self._update(project_id, chunk, payload)
+        elif method == "add_from_catalog":
+            return self._add_from_catalog(project_id, chunk, payload)
+        elif method == "add_manual":
+            return self._add_manual(project_id, chunk, payload)
+        elif method == "trash_by_id":
+            return self._trash_by_id(project_id, chunk, payload)
+        elif method == "list_projects":
+            return self._list_projects()
+        elif method == "open_project":
+            return self._open_project(project_id)
+        elif method == "create_project":
+            return self._create_project(payload)
+        elif method == "get_tokens":
+            return self._get_tokens(project_id)
+        elif method == "validate_all":
+            return self._validate_all(project_id)
+        elif method == "unlock":
+            return self._unlock(project_id)
+        else:
+            return {"error": f"unknown_method:{method}"}
+
+    def _unlock(self, project_id: str) -> dict:
+        """Powers POST /{project_id}/unlock - the only way out of the
+        locked state (see _WRITE_METHODS's gate in _handle()). Reuses
+        ProjectWindow.apply_lock_state(False) - the exact state-change logic
+        the GUI's own lock button runs on a confirmed unlock (clears cached
+        results, unfreezes every page widget, resets the lock icon/tooltip)
+        - but skips _on_lock_toggled()'s confirmation dialog entirely: there
+        is no human to click "Yes" on an API call, and calling this
+        dedicated endpoint at all is itself the explicit intent a dialog
+        would otherwise exist to confirm. Idempotent - unlocking an
+        already-unlocked project is a no-op success, not an error."""
+        win = self._find_window(project_id)
+        if win is None:
+            return {"error": "project_not_open"}
+        if not win._frozen:
+            return {"ok": True, "status": "already_unlocked"}
+        win.apply_lock_state(False)
+        return {"ok": True, "status": "unlocked"}
 
     def _get_tokens(self, project_id: str) -> dict:
         win = self._find_window(project_id)
@@ -126,29 +176,44 @@ class ApiBridge(QObject):
             }
 
     def _validate_all(self, project_id: str) -> dict:
-        """Powers GET /{project_id}/validate - actually operates the
-        Results page's "Calculate" button (ProjectWindow._run_calculate(),
-        the exact slot self.btn_calculate.clicked is wired to), not a
-        reimplementation of it, so the open GUI window's Results page
-        updates exactly like a native click would: an error/warning report
-        if anything's wrong, or a success indicator plus the real
-        calculation (OutputsPage.run_calculation() launches that on its own
-        QThread and returns immediately - non-blocking, so this call itself
-        stays fast; the Results view then updates itself asynchronously off
-        _on_calc_finished() same as always) if the project is clean, and
-        either way the visible content_stack navigates to the Results page
-        and the sidebar selection follows, same as a human click.
+        """Powers GET /{project_id}/validate. Same aggregate check the
+        Results page's "Calculate" button runs (every page's validate() ->
+        {page: [errors]}/{page: [warnings]}), then - if there are zero
+        errors - the real LCC calculation, with the open window's Results
+        page ending up in the exact same state a native click leaves it in
+        (error report, or the full computed results view).
 
-        _run_calculate() itself returns nothing (it's a GUI slot, not a
-        query) - the errors/warnings this route's JSON response needs are
-        computed here via the same per-page validate() aggregation
-        OutputsPage.run_validation() uses internally, run BEFORE calling
-        _run_calculate() so this response reflects the exact state that
-        real call is about to (re-)validate. validate() is a pure read of
-        already-current in-memory field state (no engine write, no dialog),
-        so computing it here first and letting _run_calculate() compute the
-        identical thing again internally is redundant but harmless - not a
-        race, since both run synchronously on this same main-thread call."""
+        Deliberately DIVERGES from the GUI's own gating here: natively,
+        OutputsPage.run_validation() only auto-calculates when BOTH errors
+        and warnings are zero - if there are only warnings, it shows them
+        plus a "Run the LCC analysis" button and waits for a human click.
+        There's no human to click here, and warnings are advisory-only by
+        definition (see gui/components/utils/VALIDATION.md) - the response
+        already surfaces them under "warnings" for the caller to inspect -
+        so this route calculates whenever errors are zero, regardless of
+        warnings, rather than making the caller poll/re-POST to confirm.
+
+        Also deliberately does NOT drive this through
+        OutputsPage.run_calculation() (which hands the work to a QThread +
+        worker and returns immediately, so the GUI stays responsive while it
+        runs). That threading exists to keep a human's UI from freezing
+        during a live click; it buys nothing here - this call is already
+        blocking the HTTP request until it returns. Instead it reuses the
+        exact same worker class run_calculation() would (calc_logic.py's
+        _LCCAWorker - not reimplemented), but calls its .run() directly
+        instead of via QThread.start(): .run() is a plain method, and
+        called this way its finished/errored signals fire as ordinary
+        same-thread direct calls before .run() returns, so the result is
+        available synchronously with no thread or event loop needed. The
+        result then feeds into OutputsPage's own _on_calc_finished()/
+        _on_calc_errored() - the exact methods the QThread path itself calls
+        on completion - so the widget ends up in an identical state (results
+        cached, success/error view rendered).
+
+        The computed numbers are never persisted to the "outputs_data" chunk
+        on disk (only a UI status flag is - see OutputsPage._save_state()),
+        so returning them here, read via get_export_data(), is the only way
+        an API caller ever sees them."""
         win = self._find_window(project_id)
         if win is None:
             return {"error": "project_not_open"}
@@ -157,11 +222,12 @@ class ApiBridge(QObject):
 
         for name in win._page_names:
             win._get_or_create_widget(name)
-        win.outputs_page.register_pages(win.widget_map)
+        op = win.outputs_page
+        op.register_pages(win.widget_map)
 
         all_errors: dict = {}
         all_warnings: dict = {}
-        for name, page in win.outputs_page._pages.items():
+        for name, page in op._pages.items():
             res = page.validate()
             if isinstance(res, dict):
                 if res.get("errors"):
@@ -175,10 +241,75 @@ class ApiBridge(QObject):
                 elif status == ValidationStatus.WARNING:
                     all_warnings[name] = issues
 
-        # The real button handler - updates the open window's Results page
-        # (error/warning report, or success + async calculation) exactly
-        # like a native click, and navigates the visible window there.
-        win._run_calculate()
+        results = None
+        if not all_errors:
+            from three_ps_lcca_gui.gui.components.outputs.calc_logic import _LCCAWorker
+            from three_ps_lcca_gui.gui.components.utils.common_requested_data import get_currency
+
+            all_data = {}
+            for name, page in op._pages.items():
+                if hasattr(page, "get_data"):
+                    res = page.get_data()
+                    all_data[res["chunk"]] = res["data"]
+
+            op._last_all_data = all_data
+            op._currency = get_currency()
+            analysis_period = int(all_data.get("bridge_data", {}).get("analysis_period", 0))
+
+            # Reuses the exact same worker class run_calculation() hands to a
+            # QThread - only the threading is skipped. .run() is a plain
+            # method; called directly (not moved to a thread, never started
+            # via QThread.start()) it executes on this thread, so its
+            # finished/errored signals fire as ordinary direct calls to the
+            # lambdas below, synchronously, before run() returns.
+            worker = _LCCAWorker(all_data, analysis_period)
+            outcome: dict = {}
+            worker.finished.connect(
+                lambda r, ad, lb: outcome.update(ok=True, results=r, all_data=ad, lcc_breakdown=lb)
+            )
+            worker.errored.connect(
+                lambda exc, tb: outcome.update(ok=False, exc=exc, tb=tb)
+            )
+            worker.run()
+
+            # _save_cache_on_finish left unset deliberately: getattr(...,
+            # True) inside _on_calc_finished() then defaults to True, same
+            # as run_calculation()'s own default - a successful calculation
+            # here marks the project "fit_for_comparison" (comparison-cache
+            # meta) and, via the calculation_completed signal ProjectWindow
+            # connects to _on_calculation_done(), LOCKS the project - same
+            # as a human's Calculate click. That lock is intentional, core
+            # behavior (protects computed results from silent invalidation)
+            # - not something this route suppresses. Once locked, further
+            # writes (including another /validate) are rejected by the
+            # per-route lock check below/in _update() until POST
+            # /{project_id}/unlock explicitly clears it (see _unlock()).
+            if outcome.get("ok"):
+                op._on_calc_finished(outcome["results"], outcome["all_data"], outcome["lcc_breakdown"])
+            else:
+                op._on_calc_errored(outcome.get("exc", RuntimeError("calculation failed")), outcome.get("tb", ""))
+
+            if outcome.get("ok"):
+                results = op.get_export_data()
+                # get_export_data()'s "all_data" (every input page's full
+                # raw chunk data - just an echo of what was already POSTed;
+                # dwarfed everything else here, ~98% of bytes in testing)
+                # and "lcc_breakdown" (report-building intermediate, not
+                # meant for direct reading) are useful to other callers
+                # (PDF export) but not to this response - drop both here
+                # only, not from get_export_data() itself.
+                if results is not None:
+                    results = {k: v for k, v in results.items() if k not in ("all_data", "lcc_breakdown")}
+        else:
+            op.show_results(all_errors, all_warnings)
+
+        # Navigate the visible window to Results, same as a native click
+        # (ProjectWindow._run_calculate()'s own tail end - replicated here
+        # since this path no longer calls that method).
+        win.content_stack.setCurrentWidget(op)
+        items = win.sidebar.findItems("Results", Qt.MatchExactly)
+        if items:
+            win.sidebar.setCurrentItem(items[0])
 
         # Maps each page name in errors/warnings to the chunk id(s) an API
         # caller would GET/POST to actually fix something on that page - a
@@ -199,6 +330,7 @@ class ApiBridge(QObject):
             "errors": all_errors,
             "warnings": all_warnings,
             "page_chunks": {name: page_chunks.get(name, []) for name in set(all_errors) | set(all_warnings)},
+            "results": results,
         }
 
     def _find_window(self, project_id: str):

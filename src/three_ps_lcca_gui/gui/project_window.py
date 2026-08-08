@@ -844,11 +844,25 @@ class ProjectWindow(QMainWindow):
                 self.btn_lock.setChecked(True)
                 self.btn_lock.blockSignals(False)
                 return
+        self.apply_lock_state(checked)
+
+    def apply_lock_state(self, checked: bool):
+        """Actually applies the locked/unlocked state - clearing cached
+        results on unlock, freezing/unfreezing every page widget, and
+        syncing the lock button's checked state/icon/tooltip. Split out of
+        _on_lock_toggled() so ApiBridge._unlock() (POST /{project_id}/unlock)
+        can apply the same state change without that method's confirmation
+        dialog - a deliberate API call to a dedicated unlock endpoint is
+        itself the confirmation, same as a human clicking "Yes"."""
+        if not checked and self.outputs_page._has_results:
             self.outputs_page.reset_for_edit()
             self.actionExportResultsJSON.setEnabled(False)
             self.actionExportAllDataJSON.setEnabled(False)
 
         self._frozen = checked
+        self.btn_lock.blockSignals(True)
+        self.btn_lock.setChecked(checked)
+        self.btn_lock.blockSignals(False)
         self.btn_lock.setIcon(
             make_icon("lock", color=get_token("base")) if checked
             else make_icon("lock-open", color=get_token("text"))

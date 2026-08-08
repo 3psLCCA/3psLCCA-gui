@@ -241,30 +241,66 @@ def _help_payload() -> dict:
                     "Actually operates the GUI's own \"Calculate\" button - "
                     "the open project window's Results page updates exactly "
                     "like a native click (error/warning report, or a success "
-                    "indicator plus the real calculation, which runs "
-                    "asynchronously and does not block this response). "
-                    "Never changes any stored chunk data - only Results-page "
-                    "cache/UI state, same as clicking the button yourself."
+                    "indicator plus the real calculation). If the project is "
+                    "clean, this call waits for that calculation to finish "
+                    "and returns its results in the same response - the "
+                    "computed numbers are never persisted to disk, only kept "
+                    "in memory on the Results page, so this is the only way "
+                    "to read them via the API. Never changes any stored "
+                    "chunk data - only Results-page cache/UI state, same as "
+                    "clicking the button yourself. If the project is "
+                    "already locked (see POST /{project_id}/unlock below), "
+                    "this returns 423 project_locked instead of recalculating."
                 ),
                 "response": (
                     "{\"project_id\", \"valid\": bool, "
                     "\"errors\": {<page name>: [msg, ...]}, "
                     "\"warnings\": {<page name>: [msg, ...]}, "
-                    "\"page_chunks\": {<page name>: [chunk id, ...]}}. ERRORS "
-                    "must be resolved - they block calculation (\"valid\": "
-                    "true means zero errors across every page). WARNINGS "
-                    "never block anything - advisory only. \"page_chunks\" "
-                    "maps each page name appearing in errors/warnings to the "
-                    "chunk id(s) to GET/POST to fix it (a page name alone "
-                    "isn't directly callable, and one page can span several "
+                    "\"page_chunks\": {<page name>: [chunk id, ...]}, "
+                    "\"results\": {results, analysis_period, currency} | "
+                    "null - \"all_data\" (every input page's full raw chunk "
+                    "data, just an echo of what was already POSTed - "
+                    "dwarfed everything else here, ~98% of bytes) and "
+                    "\"lcc_breakdown\" (an internal report-building "
+                    "intermediate, not meant for direct reading) are "
+                    "deliberately excluded. ERRORS must be "
+                    "resolved - they block calculation (\"valid\": true "
+                    "means zero errors across every page, and is required "
+                    "for \"results\" to be non-null). WARNINGS never block "
+                    "anything - advisory only. \"page_chunks\" maps each "
+                    "page name appearing in errors/warnings to the chunk "
+                    "id(s) to GET/POST to fix it (a page name alone isn't "
+                    "directly callable, and one page can span several "
                     "chunks). Pages with neither an error nor a warning are "
-                    "omitted everywhere. If \"valid\" is true, the "
-                    "calculation was also just kicked off on the open window "
-                    "(non-blocking) - this response reflects the validation "
-                    "state at call time, not the calculation's own result."
+                    "omitted everywhere."
                 ),
                 "example": (
                     f"curl {base}/proj_a1b2c3d4/validate "
+                    "-H 'X-API-Token: <token>'"
+                ),
+            },
+            {
+                "method": "POST",
+                "path": "/{project_id}/unlock",
+                "auth_required": True,
+                "summary": (
+                    "The only way to clear a locked project (see "
+                    "project_locked in the error catalogue below) - every "
+                    "write route, including GET /{project_id}/validate, "
+                    "returns 423 while locked. Reuses the GUI lock button's "
+                    "own unlock logic, minus its confirmation dialog (this "
+                    "call is itself the confirmation)."
+                ),
+                "response": (
+                    "{\"project_id\", \"status\": \"unlocked\"|"
+                    "\"already_unlocked\", \"note\"}. Idempotent - "
+                    "unlocking an already-unlocked project is a no-op 200, "
+                    "not an error. Clears the cached calculation results and "
+                    "re-enables editing on every page; does not change any "
+                    "input data."
+                ),
+                "example": (
+                    f"curl -X POST {base}/proj_a1b2c3d4/unlock "
                     "-H 'X-API-Token: <token>'"
                 ),
             },
@@ -467,6 +503,7 @@ def _help_payload() -> dict:
                 {"status": 404, "error": "project_not_open", "meaning": "The project exists but is not open in the app.", "resolve": "POST /projects/open, then retry once it has finished opening."},
                 {"status": 404, "error": "not_found", "meaning": "Unknown route or page name.", "resolve": "Check \"available_pages\" in the response and the endpoints list here."},
                 {"status": 404, "error": "not_supported", "meaning": "This chunk doesn't support add_from_catalog (only Construction Works str_* chunks do).", "resolve": "Use POST /{project_id}/{chunk} with \"catalog_item\" or \"values\" instead."},
+                {"status": 423, "error": "project_locked", "meaning": "A calculation has completed and the project's inputs are frozen (same as the GUI's lock button) - every write route, including GET /{project_id}/validate, is blocked while locked.", "resolve": "POST /{project_id}/unlock, then retry."},
             ],
         },
     }
@@ -564,6 +601,27 @@ def _not_found_info() -> dict:
         "available_pages": sorted(CHUNK_PAGE_MAP.keys()),
         **_usage_info(),
     }
+
+
+def _locked_response(result: dict):
+    # Shared by every write route (POST .../{chunk}, add_from_catalog,
+    # add_manual, trash, and GET .../validate) - ApiBridge._handle() gates
+    # all of them on the same "project_locked" check (see its _WRITE_METHODS
+    # set) before ever reaching their own handler, so this one response
+    # shape covers every caller. 423 Locked is the correct HTTP status for
+    # "the resource is locked" - distinct from 405 (read_only_chunk, which
+    # never becomes writable) since a locked project unlocks.
+    return jsonify({
+        **result,
+        "message": (
+            "This project is locked (either a calculation completed and "
+            "auto-locked it, or a human locked it manually via the GUI's "
+            "lock button) - its inputs are frozen either way. POST "
+            "/{project_id}/unlock first to clear any results and resume "
+            "editing."
+        ),
+        **_usage_info(),
+    }), 423
 
 
 def _create_app(bridge: ApiBridge) -> Flask:
@@ -763,11 +821,25 @@ def _create_app(bridge: ApiBridge) -> Flask:
         if not tokens.check_token(project_id, provided):
             return jsonify({"error": "unauthorized", **_usage_info()}), 401
 
-        result = bridge.call("validate_all", project_id, "", timeout=30.0)
+        # timeout > the bridge's own 60s calculation-wait safety cap (see
+        # ApiBridge._validate_all()), so a slow-but-real calculation gets to
+        # finish rather than this route returning {"error": "timeout"} first.
+        result = bridge.call("validate_all", project_id, "", timeout=75.0)
         if "error" in result:
             if result["error"] == "project_not_open":
                 return jsonify({**result, **_not_found_info()}), 404
+            if result["error"] == "project_locked":
+                return _locked_response(result)
             return jsonify({**result, **_usage_info()}), 400
+
+        # Only mention error-resolution guidance when there actually are
+        # errors - stating "errors need to be resolved" on an already-clean
+        # response is noise, not guidance.
+        note_parts = []
+        if result["errors"]:
+            note_parts.append("Errors must be resolved before calculating.")
+        if result["warnings"]:
+            note_parts.append("Warnings are advisory only.")
 
         return jsonify({
             "project_id": project_id,
@@ -775,21 +847,13 @@ def _create_app(bridge: ApiBridge) -> Flask:
             "errors": result["errors"],
             "warnings": result["warnings"],
             "page_chunks": result["page_chunks"],
-            "note": (
-                "Errors NEED TO BE RESOLVED - they block calculation entirely, "
-                "same as the GUI (\"valid\": true means zero errors across "
-                "every page). Warnings do NOT block anything - they CAN JUST "
-                "BE CHECKED in this JSON response and left as-is if "
-                "acceptable; nothing further is required for them. "
-                "errors/warnings are keyed by page name (e.g. \"Bridge Data\"), "
-                "each a list of human-readable messages - same aggregate check "
-                "the GUI's own \"Calculate\" button runs before computing "
-                "results. \"page_chunks\" maps each page name that appears "
-                "above to the chunk id(s) to GET/POST to actually fix it (a "
-                "page name alone isn't directly callable, and one page can "
-                "span several chunks - e.g. \"Carbon Emissions Data\" is "
-                "social_cost_data, machinery_emissions_data, and others)."
-            ),
+            "results": result["results"],
+            "note": " ".join(note_parts + [
+                "Keyed by page name. \"page_chunks\" maps each page to the "
+                "chunk id(s) to GET/POST to fix it. \"results\" "
+                "({results, analysis_period, currency}) is non-null only "
+                "when \"valid\" is true."
+            ]),
         })
 
     @app.get("/<project_id>/<chunk>")
@@ -858,6 +922,8 @@ def _create_app(bridge: ApiBridge) -> Flask:
                     "message": "This page's data is computed/managed by the app and cannot be written via the API.",
                     **_usage_info(),
                 }), 405
+            if result["error"] == "project_locked":
+                return _locked_response(result)
             return jsonify({**result, **_usage_info()}), 400
 
         response = {
@@ -894,6 +960,8 @@ def _create_app(bridge: ApiBridge) -> Flask:
                     "message": "This page doesn't support add_from_catalog.",
                     **_usage_info(),
                 }), 404
+            if result["error"] == "project_locked":
+                return _locked_response(result)
             return jsonify({**result, **_usage_info()}), 400
 
         response = {
@@ -928,6 +996,8 @@ def _create_app(bridge: ApiBridge) -> Flask:
                     "message": "This page doesn't support add_manual.",
                     **_usage_info(),
                 }), 404
+            if result["error"] == "project_locked":
+                return _locked_response(result)
             return jsonify({**result, **_usage_info()}), 400
 
         return jsonify({
@@ -995,12 +1065,40 @@ def _create_app(bridge: ApiBridge) -> Flask:
                     "message": "This page doesn't support the /trash shortcut.",
                     **_usage_info(),
                 }), 404
+            if result["error"] == "project_locked":
+                return _locked_response(result)
             return jsonify({**result, **_usage_info()}), 400
 
         return jsonify({
             "project_id": project_id,
             "chunk": chunk,
             "data": result["data"],
+        })
+
+    @app.post("/<project_id>/unlock")
+    def unlock_project(project_id):
+        # The only way out of the locked state every write route above (and
+        # GET .../validate) is gated on - see ApiBridge._handle()'s
+        # _WRITE_METHODS check and _unlock(). Idempotent: unlocking an
+        # already-unlocked project is a no-op 200, not an error.
+        provided = request.headers.get("X-API-Token")
+        if not tokens.check_token(project_id, provided):
+            return jsonify({"error": "unauthorized", **_usage_info()}), 401
+
+        result = bridge.call("unlock", project_id, "")
+        if "error" in result:
+            if result["error"] == "project_not_open":
+                return jsonify({**result, **_not_found_info()}), 404
+            return jsonify({**result, **_usage_info()}), 400
+
+        return jsonify({
+            "project_id": project_id,
+            "status": result["status"],
+            "note": (
+                "Unlocking clears the cached calculation results and "
+                "re-enables editing on every page, same as the GUI's lock "
+                "button - it does not itself change any input data."
+            ),
         })
 
     register_catalog_routes(app, _usage_info)

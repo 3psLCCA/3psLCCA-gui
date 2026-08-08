@@ -21,9 +21,10 @@ implementation plan for every remaining GUI page.
 | Construction Works Data   | `StructureTabView`    | `str_super_structure`, `str_sub_structure`, `str_foundation`, `str_misc` (read-only: `str_component_registry`; internal: `str_summary`) | ✅ done (Tier C) |
 | Carbon Emissions Data     | `CarbonEmissionTabView` | `social_cost_data` ✅ done; `machinery_emissions_data` ✅ done; `transport_emissions_data`, `diversion_emissions` still planned — Tier C (internal: `transport_data`; `material_emissions_data` **not exposed** — see note below) | in progress — Tier C |
 | Recycling                 | `Recycling`           | **no API of its own** — controlled entirely via `str_*` entry writes (see note below) | — |
-| Results                   | `OutputsPage`         | `outputs_data`               | planned — Tier D (read-only) |
+| Results                   | `OutputsPage`         | `outputs_data` (results themselves folded into `GET /{project_id}/validate` — see below) | ✅ done (Tier D) |
 | *(app-level)* Material catalog search | — (`MaterialSearchEngine`, no widget) | — (reads SOR JSON databases, not chunks) | ✅ done (Tier E, read-only, no Qt) |
 | *(app-level)* Project lifecycle | — (`ProjectManager` / `SafeChunkEngine` statics) | — (list/create/open/close projects) | ✅ done (Tier E — list/active/open/new; close and delete not exposed) |
+| *(app-level)* `GET /{project_id}/validate` | `OutputsPage.run_validation()` + `run_calculation()` (real button handler) | — (aggregate errors/warnings + `page_chunks` + computed `results` across all pages) | ✅ done |
 
 Tiers: **A** = registration-only (FieldDef form, copy the existing pattern).
 **B** = FieldDef form plus nested/custom data needing schema + validator hooks.
@@ -447,17 +448,32 @@ page's own `recycling_data` chunk stays unregistered.
 
 ### Tier D — read-only
 
-#### 8. Results (`outputs_data`)
+#### 8. Results — ✅ done, folded into `GET /{project_id}/validate`
 
-- `OutputsPage` computes LCC summaries into `outputs_data` (outputs_page.py, `CHUNK =
-  "outputs_data"`, state persisted via `fetch_chunk`).
-- Register with `read_only=True` and a minimal hand-written `schema` describing the
-  result structure. `GET` only; `POST` → `405 read_only_chunk` with a message telling
-  the caller results are computed from the input chunks.
-- This is the endpoint that makes the API genuinely useful to agents (change inputs →
-  read outcomes), so do it **early** despite being listed last — it's tiny.
-- Future (out of scope here): a `recompute` command so an agent can force a fresh
-  calculation without opening the Results page.
+The `outputs_data` chunk on disk only ever holds a UI status flag
+(`{status, data}`) — the actual computed numbers live only in-memory on
+`OutputsPage` (`_last_results`/`_last_all_data`/`_last_lcc_breakdown`,
+read via `get_export_data()`), so a plain `read_only` chunk registration
+would return almost nothing useful. Instead of a separate endpoint,
+`GET /validate` (see the row above) returns
+`"results": {results, analysis_period, currency}` in the same response
+whenever there are **zero errors** (warnings do **not** gate it, unlike
+the GUI's own button-gated behavior when only warnings exist — no human
+to click here, and warnings are already surfaced in the response for
+inspection). `results.results` is the raw, unmodified return value of
+`run_full_lcc_analysis()`. `all_data` (~98% of response bytes in
+testing — just an echo of already-POSTed input) and `lcc_breakdown` (an
+internal report-building intermediate) are deliberately dropped from
+this response, though `get_export_data()` itself still returns both for
+its other callers (PDF export).
+
+Calculation runs exactly **once**, synchronously, reusing `_LCCAWorker`
+(calc_logic.py) directly — its `.run()` is called inline instead of via
+`QThread.start()`, so `finished`/`errored` fire as ordinary same-thread
+calls with no thread/event-loop wait needed. The result feeds into
+`OutputsPage._on_calc_finished()`/`_on_calc_errored()` (the same methods
+the native async path calls), so the open GUI window's Results page ends
+up in an identical state — no separate/duplicate calculation for the GUI.
 
 ### Tier E — app-level service endpoints
 
@@ -584,12 +600,12 @@ the window appears, `general_info` shows the locked country/currency; `POST
    `ProjectManager.create_project()` extraction). Independent of the registry
    extensions; high agent value — after this step an agent can go from cold start to
    working on a project without a human opening anything.
-4. **Tier D**: `outputs_data` read-only — small, high agent value.
+4. ~~**Tier D**: `outputs_data` read-only~~ ✅ done — folded into `GET /validate`.
 5. **Tier B**: `traffic_and_road_data`.
 6. **Tier C**: structure chunks (including the carbon/recyclability entry rules —
    that single write path covers Material Emissions and Recycling, which have no
    API of their own) → remaining carbon chunks (`diversion_emissions`,
-   ~~`social_cost_data`~~ ✅ done, `machinery_emissions_data`,
+   ~~`social_cost_data`~~ ✅ done, ~~`machinery_emissions_data`~~ ✅ done,
    `transport_emissions_data`). Ship Tier E before/with the structure chunks, since
    search → insert-row is the workflow that makes writable `str_*` chunks usable to
    an agent.
