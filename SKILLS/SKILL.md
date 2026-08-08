@@ -75,10 +75,14 @@ This skill documents how to interact with the local HTTP API exposed by the runn
 * **Single-Entry Constraint (str_* chunks)**: For Construction Works chunks (`str_foundation`, `str_sub_structure`, `str_super_structure`, `str_misc`), each `POST` to `/{project_id}/{chunk}` can only create/update **exactly one entry, in exactly one component**. Batching multiple entries or components in one call is rejected.
 * **Request Bodies**: Parsed as JSON regardless of the `Content-Type` header sent.
 * **Catalog Scope**: `/catalog/*` endpoints are not project-scoped (the material database is shared across all projects) but still require a token — any currently-valid project token works. Always search the catalog before inventing rate or carbon values: `GET /catalog/search?q=...`, then send a result as `"catalog_item"` in a POST to a `str_*` chunk.
+* **Locked Projects Reject All Writes**: A project locks itself the moment `GET /validate` (or a human) runs a calculation with zero errors — this protects the computed results from being silently invalidated. While locked, **every** write endpoint (`POST /{project_id}/{page}`, `add_from_catalog`, `add_manual`, `trash`, and `GET /validate` itself) returns `423 project_locked`; `GET` reads keep working. Call `POST /{project_id}/unlock` first — see Section 4.
 
 ---
 
 ## 4. Data & Catalog Endpoints Reference
+
+### Token endpoint
+* **`GET`/`POST /{project_id}/get_tokens`** *(no token required — this is how you get one)* — One-shot handshake that pops an Allow/Deny dialog in the desktop app; blocks until a human responds (up to ~2 minutes) or one of the terminal cases in Section 2 fires (`denied`, `token_already_delivered`, `too_many_requests`, `project_not_open`). Returns `{"ok": true, "token": "..."}` on success. See Section 2 for the full result table, retry rules (never poll/retry this in a loop — one attempt, then fall back to File > API Access), and a ready-to-use Python helper.
 
 ### Project pages
 Valid `{page}` values: `bridge_data`, `demolition_data`, `financial_data`, `general_info`, `maintenance_data`, `str_component_registry`, `str_foundation`, `str_misc`, `str_sub_structure`, `str_super_structure`. (Confirm against `GET /help` — this list can change with app updates.)
@@ -91,6 +95,10 @@ Valid `{page}` values: `bridge_data`, `demolition_data`, `financial_data`, `gene
 * **`POST /{project_id}/{chunk}/add_manual`** — Add exactly one material with your own values, no catalog lookup: `{"component", "values": {"material_name", "unit", "quantity", "rate" required, ...optional}, "state": {"included_in_carbon_emission"?, "included_in_recyclability"?}, "custom_unit"?}`. Note the flat `{component, values}` shape — different from the generic endpoint's list-wrapped form. `carbon_unit_den` only needs the denominator (e.g. `"kg"`); the server builds the full `"kgCO₂e/<unit>"` string.
 * **`GET /{project_id}/{chunk}/trash`** — List only trashed entries (`state.in_trash=true`) across all components; components with none are omitted.
 * **`POST /{project_id}/{chunk}/trash`** — Trash or restore one entry by id: `{"id": "<entry-uuid>", "untrash"?: bool}` (default `false`). Idempotent.
+
+### Results & calculation (not chunk-scoped)
+* **`GET /{project_id}/validate`** *(token required)* — Runs the same aggregate check the GUI's Calculate button runs: every page's own validation, keyed by page name (`{"errors": {...}, "warnings": {...}}` — errors block calculation, warnings are advisory only and never block anything). If there are **zero errors**, it also runs the real life-cycle-cost calculation synchronously (this call waits for it) and **locks the project**, exactly like a successful native Calculate click. On success, `"results"` (`{results, analysis_period, currency}`) holds the actual computed output — this is the *only* way to read a calculation result via the API, since it's never written to disk. `"page_chunks"` maps each page name in `errors`/`warnings` to the chunk id(s) to fix it. Returns `423 project_locked` instead of recalculating if the project is already locked.
+* **`POST /{project_id}/unlock`** *(token required)* — The only way to clear a locked project. Clears the cached results and re-enables editing on every page; does not itself change any input data. Idempotent — unlocking an already-unlocked project returns `200` with `"status": "already_unlocked"`.
 
 ### Materials catalog
 * **`GET /catalog/databases`** — List available Schedule of Rates (SOR) databases (optional filters: `country`, `region`).
@@ -269,6 +277,7 @@ Errors are returned as JSON: `{"error": "<code>", "details"?: [...], "documentat
 | 404 | `project_not_open` | Project exists but isn't open in the app. | `POST /projects/open`, then retry once it's finished opening. |
 | 404 | `not_found` | Unknown route or page name. | Check `"available_pages"` in the response and `GET /help`. |
 | 404 | `not_supported` | Chunk doesn't support `add_from_catalog` (only `str_*` chunks do). | Use `POST /{project_id}/{chunk}` with `"catalog_item"` or `"values"` instead. |
+| 423 | `project_locked` | Project is locked (a calculation completed and auto-locked it, or a human locked it manually). Every write endpoint, including `GET /validate`, is blocked while locked. | `POST /{project_id}/unlock`, then retry. |
 | 403 | `denied` | User clicked Deny (or closed) the `/get_tokens` popup for this request. | Ask again for a fresh popup, or fall back to File > API Access. |
 | 403 | `token_already_delivered` | `/get_tokens` already handed this project's token out once this session. | Ask the user for it via File > API Access instead — it won't be resent automatically. |
 | 429 | `too_many_requests` | `/get_tokens` popup cap hit for this project this session. | Ask the user for it via File > API Access instead of retrying. |

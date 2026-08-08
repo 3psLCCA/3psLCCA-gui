@@ -57,6 +57,7 @@ Three kinds of pages exist, distinguishable by what `GET` returns:
   - [POST .../add_manual](#post-project_idchunkadd_manual)
   - [POST .../trash](#post-project_idchunktrash)
 - [Social Cost of Carbon (social_cost_data)](#social-cost-of-carbon-social_cost_data)
+- [Results & calculation (GET /validate, POST /unlock)](#results--calculation-get-validate-post-unlock)
 - [Material catalog search](#material-catalog-search)
 - [Image upload fields](#image-upload-fields)
 - [Disabling the API](#disabling-the-api)
@@ -489,6 +490,7 @@ one part of the request didn't take effect - see the example in
 | `404` | `{"error": "not_found", "usage": "...", "available_pages": [...], "documentation_url": "..."}` | The URL didn't match any known route at all (wrong path, typo'd page name, etc.) |
 | `400` | `{"error": "invalid_json_body", "documentation_url": "..."}` | `POST` body wasn't valid JSON |
 | `400` | `{"error": "invalid_field_values", "details": [...], "documentation_url": "..."}` | One or more keys/values in the body don't match the field schema (bad combo option, non-numeric value, out-of-range number, unrecognized key) - nothing is changed |
+| `423` | `{"error": "project_locked", "message": "...", "documentation_url": "..."}` | The project is locked (a calculation completed and auto-locked it, or a human locked it via the GUI) - every write route, including `GET /validate`, is blocked until you `POST /{project_id}/unlock` - see [Results & calculation](#results--calculation-get-validate-post-unlock) |
 
 Every error response, of every status, carries `documentation_url` (→ `/help`) -
 see [Discovery](#discovery--start-here-with-zero-prior-context).
@@ -760,6 +762,94 @@ no-data-in-the-database check, not a separate enum check.
 
 Not supported on this chunk (`404 not_supported`): `add_from_catalog`,
 `add_manual`, `trash` - those are `str_*`-only shortcuts.
+
+---
+
+## Results & calculation (`GET /validate`, `POST /unlock`)
+
+Not a chunk - these two project-wide routes operate the Results page's
+**Calculate** button and its **lock** button directly, the same way a human
+clicking them would.
+
+### `GET /{project_id}/validate`
+
+Runs the exact same check the GUI's Calculate button runs first: every
+page's own validation, aggregated by page name. If there are **zero
+errors**, it also runs the real life-cycle-cost calculation (synchronously
+- this call waits for it) and locks the project, exactly like a successful
+native click does.
+
+```json
+{
+  "project_id": "proj_a1b2c3d4",
+  "valid": true,
+  "errors": {},
+  "warnings": {
+    "Bridge Data": ["Carriageway Width is below 1.5 m - ..."]
+  },
+  "page_chunks": {
+    "Bridge Data": ["bridge_data"]
+  },
+  "results": {
+    "results": { "initial_stage": {"...": "..."}, "use_stage": {"...": "..."}, "...": "..." },
+    "analysis_period": 100,
+    "currency": "INR"
+  },
+  "note": "Warnings are advisory only. Keyed by page name. ..."
+}
+```
+
+- **`errors`/`warnings`** are `{<page name>: [message, ...]}`, keyed by
+  sidebar page name (e.g. `"Bridge Data"`, `"Carbon Emissions Data"`), not
+  by chunk - one page can cover several chunks. **Errors must be
+  resolved** - they block the calculation entirely, same as the GUI
+  (`"valid": true` means zero errors across every page). **Warnings never
+  block anything** - they're advisory only; this response is where you
+  check them, nothing further is required.
+- **`page_chunks`** maps every page name appearing in `errors`/`warnings`
+  to the chunk id(s) to `GET`/`POST` to actually fix it, since a page name
+  alone isn't a callable URL (e.g. `"Carbon Emissions Data"` →
+  `["machinery_emissions_data", "social_cost_data"]`).
+- **`results`** is the real computed LCC output - only non-null when
+  `"valid"` is `true`. It deliberately excludes `all_data` (an echo of
+  every input page's data you already have - it was ~98% of this
+  response's bytes before being dropped) and `lcc_breakdown` (an internal
+  report-building intermediate) - just `{results, analysis_period,
+  currency}`. This is the **only** way to read a computed result via the
+  API - the numbers are never written to disk, only kept in memory on the
+  open Results page.
+- If the project is **already locked**, this returns `423 project_locked`
+  instead of recalculating - `POST /unlock` first (see below). This
+  matches the GUI: the Calculate button itself is disabled while locked.
+
+### `POST /{project_id}/unlock`
+
+The only way to clear a locked project. A project locks itself whenever a
+calculation completes with zero errors (via `GET /validate` above, or a
+human clicking Calculate natively) - locking protects computed results
+from being silently invalidated by further edits. **Every write route**
+(every chunk `POST`, `add_from_catalog`, `add_manual`, `trash`, and
+`GET /validate` itself) returns `423 project_locked` while locked; `GET`
+reads always keep working (same as the GUI - locked fields are disabled,
+not hidden).
+
+```bash
+curl -X POST http://127.0.0.1:8765/proj_a1b2c3d4/unlock -H "X-API-Token: <token>"
+```
+
+```json
+{
+  "project_id": "proj_a1b2c3d4",
+  "status": "unlocked",
+  "note": "Unlocking clears the cached calculation results and re-enables editing on every page, same as the GUI's lock button - it does not itself change any input data."
+}
+```
+
+Idempotent - unlocking an already-unlocked project returns `200` with
+`"status": "already_unlocked"`, not an error. Reuses the GUI lock button's
+own unlock logic, minus its confirmation dialog (there's no human to click
+"Yes" on an API call - making this dedicated call at all is the
+confirmation).
 
 ---
 

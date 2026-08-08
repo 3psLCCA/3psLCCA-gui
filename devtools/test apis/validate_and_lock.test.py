@@ -198,21 +198,49 @@ if status == 200 and precheck.get("valid"):
     status, r = call("POST", f"/{project_id}/str_super_structure/trash", token=TOKEN, body={"id": "whatever"})
     ok("trash while locked -> 423", status == 423 and r.get("error") == "project_locked", detail=str(r))
 
-    step("5e. POST /unlock clears the lock - status 'unlocked'")
+    step("5e. Every other form page (Tier A) is also rejected with 423 while locked - "
+         "re-echoes each chunk's own currently-stored value for one field, so a 400 "
+         "(bad shape) can never be mistaken for the 423 this step is actually checking")
+    for chunk in ("bridge_data", "financial_data", "maintenance_data", "demolition_data"):
+        status, get_r = call("GET", f"/{project_id}/{chunk}", token=TOKEN)
+        if status != 200:
+            ok(f"{chunk}: could not GET current data to build a re-echo payload - skipping", False, detail=str(get_r))
+            continue
+        body = None
+        for k, v in get_r.get("data", {}).items():
+            if k == "agency_logo":  # huge base64 - not needed to prove the lock check
+                continue
+            if isinstance(v, (str, int, float, bool)):
+                body = {k: v}
+                break
+        if body is None:
+            ok(f"{chunk}: no simple field found to re-echo - skipping", False, detail=str(get_r.get("data")))
+            continue
+        status, r = call("POST", f"/{project_id}/{chunk}", token=TOKEN, body=body)
+        ok(f"{chunk} while locked -> 423 project_locked", status == 423 and r.get("error") == "project_locked",
+           detail=f"body={body} got status={status} r={r}")
+
+    step("5f. Nested-object Tier C chunks (Carbon Emissions Data) are also rejected with 423 while locked")
+    status, r = call("POST", f"/{project_id}/social_cost_data", token=TOKEN, body={"custom": {"scc_value": 1}})
+    ok("social_cost_data while locked -> 423", status == 423 and r.get("error") == "project_locked", detail=str(r))
+    status, r = call("POST", f"/{project_id}/machinery_emissions_data", token=TOKEN, body={"remarks": "should be rejected"})
+    ok("machinery_emissions_data while locked -> 423", status == 423 and r.get("error") == "project_locked", detail=str(r))
+
+    step("5g. POST /unlock clears the lock - status 'unlocked'")
     status, r = unlock(project_id, TOKEN)
     ok("POST /unlock -> 200, status 'unlocked'", status == 200 and r.get("status") == "unlocked", detail=str(r))
 
-    step("5f. Unlocking again is idempotent - status 'already_unlocked'")
+    step("5h. Unlocking again is idempotent - status 'already_unlocked'")
     status, r = unlock(project_id, TOKEN)
     ok("POST /unlock again -> 200, status 'already_unlocked'", status == 200 and r.get("status") == "already_unlocked", detail=str(r))
 
-    step("5g. Writes work again after unlock")
+    step("5i. Writes work again after unlock")
     marker2 = f"validate_and_lock.test.py post-unlock {time.strftime('%Y-%m-%d %H:%M:%S')}"
     status, r = call("POST", f"/{project_id}/general_info", token=TOKEN, body={"remarks": marker2})
     ok("write after unlock -> 200", status == 200, detail=str(r))
     ok("GET confirms the post-unlock write persisted", get_general_info(project_id, TOKEN).get("remarks") == marker2)
 else:
-    _skip += 8
+    _skip += 17
     print(f"  [SKIP] section 5 (full lock lifecycle) - this project's /validate returned "
           f"valid={precheck.get('valid')} (status {status}), not True. Pass a project with "
           f"zero validation errors via --project-id/--token to exercise this section.")
