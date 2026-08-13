@@ -101,6 +101,8 @@ Valid `{page}` values: `bridge_data`, `demolition_data`, `financial_data`, `gene
 * **`POST /{project_id}/unlock`** *(token required)* — The only way to clear a locked project. Clears the cached results and re-enables editing on every page; does not itself change any input data. Idempotent — unlocking an already-unlocked project returns `200` with `"status": "already_unlocked"`.
 
 ### Materials catalog
+> **For any task that involves finding a matching SOR catalog item from a user's plain-language description of an activity/material** (choosing a database, deriving search tokens, searching, and judging whether a result is a real match), **refer to the separate `SKILL-search-sor.md` skill** — it documents that end-to-end workflow in detail. The endpoint reference below is a quick summary only.
+
 * **`GET /catalog/databases`** — List available Schedule of Rates (SOR) databases (optional filters: `country`, `region`).
 * **`GET /catalog/components`** — Flat list of all component names across every material type.
 * **`GET /catalog/items?db_key=&region=&limit=&offset=`** — All catalog rows, optionally filtered (default limit 50, max 200). Note: `component` filter parameter is removed.
@@ -179,6 +181,8 @@ To prevent guessing search queries that return zero results:
 3. Note regional/SOR naming conventions: For example, in Maharashtra PWD SSR, pile cap items may be listed under `well cap` or `caps`, and `levelling` uses British double-l spelling.
 
 ### Step 5: Search, Discuss, and Add (NO ASSUMPTIONS)
+> **Use the `SKILL-search-sor.md` skill for the actual searching sub-workflow** (picking the database, fetching tokens, deriving search words from the user's request, searching, and vetting each result's description before presenting it). The steps below summarize that flow inline for convenience.
+
 Once suitable search keywords are identified:
 1. Perform full-text search query using `GET /catalog/search?q=<token>&db_key=<db_key>`. If it returns no results, try a couple of alternate tokens from `GET /catalog/tokens` before concluding there's genuinely no match — don't stop after a single query.
 2. If `add_from_catalog` fails with 400 because a material name exists in multiple categories (e.g. `TMT Fe500 Reinforcement Steel Bars`), send the full `catalog_item` object with `category` and `component` specified via `POST /{project_id}/{chunk}`.
