@@ -572,7 +572,7 @@ def _create_metric_card(name: str, color: str, pct: float, amount_str: str) -> Q
 
     # Row 2: Value
     val_lbl = QLabel(amount_str)
-    val_lbl.setFont(_f(FS_DISP, FW_BOLD))
+    val_lbl.setFont(_f(FS_XL, FW_BOLD))
     val_lbl.setStyleSheet(f"color: {get_token('text')}; border: none; background: transparent; padding-top: 1px;")
     item_v.addWidget(val_lbl)
 
@@ -610,14 +610,14 @@ def _create_total_block(total_val: float, currency: str) -> QFrame:
     tb_v.setSpacing(2)
 
     tlabel = QLabel("Total cost")
-    tlabel.setFont(_f(FS_XS, FW_NORMAL))
+    tlabel.setFont(_f(FS_SM, FW_MEDIUM))
     tlabel.setStyleSheet(f"color: {get_token('text_secondary')}; border: none; background: transparent;")
     tb_v.addWidget(tlabel)
 
     formatted_total = fmt_currency(total_val, currency, decimals=2, style="short", use_short_suffix=True).title()
     tvalue = QLabel(
-        f"<span style='font-size:16pt; font-weight:700; color:{get_token('text')};'>{formatted_total}</span> "
-        f"<span style='font-size:9.5pt; font-weight:500; color:{get_token('text_secondary')};'>{currency}</span>"
+        f"<span style='font-size:13pt; font-weight:700; color:{get_token('text')};'>{formatted_total}</span> "
+        f"<span style='font-size:8.5pt; font-weight:500; color:{get_token('text_secondary')};'>{currency}</span>"
     )
     tvalue.setTextFormat(Qt.RichText)
     tvalue.setStyleSheet("border: none; background: transparent;")
@@ -675,7 +675,7 @@ class AggregateChartWidget(QWidget):
 
         title = QLabel("Across 3 Stages")
         title.setAlignment(Qt.AlignLeft)
-        title.setFont(_f(FS_SUBHEAD, FW_BOLD))
+        title.setFont(_f(FS_XL, FW_BOLD))
         title.setStyleSheet(
             f"color: {get_token('text')}; border: none; background: transparent; letter-spacing: -0.2px;"
         )
@@ -684,7 +684,7 @@ class AggregateChartWidget(QWidget):
         sub_desc = QLabel(f"Total cost breakdown across 3 lifecycle stages, in {self._currency}.")
         sub_desc.setAlignment(Qt.AlignLeft)
         sub_desc.setWordWrap(True)
-        sub_desc.setFont(_f(FS_SM))
+        sub_desc.setFont(_f(FS_BASE))
         sub_desc.setStyleSheet(
             f"color: {get_token('text_secondary')}; border: none; background: transparent; line-height: 1.4;"
         )

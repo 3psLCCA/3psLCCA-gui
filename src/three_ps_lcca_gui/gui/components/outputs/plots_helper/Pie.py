@@ -268,7 +268,7 @@ class SimplePillarPlotter:
 
     def _fmt(self, val: float) -> str:
         if self.mode == "Percentage": return f"{val / (self.total or 1) * 100:.1f}%"
-        return fmt_currency(val, self.currency, decimals=0, style="short")
+        return fmt_currency(val, self.currency, decimals=2, style="short", use_short_suffix=True).title()
 
     def _hover(self, event):
         if not hasattr(self, "wedges") or not self.wedges:
@@ -334,9 +334,6 @@ class SimplePillarPlotter:
         self.ax.axis("off")
         self.ax.set_xlim(-1.85, 1.85)
         self.ax.set_ylim(-1.85, 1.85)
-        self.fig.text(0.98, 0.97, currency_note(self.currency),
-                      ha="right", va="top", fontsize=8,
-                      color=get_token("text"), alpha=0.85)
         return self.fig
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -374,7 +371,7 @@ class SustainabilityCircularPlotter:
 
     def _fmt(self, val: float) -> str:
         if self.mode == "Percentage": return f"{val / (self.total_value or 1) * 100:.1f}%"
-        return fmt_currency(val, self.currency, decimals=0, style="short")
+        return fmt_currency(val, self.currency, decimals=2, style="short", use_short_suffix=True).title()
 
     def _hover(self, event):
         if not hasattr(self, "outer_wedges") or not self.outer_wedges:
@@ -529,9 +526,6 @@ class SustainabilityCircularPlotter:
         self.ax.axis("off")
         self.ax.set_xlim(-2.1, 2.1)
         self.ax.set_ylim(-2.1, 2.1)
-        self.fig.text(0.98, 0.97, currency_note(self.currency),
-                      ha="right", va="top", fontsize=8,
-                      color=get_token("text"), alpha=0.85)
         return self.fig
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -583,7 +577,7 @@ class LCCPieWidget(QWidget):
         title_lbl = QLabel(_TAB_META[1]["title"])
         title_lbl.setAlignment(Qt.AlignLeft)
         title_lbl.setWordWrap(True)
-        title_lbl.setFont(_f(FS_SUBHEAD, FW_BOLD))
+        title_lbl.setFont(_f(FS_XL, FW_BOLD))
         title_lbl.setStyleSheet(
             f"color: {get_token('text')}; border: none; background: transparent; letter-spacing: -0.2px;"
         )
@@ -592,7 +586,7 @@ class LCCPieWidget(QWidget):
         desc_lbl = QLabel(f"Total cost breakdown across 3 sustainability pillars, in {self._currency}.")
         desc_lbl.setWordWrap(True)
         desc_lbl.setAlignment(Qt.AlignLeft)
-        desc_lbl.setFont(_f(FS_SM))
+        desc_lbl.setFont(_f(FS_BASE))
         desc_lbl.setStyleSheet(
             f"color: {get_token('text_secondary')}; border: none; background: transparent; line-height: 1.4;"
         )
@@ -609,9 +603,9 @@ class LCCPieWidget(QWidget):
         sum_pt = sum([v_eco, v_env, v_soc]) or 1.0
         p_eco, p_env, p_soc = v_eco / sum_pt * 100, v_env / sum_pt * 100, v_soc / sum_pt * 100
 
-        a_eco = fmt_currency(v_eco, self._currency, decimals=0, style="short", use_short_suffix=True).title()
-        a_env = fmt_currency(v_env, self._currency, decimals=0, style="short", use_short_suffix=True).title()
-        a_soc = fmt_currency(v_soc, self._currency, decimals=0, style="short", use_short_suffix=True).title()
+        a_eco = fmt_currency(v_eco, self._currency, decimals=2, style="short", use_short_suffix=True).title()
+        a_env = fmt_currency(v_env, self._currency, decimals=2, style="short", use_short_suffix=True).title()
+        a_soc = fmt_currency(v_soc, self._currency, decimals=2, style="short", use_short_suffix=True).title()
 
         card_eco = _create_metric_card("Economic", c_eco, p_eco, a_eco)
         card_env = _create_metric_card("Environmental", c_env, p_env, a_env)
