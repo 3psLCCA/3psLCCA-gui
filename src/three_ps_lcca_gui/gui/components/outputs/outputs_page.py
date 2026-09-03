@@ -1148,25 +1148,19 @@ class OutputsPage(ScrollableForm):
         self._last_results = results
         self._clear_status()
 
-        # Toolbar for results (PDF + Comparison)
-        toolbar_row = QWidget()
-        tl_h = QHBoxLayout(toolbar_row)
-        tl_h.setContentsMargins(0, 0, 0, SP3)
+        # Summary Header Row with actions on the right (PDF + Comparison)
+        header_row = QWidget()
+        header_row.setStyleSheet("background: transparent; border: none;")
+        tl_h = QHBoxLayout(header_row)
+        tl_h.setContentsMargins(0, SP3, 0, SP1)
         tl_h.setSpacing(SP3)
 
-        pdf_btn = QPushButton("Generate PDF Report")
-        pdf_btn.setFixedHeight(BTN_MD)
-        pdf_btn.setFont(_f(FS_BASE, FW_MEDIUM))
-        pdf_btn.setStyleSheet(btn_primary())
-        pdf_btn.clicked.connect(self._generate_pdf_report)
-        tl_h.addWidget(pdf_btn)
+        summary_heading = QLabel("Summary")
+        summary_heading.setFont(_f(FS_SUBHEAD, FW_BOLD))
+        summary_heading.setStyleSheet(f"color: {get_token('text')}; border: none; background: transparent;")
+        tl_h.addWidget(summary_heading)
 
-        # prov_btn = QPushButton("Generate Report V2")
-        # prov_btn.setFixedHeight(BTN_MD)
-        # prov_btn.setFont(_f(FS_BASE, FW_MEDIUM))
-        # prov_btn.setStyleSheet(btn_primary())
-        # prov_btn.clicked.connect(self._generate_provenance_report)
-        # tl_h.addWidget(prov_btn)
+        tl_h.addStretch()
 
         if COMPARISON_MODE:
             comp_btn = QPushButton("Add to Comparison ↗")
@@ -1177,15 +1171,20 @@ class OutputsPage(ScrollableForm):
             comp_btn.clicked.connect(self._on_compare_clicked)
             tl_h.addWidget(comp_btn)
 
-        tl_h.addStretch()
-        self._status_layout.addWidget(toolbar_row)
+        pdf_btn = QPushButton("Generate PDF Report")
+        pdf_btn.setFixedHeight(BTN_MD)
+        pdf_btn.setFont(_f(FS_BASE, FW_MEDIUM))
+        pdf_btn.setStyleSheet(btn_primary())
+        pdf_btn.clicked.connect(self._generate_pdf_report)
+        tl_h.addWidget(pdf_btn)
+
+        self._status_layout.addWidget(header_row)
 
         _bd = getattr(self, "_last_all_data", {}).get("bridge_data", {})
         _ap = int(_bd.get("analysis_period", 0))
         _yoc = int(_bd.get("year_of_construction", 0))
 
         sections = [
-            lambda r: _section_heading("Summary"),
             lambda r: LCCSummaryCards(r, currency=self._currency,
                                       analysis_period=_ap, year_of_construction=_yoc),
             lambda r: _divider(),
