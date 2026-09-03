@@ -28,6 +28,7 @@ from PySide6.QtWidgets import (
     QApplication,
     QBoxLayout,
     QCheckBox,
+    QHBoxLayout,
     QLabel,
     QSizePolicy,
     QStackedWidget,
@@ -39,9 +40,9 @@ from PySide6.QtWidgets import (
 
 from three_ps_lcca_gui.gui.theme import (
     FONT_FAMILY,
-    FS_SM, FS_BASE, FS_LG, FS_SUBHEAD, FS_XS, FS_MD,
-    FW_NORMAL, FW_BOLD,
-    SP2, SP4, SP6, RADIUS_LG, RADIUS_XL,
+    FS_XS, FS_SM, FS_BASE, FS_MD, FS_LG, FS_XL, FS_SUBHEAD, FS_DISP,
+    FW_NORMAL, FW_MEDIUM, FW_SEMIBOLD, FW_BOLD,
+    SP1, SP2, SP3, SP4, SP5, SP6, RADIUS_SM, RADIUS_MD, RADIUS_LG, RADIUS_XL,
 )
 from three_ps_lcca_gui.gui.themes import get_token
 from three_ps_lcca_gui.gui.styles import font as _f
@@ -129,11 +130,11 @@ def _build_pillar_data(results: dict) -> list:
 class _BasePlotter:
     def __init__(self, currency: str):
         self.currency = currency
-        self.fig = Figure(figsize=(9, 6))
+        self.fig = Figure(figsize=(8, 5))
         self.fig.patch.set_alpha(0.0)
         self.ax = self.fig.add_subplot(111)
         self.ax.set_facecolor("none")
-        self.fig.subplots_adjust(left=0.18, right=0.75, bottom=0.15, top=0.9)
+        self.fig.subplots_adjust(left=0.09, right=0.96, bottom=0.12, top=0.88)
         self.fig.canvas.mpl_connect("motion_notify_event", self._hover)
 
     def _hover(self, event):
@@ -154,43 +155,42 @@ class _BasePlotter:
         """To be implemented by subclasses. Returns (text, xy) or None."""
         return None
 
-    def _setup_spines(self, tc):
+    def _setup_spines(self, gc):
         for s in self.ax.spines.values():
             s.set_visible(False)
         for spine in ("left", "bottom"):
             self.ax.spines[spine].set_visible(True)
-            self.ax.spines[spine].set_edgecolor(tc)
-            self.ax.spines[spine].set_linewidth(0.8)
+            self.ax.spines[spine].set_edgecolor(gc)
+            self.ax.spines[spine].set_linewidth(1.0)
 
     def _setup_annotation(self, tc):
         self.annot = self.ax.annotate(
             "", xy=(0, 0), xytext=(15, 15), textcoords="offset points",
             bbox=dict(boxstyle="round,pad=0.5", fc=get_token("base"),
-                      ec=get_token("surface_mid"), alpha=0.9),
+                      ec=get_token("surface_mid"), alpha=0.95),
             zorder=10, fontweight="bold", color=tc, fontsize=8,
         )
         self.annot.set_visible(False)
 
     def _make_legend(self, handles, title, tc):
         leg = self.ax.legend(
-            handles=handles, title=title,
-            loc="center left", bbox_to_anchor=(1.02, 0.5),
-            frameon=False, fontsize=8, title_fontsize=9, labelcolor=tc,
+            handles=handles,
+            loc="upper right", ncol=len(handles),
+            frameon=False, fontsize=8.5, labelcolor=tc,
         )
-        plt.setp(leg.get_title(), color=tc)
 
-    def _setup_axes_style(self, tc, gc, x, xlabels, ylabel):
+    def _setup_axes_style(self, tc, gc, x, xlabels, ylabel=""):
         self.ax.set_xticks(x)
-        self.ax.set_xticklabels(xlabels, fontweight="bold", color=tc, fontsize=9)
-        self.ax.set_ylabel(ylabel, fontweight="bold", color=tc, fontsize=9)
-        self.ax.tick_params(axis="both", colors=tc, labelsize=8)
-        self.ax.yaxis.grid(True, linestyle="--", alpha=0.3, color=gc)
+        self.ax.set_xticklabels(xlabels, fontweight="bold", color=tc, fontsize=9.5)
+        self.ax.tick_params(axis="x", colors=tc, length=0)
+        self.ax.tick_params(axis="y", colors=get_token("text_secondary"), labelsize=8.5, length=3)
+        self.ax.yaxis.grid(True, linestyle="-", alpha=0.3, color=gc)
         self.ax.set_axisbelow(True)
 
     def _setup_y_formatter(self):
         self.ax.yaxis.set_major_formatter(
             matplotlib.ticker.FuncFormatter(
-                lambda v, _: fmt_currency(v, self.currency, decimals=0, style="short")
+                lambda v, _: fmt_currency(v, self.currency, decimals=0, style="short", use_short_suffix=True)
             )
         )
 
@@ -215,7 +215,7 @@ class StageBarPlotter(_BasePlotter):
             if p is not None and p.contains(event)[0]:
                 text = (
                     f"{self.labels[i]}\n"
-                    f"{fmt_currency(self.raw_values[i], self.currency, decimals=0, style='short')}"
+                    f"{fmt_currency(self.raw_values[i], self.currency, decimals=2, style='short', use_short_suffix=True)}"
                 )
                 return text, (event.xdata, event.ydata)
         return None
@@ -223,39 +223,45 @@ class StageBarPlotter(_BasePlotter):
     def setup_plot(self):
         tc = get_token("text")
         gc = get_token("surface_mid")
-        x  = np.arange(len(self.labels)) * 0.75
+        x  = np.arange(len(self.labels)) * 0.85
 
-        bars = self.ax.bar(x, self.values, color=self.colors, edgecolor="none", width=0.5)
+        bars = self.ax.bar(x, self.values, color=self.colors, edgecolor="none", width=0.45, zorder=3)
         self._patches = bars.patches
 
         max_v = max(self.values) if self.values else 1.0
         min_v = min(self.values) if self.values else 0.0
-        pad   = (max_v - min_v) * 0.12 or 1.0
+        total_span = max(max_v - min_v, 1.0)
+        pad   = total_span * 0.15
         for i, raw in enumerate(self.raw_values):
             val = self.values[i]
-            if val > 0:
-                self.ax.text(x[i], val + pad * 0.18,
-                    fmt_currency(raw, self.currency, decimals=0, style="short"),
-                    ha="center", va="bottom", fontsize=8, fontweight="bold", color=tc)
+            val_str = fmt_currency(raw, self.currency, decimals=2, style="short", use_short_suffix=True).title()
+            if val >= total_span * 0.08:
+                self.ax.text(x[i], val + pad * 0.05, val_str,
+                    ha="center", va="bottom", fontsize=10, fontweight="bold", color=tc, zorder=4)
+            elif val > 0:
+                # Smart callout for small stage bar
+                self.ax.annotate(
+                    val_str,
+                    xy=(x[i], val),
+                    xytext=(x[i], val + pad * 0.5),
+                    ha="center", va="bottom",
+                    fontsize=9, fontweight="bold", color=tc,
+                    bbox=dict(boxstyle="round,pad=0.25", fc=get_token("surface"),
+                              ec=get_token("surface_mid"), lw=1.0, alpha=0.95),
+                    arrowprops=dict(arrowstyle="-", color=get_token("surface_mid"), lw=1.0),
+                    clip_on=False, zorder=5,
+                )
             elif val < 0:
-                self.ax.text(x[i], val - pad * 0.18,
-                    fmt_currency(raw, self.currency, decimals=0, style="short"),
-                    ha="center", va="top", fontsize=8, fontweight="bold", color=tc)
+                self.ax.text(x[i], val - pad * 0.05, val_str,
+                    ha="center", va="top", fontsize=10, fontweight="bold", color=tc, zorder=4)
 
-        self._setup_axes_style(tc, gc, x, self.labels, "Cost")
+        self._setup_axes_style(tc, gc, x, self.labels)
         self._setup_y_formatter()
         if self.values:
-            self.ax.set_ylim(min(0, min_v) - pad, max(0, max_v) + pad)
+            self.ax.set_ylim(min(0, min_v) - pad * 0.2, max(0, max_v) + pad)
 
-        self._setup_spines(tc)
+        self._setup_spines(gc)
         self._setup_annotation(tc)
-        self._make_legend(
-            [Patch(facecolor=c, label=l) for l, c in zip(self.labels, self.colors)],
-            "Life Cycle Stages", tc,
-        )
-        self.fig.text(0.98, 0.97, currency_note(self.currency),
-                      ha="right", va="top", fontsize=8,
-                      color=get_token("text"), alpha=0.85)
         return self.fig
 
 
@@ -285,12 +291,12 @@ class SustainabilityBarPlotter(_BasePlotter):
                     if np.allclose(patch.get_facecolor()[:3],
                                    matplotlib.colors.to_rgb(PILLAR_COLORS[cat])):
                         x_pos     = patch.get_x() + patch.get_width() / 2
-                        stage_idx = int(round(x_pos / 0.75))
+                        stage_idx = int(round(x_pos / 0.85))
                         if 0 <= stage_idx < len(self.stages):
                             raw = self.raw_values[cat][stage_idx]
                             text = (
-                                f"{self.stages[stage_idx]}\n"
-                                f"{cat}: {fmt_currency(raw, self.currency, decimals=0, style='short')}"
+                                f"{self.stages[stage_idx]} — {cat}\n"
+                                f"{fmt_currency(raw, self.currency, decimals=2, style='short', use_short_suffix=True)}"
                             )
                             return text, (event.xdata, event.ydata)
         return None
@@ -298,21 +304,27 @@ class SustainabilityBarPlotter(_BasePlotter):
     def setup_plot(self):
         tc  = get_token("text")
         gc  = get_token("surface_mid")
-        x          = np.arange(len(self.stages)) * 0.75
+        x   = np.arange(len(self.stages)) * 0.85
         pos_bottom = np.zeros(len(self.stages))
         neg_bottom = np.zeros(len(self.stages))
 
-        # Pre-compute y range for label threshold (segments < 6% of range are skipped)
-        all_pos = sum(np.where(np.array(self.values[c]) > 0, np.array(self.values[c]), 0.0)
-                      for c in self.categories)
-        all_neg = sum(np.where(np.array(self.values[c]) < 0, np.array(self.values[c]), 0.0)
-                      for c in self.categories)
-        est_range    = float(np.max(all_pos) - np.min(all_neg)) or 1.0
-        min_label_h  = est_range * 0.06
-
-        # Environmental drawn last so it sits on top of the stack
+        # Stacking order: Economic -> Social -> Environmental
         draw_order = ["Economic", "Social", "Environmental"]
-        env_color  = PILLAR_COLORS["Environmental"]
+
+        # Pre-compute total span across all categories
+        for cat in draw_order:
+            vals = np.array(self.values[cat])
+            pos_bottom += np.where(vals > 0, vals, 0.0)
+            neg_bottom += np.where(vals < 0, vals, 0.0)
+
+        y_max = max(pos_bottom) if pos_bottom.any() else 1.0
+        y_min = min(neg_bottom) if neg_bottom.any() else 0.0
+        total_span = max(y_max - y_min, 1.0)
+        pad = total_span * 0.15
+
+        # Reset trackers for actual bar rendering
+        pos_bottom = np.zeros(len(self.stages))
+        neg_bottom = np.zeros(len(self.stages))
 
         for cat in draw_order:
             vals     = np.array(self.values[cat])
@@ -321,71 +333,67 @@ class SustainabilityBarPlotter(_BasePlotter):
             if pos_vals.any():
                 seg_bot = pos_bottom.copy()
                 self.ax.bar(x, pos_vals, bottom=pos_bottom,
-                    color=PILLAR_COLORS[cat], edgecolor="none", width=0.5)
+                    color=PILLAR_COLORS[cat], edgecolor="none", width=0.45, zorder=3)
                 pos_bottom += pos_vals
-                if cat != "Environmental":          # Env is always labelled above the bar
-                    for i, (v, b) in enumerate(zip(pos_vals, seg_bot)):
-                        if v >= min_label_h:
-                            self.ax.text(
-                                x[i], b + v / 2,
-                                f"{cat}\n{fmt_currency(v, self.currency, decimals=0, style='short')}",
-                                ha="center", va="center", fontsize=7, fontweight="bold",
-                                color="white", clip_on=True, linespacing=1.3,
-                            )
+                # Show value inside segment only if tall enough relative to total span (> 10% of chart)
+                for i, (v, b) in enumerate(zip(pos_vals, seg_bot)):
+                    if v >= 0.10 * total_span and pos_bottom[i] >= 0.15 * total_span:
+                        seg_text = fmt_currency(v, self.currency, decimals=2, style="short", use_short_suffix=True).title()
+                        self.ax.text(
+                            x[i], b + v / 2, seg_text,
+                            ha="center", va="center", fontsize=8.5, fontweight="bold",
+                            color="white", clip_on=True, zorder=4,
+                        )
             if neg_vals.any():
                 seg_bot = neg_bottom.copy()
                 self.ax.bar(x, neg_vals, bottom=neg_bottom,
-                    color=PILLAR_COLORS[cat], edgecolor="none", width=0.5)
+                    color=PILLAR_COLORS[cat], edgecolor="none", width=0.45, zorder=3)
                 neg_bottom += neg_vals
-                if cat != "Environmental":
-                    for i, (v, b) in enumerate(zip(neg_vals, seg_bot)):
-                        if abs(v) >= min_label_h:
-                            self.ax.text(
-                                x[i], b + v / 2,
-                                f"{cat}\n{fmt_currency(v, self.currency, decimals=0, style='short')}",
-                                ha="center", va="center", fontsize=7, fontweight="bold",
-                                color="white", clip_on=True, linespacing=1.3,
-                            )
+                for i, (v, b) in enumerate(zip(neg_vals, seg_bot)):
+                    if abs(v) >= 0.10 * total_span:
+                        seg_text = fmt_currency(v, self.currency, decimals=2, style="short", use_short_suffix=True).title()
+                        self.ax.text(
+                            x[i], b + v / 2, seg_text,
+                            ha="center", va="center", fontsize=8.5, fontweight="bold",
+                            color="white", clip_on=True, zorder=4,
+                        )
 
-        y_max = max(pos_bottom) if pos_bottom.any() else 0.0
-        y_min = min(neg_bottom) if neg_bottom.any() else 0.0
-        pad   = (y_max - y_min) * 0.22 or 1.0
-
+        # Smart Annotator for Bar Totals
         for i in range(len(self.stages)):
-            env_v = self.values["Environmental"][i] if self.values["Environmental"] else 0.0
-            if pos_bottom[i] > 0:
-                if env_v > 0:
-                    # Env label just above bar top
-                    self.ax.text(x[i], pos_bottom[i] + pad * 0.05,
-                        f"Environmental: \n{fmt_currency(env_v, self.currency, decimals=0, style='short')}",
-                        ha="center", va="bottom", fontsize=7.5, fontweight="bold",
-                        color=env_color, clip_on=False)
-                    # Total well above env label (single line, no overlap)
-                    self.ax.text(x[i], pos_bottom[i] + pad * 0.42,
-                        fmt_currency(pos_bottom[i], self.currency, decimals=0, style="short"),
-                        ha="center", va="bottom", fontsize=8, fontweight="bold", color=tc)
-                else:
-                    self.ax.text(x[i], pos_bottom[i] + pad * 0.12,
-                        fmt_currency(pos_bottom[i], self.currency, decimals=0, style="short"),
-                        ha="center", va="bottom", fontsize=8, fontweight="bold", color=tc)
-            if neg_bottom[i] < 0:
-                self.ax.text(x[i], neg_bottom[i] - pad * 0.12,
-                    fmt_currency(neg_bottom[i], self.currency, decimals=0, style="short"),
-                    ha="center", va="top", fontsize=8, fontweight="bold", color=tc)
+            pos_v = pos_bottom[i]
+            neg_v = neg_bottom[i]
+            net_v = pos_v + neg_v
 
-        self._setup_axes_style(tc, gc, x, self.stages, "Cost")
+            # If bar is tall (>= 8% of chart span)
+            if pos_v >= total_span * 0.08:
+                tot_str = fmt_currency(pos_v, self.currency, decimals=2, style="short", use_short_suffix=True).title()
+                self.ax.text(x[i], pos_v + pad * 0.05, tot_str,
+                    ha="center", va="bottom", fontsize=10, fontweight="bold", color=tc, zorder=4)
+            elif net_v != 0:
+                # Smart Callout with leader line for tiny bar (prevents overlapping numbers)
+                val_str = fmt_currency(net_v, self.currency, decimals=2, style="short", use_short_suffix=True).title()
+                self.ax.annotate(
+                    val_str,
+                    xy=(x[i], max(pos_v, 0)),
+                    xytext=(x[i], max(pos_v, 0) + pad * 0.5),
+                    ha="center", va="bottom",
+                    fontsize=9, fontweight="bold", color=tc,
+                    bbox=dict(boxstyle="round,pad=0.25", fc=get_token("surface"),
+                              ec=get_token("surface_mid"), lw=1.0, alpha=0.95),
+                    arrowprops=dict(arrowstyle="-", color=get_token("surface_mid"), lw=1.0),
+                    clip_on=False, zorder=5,
+                )
+
+        self._setup_axes_style(tc, gc, x, self.stages)
         self._setup_y_formatter()
-        self.ax.set_ylim(min(0, y_min) - pad * 0.3, max(0, y_max) + pad)
+        self.ax.set_ylim(min(0, y_min) - pad * 0.2, max(0, y_max) + pad)
 
-        self._setup_spines(tc)
+        self._setup_spines(gc)
         self._setup_annotation(tc)
         self._make_legend(
             [Patch(facecolor=PILLAR_COLORS[cat], label=cat) for cat in self.categories],
             "Sustainability Pillars", tc,
         )
-        self.fig.text(0.98, 0.97, currency_note(self.currency),
-                      ha="right", va="top", fontsize=8,
-                      color=get_token("text"), alpha=0.85)
         return self.fig
 
 
@@ -434,21 +442,24 @@ class PillarBreakdownBarPlotter(_BasePlotter):
     def setup_plot(self):
         tc  = get_token("text")
         gc  = get_token("surface_mid")
-        x   = np.arange(len(self.categories)) * 0.75
+        x   = np.arange(len(self.categories)) * 0.85
 
         pos_bottom = np.zeros(len(self.categories))
         neg_bottom = np.zeros(len(self.categories))
 
-        total_pos_per_cat = [
-            sum(max(0.0, self.raw_values[cat].get(st, 0)) for st in self.stages)
-            for cat in self.categories
-        ]
-        est_range   = max(total_pos_per_cat) if total_pos_per_cat else 1.0
-        min_label_h = est_range * 0.06
+        # Pre-compute total span
+        for stage in self.stages:
+            stage_vals = np.array([self.raw_values[cat].get(stage, 0.0) for cat in self.categories])
+            pos_bottom += np.where(stage_vals > 0, stage_vals, 0.0)
+            neg_bottom += np.where(stage_vals < 0, stage_vals, 0.0)
 
-        # missed[i] = [(abbrev, formatted_value, color), ...] - only used if no inside labels at all
-        missed:        dict[int, list] = {i: [] for i in range(len(self.categories))}
-        inside_count:  dict[int, int]  = {i: 0  for i in range(len(self.categories))}
+        y_max = float(np.max(pos_bottom)) if pos_bottom.any() else 1.0
+        y_min = float(np.min(neg_bottom)) if neg_bottom.any() else 0.0
+        total_span = max(y_max - y_min, 1.0)
+        pad = total_span * 0.15
+
+        pos_bottom = np.zeros(len(self.categories))
+        neg_bottom = np.zeros(len(self.categories))
 
         for stage in self.stages:
             color      = STAGE_COLORS.get(stage, "#AAAAAA")
@@ -459,94 +470,160 @@ class PillarBreakdownBarPlotter(_BasePlotter):
 
             if pos_vals.any():
                 seg_bot = pos_bottom.copy()
-                self.ax.bar(x, pos_vals, bottom=pos_bottom, color=color, edgecolor="none", width=0.5)
+                self.ax.bar(x, pos_vals, bottom=pos_bottom, color=color, edgecolor="none", width=0.45, zorder=3)
                 pos_bottom += pos_vals
                 for i, (v, b) in enumerate(zip(pos_vals, seg_bot)):
-                    if v >= min_label_h:
+                    if v >= 0.10 * total_span and pos_bottom[i] >= 0.15 * total_span:
+                        seg_text = fmt_currency(v, self.currency, decimals=2, style="short", use_short_suffix=True).title()
                         self.ax.text(
-                            x[i], b + v / 2,
-                            f"{stage}\n{fmt_currency(v, self.currency, decimals=0, style='short')}",
-                            ha="center", va="center", fontsize=7, fontweight="bold",
-                            color=lc, clip_on=True, linespacing=1.3,
+                            x[i], b + v / 2, seg_text,
+                            ha="center", va="center", fontsize=8.5, fontweight="bold",
+                            color=lc, clip_on=True, zorder=4,
                         )
-                        inside_count[i] += 1
-                    elif v > 0:
-                        missed[i].append((
-                            stage,
-                            fmt_currency(v, self.currency, decimals=0, style="short"),
-                            color,
-                        ))
             if neg_vals.any():
                 seg_bot = neg_bottom.copy()
-                self.ax.bar(x, neg_vals, bottom=neg_bottom, color=color, edgecolor="none", width=0.5)
+                self.ax.bar(x, neg_vals, bottom=neg_bottom, color=color, edgecolor="none", width=0.45, zorder=3)
                 neg_bottom += neg_vals
                 for i, (v, b) in enumerate(zip(neg_vals, seg_bot)):
-                    if abs(v) >= min_label_h:
+                    if abs(v) >= 0.10 * total_span:
+                        seg_text = fmt_currency(v, self.currency, decimals=2, style="short", use_short_suffix=True).title()
                         self.ax.text(
-                            x[i], b + v / 2,
-                            f"{stage}\n{fmt_currency(v, self.currency, decimals=0, style='short')}",
-                            ha="center", va="center", fontsize=7, fontweight="bold",
-                            color=lc, clip_on=True, linespacing=1.3,
+                            x[i], b + v / 2, seg_text,
+                            ha="center", va="center", fontsize=8.5, fontweight="bold",
+                            color=lc, clip_on=True, zorder=4,
                         )
-                        inside_count[i] += 1
-                    elif v < 0:
-                        missed[i].append((
-                            stage,
-                            fmt_currency(v, self.currency, decimals=0, style="short"),
-                            color,
-                        ))
 
-        y_max = float(np.max(pos_bottom)) if pos_bottom.any() else 0.0
-        y_min = float(np.min(neg_bottom)) if neg_bottom.any() else 0.0
-        pad   = (y_max - y_min) * 0.12 or 1.0
-
+        # Totals on top of bars
         for i in range(len(self.categories)):
-            if pos_bottom[i] > 0:
-                self.ax.text(x[i], pos_bottom[i] + pad * 0.18,
-                    fmt_currency(pos_bottom[i], self.currency, decimals=0, style="short"),
-                    ha="center", va="bottom", fontsize=8, fontweight="bold", color=tc)
-            if neg_bottom[i] < 0:
-                self.ax.text(x[i], neg_bottom[i] - pad * 0.18,
-                    fmt_currency(neg_bottom[i], self.currency, decimals=0, style="short"),
-                    ha="center", va="top", fontsize=8, fontweight="bold", color=tc)
+            pos_v = pos_bottom[i]
+            neg_v = neg_bottom[i]
+            net_v = pos_v + neg_v
 
-        # Callout boxes only when the bar had zero inside labels (all segments were tiny)
-        box_style = dict(boxstyle="round,pad=0.35", fc=get_token("base"),
-                         ec=get_token("surface_mid"), alpha=0.93, lw=0.8)
-        arrow_style = dict(arrowstyle="-", color=get_token("surface_mid"), lw=0.8)
-        for i, items in missed.items():
-            if not items or inside_count[i] > 0:
-                continue
-            label_text = "\n".join(f"{abbrev}: {val_str}" for abbrev, val_str, _ in items)
-            self.ax.annotate(
-                label_text,
-                xy=(x[i], pos_bottom[i]),
-                xytext=(x[i], pos_bottom[i] + pad * 0.9),
-                ha="center", va="bottom",
-                fontsize=6.5, fontweight="bold", color=tc,
-                bbox=box_style,
-                arrowprops=arrow_style,
-                clip_on=False,
-            )
+            if pos_v >= total_span * 0.08:
+                tot_str = fmt_currency(pos_v, self.currency, decimals=2, style="short", use_short_suffix=True).title()
+                self.ax.text(x[i], pos_v + pad * 0.05, tot_str,
+                    ha="center", va="bottom", fontsize=10, fontweight="bold", color=tc, zorder=4)
+            elif net_v != 0:
+                val_str = fmt_currency(net_v, self.currency, decimals=2, style="short", use_short_suffix=True).title()
+                self.ax.annotate(
+                    val_str,
+                    xy=(x[i], max(pos_v, 0)),
+                    xytext=(x[i], max(pos_v, 0) + pad * 0.5),
+                    ha="center", va="bottom",
+                    fontsize=9, fontweight="bold", color=tc,
+                    bbox=dict(boxstyle="round,pad=0.25", fc=get_token("surface"),
+                              ec=get_token("surface_mid"), lw=1.0, alpha=0.95),
+                    arrowprops=dict(arrowstyle="-", color=get_token("surface_mid"), lw=1.0),
+                    clip_on=False, zorder=5,
+                )
 
-        self._setup_axes_style(tc, gc, x, self.categories, "Cost")
+        self._setup_axes_style(tc, gc, x, self.categories)
         self._setup_y_formatter()
-        self.ax.set_ylim(min(0, y_min) - pad, max(0, y_max) + pad)
-        self._setup_spines(tc)
+        self.ax.set_ylim(min(0, y_min) - pad * 0.2, max(0, y_max) + pad)
+        self._setup_spines(gc)
         self._setup_annotation(tc)
         self._make_legend(
             [Patch(facecolor=STAGE_COLORS.get(st, "#AAAAAA"), label=st) for st in self.stages],
             "Life Cycle Stages", tc,
         )
-        self.fig.text(0.98, 0.97, currency_note(self.currency),
-                      ha="right", va="top", fontsize=8,
-                      color=get_token("text"), alpha=0.85)
         return self.fig
 
 
 # ─────────────────────────────────────────────────────────────────────────────
 # WIDGET
 # ─────────────────────────────────────────────────────────────────────────────
+# CARD HELPERS
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _create_metric_card(name: str, color: str, pct: float, amount_str: str) -> QFrame:
+    item = QFrame()
+    item.setStyleSheet(
+        f"QFrame {{"
+        f"  background-color: {get_token('surface')};"
+        f"  border: 1px solid {get_token('surface_mid')};"
+        f"  border-radius: {RADIUS_LG}px;"
+        f"}}"
+    )
+    item_v = QVBoxLayout(item)
+    item_v.setContentsMargins(SP3, SP3, SP3, SP3)
+    item_v.setSpacing(SP1)
+
+    # Row 1: dot + name on left, percentage on right
+    r1 = QHBoxLayout()
+    r1.setContentsMargins(0, 0, 0, 0)
+    r1.setSpacing(SP2)
+
+    dot = QLabel()
+    dot.setFixedSize(9, 9)
+    dot.setStyleSheet(f"background-color: {color}; border-radius: 4px; border: none;")
+    r1.addWidget(dot)
+
+    name_lbl = QLabel(name)
+    name_lbl.setFont(_f(FS_BASE, FW_SEMIBOLD))
+    name_lbl.setStyleSheet(f"color: {get_token('text')}; border: none; background: transparent;")
+    r1.addWidget(name_lbl)
+    r1.addStretch()
+
+    pct_lbl = QLabel(f"{pct:.1f}%")
+    pct_lbl.setFont(_f(FS_SM, FW_SEMIBOLD))
+    pct_lbl.setStyleSheet(f"color: {get_token('text_secondary')}; border: none; background: transparent;")
+    r1.addWidget(pct_lbl)
+    item_v.addLayout(r1)
+
+    # Row 2: Value
+    val_lbl = QLabel(amount_str)
+    val_lbl.setFont(_f(FS_DISP, FW_BOLD))
+    val_lbl.setStyleSheet(f"color: {get_token('text')}; border: none; background: transparent; padding-top: 1px;")
+    item_v.addWidget(val_lbl)
+
+    # Row 3: Bar track with progress fill
+    track = QFrame()
+    track.setFixedHeight(5)
+    track.setStyleSheet(f"background-color: {get_token('surface_mid')}; border-radius: 2px; border: none;")
+    track_l = QHBoxLayout(track)
+    track_l.setContentsMargins(0, 0, 0, 0)
+    track_l.setSpacing(0)
+
+    clamped_pct = max(0.0, min(100.0, pct))
+    fill_weight = int(round(clamped_pct))
+    empty_weight = int(round(100.0 - clamped_pct))
+
+    if fill_weight > 0:
+        fill = QFrame()
+        fill.setFixedHeight(5)
+        fill.setStyleSheet(f"background-color: {color}; border-radius: 2px; border: none;")
+        track_l.addWidget(fill, fill_weight)
+    if empty_weight > 0:
+        track_l.addStretch(empty_weight)
+
+    item_v.addWidget(track)
+    return item
+
+
+def _create_total_block(total_val: float, currency: str) -> QFrame:
+    total_block = QFrame()
+    total_block.setStyleSheet(
+        f"border: none; border-top: 1px solid {get_token('surface_mid')}; background: transparent;"
+    )
+    tb_v = QVBoxLayout(total_block)
+    tb_v.setContentsMargins(0, SP3, 0, 0)
+    tb_v.setSpacing(2)
+
+    tlabel = QLabel("Total cost")
+    tlabel.setFont(_f(FS_XS, FW_NORMAL))
+    tlabel.setStyleSheet(f"color: {get_token('text_secondary')}; border: none; background: transparent;")
+    tb_v.addWidget(tlabel)
+
+    formatted_total = fmt_currency(total_val, currency, decimals=2, style="short", use_short_suffix=True).title()
+    tvalue = QLabel(
+        f"<span style='font-size:16pt; font-weight:700; color:{get_token('text')};'>{formatted_total}</span> "
+        f"<span style='font-size:9.5pt; font-weight:500; color:{get_token('text_secondary')};'>{currency}</span>"
+    )
+    tvalue.setTextFormat(Qt.RichText)
+    tvalue.setStyleSheet("border: none; background: transparent;")
+    tb_v.addWidget(tvalue)
+    return total_block
+
 
 class AggregateChartWidget(QWidget):
     def __init__(self, results: dict, currency: str = "INR",
@@ -576,26 +653,44 @@ class AggregateChartWidget(QWidget):
         self.card.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
 
         self._card_layout = QBoxLayout(QBoxLayout.Direction.LeftToRight, self.card)
-        self._card_layout.setContentsMargins(SP6, SP6, SP6, SP6)
-        self._card_layout.setSpacing(SP6)
+        self._card_layout.setContentsMargins(0, 0, 0, 0)
+        self._card_layout.setSpacing(0)
 
-        # ── Text panel ───────────────────────────────────────────────────────
-        self._text_panel = QWidget()
-        self._text_panel.setStyleSheet("background: transparent; border: none;")
+        # ── Left panel ───────────────────────────────────────────────────────
+        self._text_panel = QFrame()
+        self._text_panel.setObjectName("aggTextPanel")
+        self._text_panel.setStyleSheet(
+            f"#aggTextPanel {{"
+            f"  background-color: {get_token('window')};"
+            f"  border-top-left-radius: {RADIUS_XL - 1}px;"
+            f"  border-bottom-left-radius: {RADIUS_XL - 1}px;"
+            f"  border-right: 1.5px solid {get_token('surface_mid')};"
+            f"}}"
+        )
+        self._text_panel.setFixedWidth(310)
+
         text_v = QVBoxLayout(self._text_panel)
-        text_v.setContentsMargins(0, 0, 0, 0)
-        text_v.setSpacing(SP4)
-        text_v.setAlignment(Qt.AlignCenter)
+        text_v.setContentsMargins(SP5, SP5, SP5, SP5)
+        text_v.setSpacing(SP3)
 
         title = QLabel("Across 3 Stages")
-        title.setAlignment(Qt.AlignCenter)
+        title.setAlignment(Qt.AlignLeft)
         title.setFont(_f(FS_SUBHEAD, FW_BOLD))
         title.setStyleSheet(
-            f"color: {get_token('text')}; border: none; background: transparent; letter-spacing: 0.5px;"
+            f"color: {get_token('text')}; border: none; background: transparent; letter-spacing: -0.2px;"
         )
         text_v.addWidget(title)
 
-        # Ratio box- normalized so smallest = 1
+        sub_desc = QLabel(f"Total cost breakdown across 3 lifecycle stages, in {self._currency}.")
+        sub_desc.setAlignment(Qt.AlignLeft)
+        sub_desc.setWordWrap(True)
+        sub_desc.setFont(_f(FS_SM))
+        sub_desc.setStyleSheet(
+            f"color: {get_token('text_secondary')}; border: none; background: transparent; line-height: 1.4;"
+        )
+        text_v.addWidget(sub_desc)
+
+        # Stage cards
         summary = compute_all_summaries(self._results)
         st      = summary.get("stagewise", {})
 
@@ -616,66 +711,31 @@ class AggregateChartWidget(QWidget):
         a_use = fmt_currency(v_use, self._currency, decimals=0, style="short", use_short_suffix=True).title()
         a_end = fmt_currency(v_end, self._currency, decimals=0, style="short", use_short_suffix=True).title()
 
-        _sep = f"<span style='color:{get_token('text_disabled')}'><b>:</b></span>"
+        card_init = _create_metric_card("Initial", c_init, p_ini, a_ini)
+        card_use  = _create_metric_card("Use", c_use, p_use, a_use)
+        card_end  = _create_metric_card("End-of-Life", c_end, p_end, a_end)
 
-        ratio_box = QFrame()
-        ratio_box.setStyleSheet(
-            f"background-color: {get_token('surface_mid', 'hover')}; "
-            f"border: 1px solid {get_token('surface_mid', 'focus')}; "
-            f"border-radius: {RADIUS_LG}px;"
-        )
-        ratio_box.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        rb_v = QVBoxLayout(ratio_box)
-        rb_v.setContentsMargins(SP4, SP4, SP4, SP4)
-        rb_v.setSpacing(SP2)
+        text_v.addWidget(card_init)
+        text_v.addWidget(card_use)
+        text_v.addWidget(card_end)
 
-        rb_label = QLabel(
-            f"<span style='color:{c_init}'>Initial</span> {_sep} "
-            f"<span style='color:{c_use}'>Use</span> {_sep} "
-            f"<span style='color:{c_end}'>End-of-Life</span>"
-        )
-        rb_label.setAlignment(Qt.AlignCenter)
-        rb_label.setWordWrap(True)
-        rb_label.setTextFormat(Qt.RichText)
-        rb_label.setFont(_f(FS_MD, FW_BOLD))
-        rb_label.setStyleSheet(f"color: {get_token('text')}; letter-spacing: 1.2px; border: none; background: transparent;")
-        rb_v.addWidget(rb_label)
+        text_v.addStretch()
 
-        rb_pct = QLabel(
-            f"<span style='color:{c_init}'>{p_ini:.1f}%</span> {_sep} "
-            f"<span style='color:{c_use}'>{p_use:.1f}%</span> {_sep} "
-            f"<span style='color:{c_end}'>{p_end:.1f}%</span>"
-        )
-        rb_pct.setAlignment(Qt.AlignCenter)
-        rb_pct.setTextFormat(Qt.RichText)
-        rb_pct.setFont(QFont("Consolas", FS_MD, FW_BOLD))
-        rb_pct.setStyleSheet("border: none; background: transparent;")
-        rb_v.addWidget(rb_pct)
-
-        rb_amt = QLabel(
-            f"<span style='color:{c_init}'>{a_ini}</span> {_sep} "
-            f"<span style='color:{c_use}'>{a_use}</span> {_sep} "
-            f"<span style='color:{c_end}'>{a_end}</span>"
-        )
-        rb_amt.setAlignment(Qt.AlignCenter)
-        rb_amt.setTextFormat(Qt.RichText)
-        rb_amt.setFont(_f(FS_MD, FW_BOLD))
-        rb_amt.setStyleSheet(f"border: none; background: transparent; color: {get_token('text_secondary')};")
-        rb_v.addWidget(rb_amt)
-
-        text_v.addWidget(ratio_box)
+        # Total Cost Block
+        total_val = v_ini + v_use + v_end
+        text_v.addWidget(_create_total_block(total_val, self._currency))
 
         # "Show pillar wise" checkbox
         self._pillar_cb = QCheckBox("Show pillar wise")
         self._pillar_cb.setFont(_f(FS_BASE))
         self._pillar_cb.setStyleSheet(
-            f"color: {get_token('text_secondary')}; background: transparent; border: none;"
+            f"color: {get_token('text_secondary')}; background: transparent; border: none; padding-top: {SP1}px;"
         )
-        text_v.addWidget(self._pillar_cb, 0, Qt.AlignCenter)
+        text_v.addWidget(self._pillar_cb)
 
         if self._note:
             note_lbl = QLabel(self._note)
-            note_lbl.setAlignment(Qt.AlignCenter)
+            note_lbl.setAlignment(Qt.AlignLeft)
             note_lbl.setWordWrap(True)
             note_lbl.setFont(_f(FS_XS, FW_NORMAL, italic=True))
             note_lbl.setStyleSheet(
@@ -683,7 +743,7 @@ class AggregateChartWidget(QWidget):
             )
             text_v.addWidget(note_lbl)
 
-        self._card_layout.addWidget(self._text_panel, 1)
+        self._card_layout.addWidget(self._text_panel)
 
         # ── Chart stack ──────────────────────────────────────────────────────
         self._chart_stack = QStackedWidget()
@@ -743,12 +803,35 @@ class AggregateChartWidget(QWidget):
         self._chart_cont = QWidget()
         self._chart_cont.setStyleSheet("background: transparent; border: none;")
         chart_cv = QVBoxLayout(self._chart_cont)
-        chart_cv.setContentsMargins(0, 0, 0, 0)
-        chart_cv.setSpacing(0)
-        chart_cv.addWidget(self._chart_stack)
-        chart_cv.addWidget(self._toolbar_stack)
+        chart_cv.setContentsMargins(SP5, SP4, SP5, SP4)
+        chart_cv.setSpacing(SP2)
 
-        self._card_layout.addWidget(self._chart_cont, 2)
+        top_bar = QHBoxLayout()
+        top_bar.setContentsMargins(0, 0, 0, 0)
+        top_bar.addStretch()
+        unit_lbl = QLabel(f"All values in {self._currency}")
+        unit_lbl.setFont(_f(FS_SM, FW_MEDIUM))
+        unit_lbl.setStyleSheet(f"color: {get_token('text_secondary')}; border: none; background: transparent;")
+        top_bar.addWidget(unit_lbl)
+        chart_cv.addLayout(top_bar)
+
+        chart_cv.addWidget(self._chart_stack, 1)
+
+        footer_frame = QFrame()
+        footer_frame.setStyleSheet(
+            f"border: none; border-top: 1px solid {get_token('surface_mid')}; background: transparent; padding-top: 2px;"
+        )
+        footer_l = QHBoxLayout(footer_frame)
+        footer_l.setContentsMargins(0, 4, 0, 0)
+        footer_hint = QLabel("Hover on bars to inspect breakdown")
+        footer_hint.setFont(_f(FS_XS))
+        footer_hint.setStyleSheet(f"color: {get_token('text_disabled')}; border: none; background: transparent;")
+        footer_l.addWidget(footer_hint)
+        footer_l.addStretch()
+        footer_l.addWidget(self._toolbar_stack)
+        chart_cv.addWidget(footer_frame)
+
+        self._card_layout.addWidget(self._chart_cont, 1)
 
         self._main_v.addWidget(self.card)
 
@@ -759,13 +842,34 @@ class AggregateChartWidget(QWidget):
         is_narrow = event.size().width() < 880
         if is_narrow:
             self._card_layout.setDirection(QBoxLayout.Direction.TopToBottom)
-            self._card_layout.insertWidget(0, self._text_panel)
             self._text_panel.setMinimumWidth(0)
             self._text_panel.setMaximumWidth(16777215)
+            self._text_panel.setStyleSheet(
+                f"#aggTextPanel {{"
+                f"  background-color: {get_token('window')};"
+                f"  border-top-left-radius: {RADIUS_XL - 1}px;"
+                f"  border-top-right-radius: {RADIUS_XL - 1}px;"
+                f"  border-bottom-left-radius: 0px;"
+                f"  border-bottom-right-radius: 0px;"
+                f"  border-bottom: 1.5px solid {get_token('surface_mid')};"
+                f"  border-right: none;"
+                f"}}"
+            )
         else:
             self._card_layout.setDirection(QBoxLayout.Direction.LeftToRight)
-            self._card_layout.insertWidget(0, self._text_panel)
-            self._text_panel.setFixedWidth(350)
+            self._text_panel.setFixedWidth(310)
+            self._text_panel.setStyleSheet(
+                f"#aggTextPanel {{"
+                f"  background-color: {get_token('window')};"
+                f"  border-top-left-radius: {RADIUS_XL - 1}px;"
+                f"  border-bottom-left-radius: {RADIUS_XL - 1}px;"
+                f"  border-top-right-radius: 0px;"
+                f"  border-bottom-right-radius: 0px;"
+                f"  border-right: 1.5px solid {get_token('surface_mid')};"
+                f"  border-bottom: none;"
+                f"}}"
+            )
 
     def minimumSizeHint(self):
         return QSize(0, 400)
+

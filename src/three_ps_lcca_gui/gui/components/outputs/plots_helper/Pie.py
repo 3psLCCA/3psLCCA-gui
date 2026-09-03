@@ -51,6 +51,7 @@ from ..helper_functions.lcc_colors import COLORS as LCC_COLORS
 from .AggregateChart import (
     StageBarPlotter, SustainabilityBarPlotter, PillarBreakdownBarPlotter,
     _build_pillar_total_data, _build_pillar_data as _build_pillar_bar_data,
+    _create_metric_card, _create_total_block,
 )
 from .plot_utils import register_ubuntu_fonts, WheelForwarder, ChartToolbar, currency_note
 
@@ -86,6 +87,7 @@ _TAB_META = [
     },
     {
         "title": "Across 3 Pillars of Sustainability",
+        "desc": "Total cost breakdown across economic, environmental, and social pillars.",
     },
 ]
 
@@ -548,41 +550,53 @@ class LCCPieWidget(QWidget):
 
         self.card = QFrame()
         self.card.setObjectName("pieCard")
-        self.card.setStyleSheet(f"#pieCard {{ background: transparent; border: 1.5px solid {get_token('surface_mid')}; border-radius: {RADIUS_XL}px; }}")
+        self.card.setStyleSheet(
+            f"#pieCard {{"
+            f"  background: transparent;"
+            f"  border: 1.5px solid {get_token('surface_mid')};"
+            f"  border-radius: {RADIUS_XL}px;"
+            f"}}"
+        )
         self.card.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
 
-        card_v = QVBoxLayout(self.card)
-        card_v.setContentsMargins(SP6, SP5, SP6, SP6)
-        card_v.setSpacing(SP4)
+        self._card_layout = QBoxLayout(QBoxLayout.Direction.LeftToRight, self.card)
+        self._card_layout.setContentsMargins(0, 0, 0, 0)
+        self._card_layout.setSpacing(0)
 
-        content_row = QWidget()
-        content_row.setStyleSheet("background: transparent; border: none;")
-        self._content_h = QHBoxLayout(content_row)
-        self._content_h.setContentsMargins(0, 0, 0, 0)
-        self._content_h.setSpacing(SP6)
+        # ── Left panel ───────────────────────────────────────────────────────
+        self._left_panel = QFrame()
+        self._left_panel.setObjectName("pieTextPanel")
+        self._left_panel.setStyleSheet(
+            f"#pieTextPanel {{"
+            f"  background-color: {get_token('window')};"
+            f"  border-top-left-radius: {RADIUS_XL - 1}px;"
+            f"  border-bottom-left-radius: {RADIUS_XL - 1}px;"
+            f"  border-right: 1.5px solid {get_token('surface_mid')};"
+            f"}}"
+        )
+        self._left_panel.setFixedWidth(310)
 
-        self._left_panel = QWidget()
-        self._left_panel.setStyleSheet("background: transparent; border: none;")
         left_v = QVBoxLayout(self._left_panel)
-        left_v.setContentsMargins(0, 0, 0, 0)
-        left_v.setSpacing(SP4)
-        left_v.setAlignment(Qt.AlignCenter)
+        left_v.setContentsMargins(SP5, SP5, SP5, SP5)
+        left_v.setSpacing(SP3)
 
         title_lbl = QLabel(_TAB_META[1]["title"])
-        title_lbl.setAlignment(Qt.AlignCenter)
+        title_lbl.setAlignment(Qt.AlignLeft)
         title_lbl.setWordWrap(True)
         title_lbl.setFont(_f(FS_SUBHEAD, FW_BOLD))
-        title_lbl.setStyleSheet(f"color: {get_token('text')}; border: none; letter-spacing: 0.5px;")
+        title_lbl.setStyleSheet(
+            f"color: {get_token('text')}; border: none; background: transparent; letter-spacing: -0.2px;"
+        )
         left_v.addWidget(title_lbl)
 
-        _desc = _TAB_META[1].get("desc", "")
-        if _desc:
-            desc_lbl = QLabel(_desc)
-            desc_lbl.setWordWrap(True)
-            desc_lbl.setAlignment(Qt.AlignCenter)
-            desc_lbl.setFont(_f(FS_BASE))
-            desc_lbl.setStyleSheet(f"color: {get_token('text_secondary')}; border: none;")
-            left_v.addWidget(desc_lbl)
+        desc_lbl = QLabel(f"Total cost breakdown across 3 sustainability pillars, in {self._currency}.")
+        desc_lbl.setWordWrap(True)
+        desc_lbl.setAlignment(Qt.AlignLeft)
+        desc_lbl.setFont(_f(FS_SM))
+        desc_lbl.setStyleSheet(
+            f"color: {get_token('text_secondary')}; border: none; background: transparent; line-height: 1.4;"
+        )
+        left_v.addWidget(desc_lbl)
 
         summary = compute_all_summaries(self._results)
         pt = summary.get("pillar_totals", {})
@@ -594,67 +608,43 @@ class LCCPieWidget(QWidget):
         v_eco, v_env, v_soc = pt.get("eco", 0), pt.get("env", 0), pt.get("social", 0)
         sum_pt = sum([v_eco, v_env, v_soc]) or 1.0
         p_eco, p_env, p_soc = v_eco / sum_pt * 100, v_env / sum_pt * 100, v_soc / sum_pt * 100
-        
+
         a_eco = fmt_currency(v_eco, self._currency, decimals=0, style="short", use_short_suffix=True).title()
         a_env = fmt_currency(v_env, self._currency, decimals=0, style="short", use_short_suffix=True).title()
         a_soc = fmt_currency(v_soc, self._currency, decimals=0, style="short", use_short_suffix=True).title()
 
-        ratio_box = QFrame()
-        ratio_box.setStyleSheet(
-            f"background-color: {get_token('surface_mid')}; "
-            f"border: 1px solid {get_token('surface_mid')}; "
-            f"border-radius: {RADIUS_LG}px;"
-        )
-        ratio_box.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        rb_v = QVBoxLayout(ratio_box)
-        rb_v.setContentsMargins(SP4, SP4, SP4, SP4)
-        rb_v.setSpacing(SP2)
+        card_eco = _create_metric_card("Economic", c_eco, p_eco, a_eco)
+        card_env = _create_metric_card("Environmental", c_env, p_env, a_env)
+        card_soc = _create_metric_card("Social", c_soc, p_soc, a_soc)
 
-        rb_label = QLabel(f"<span style='color:{c_eco}'>Economic</span> <span style='color:{get_token('text_disabled')}'>:</span> <span style='color:{c_env}'>Environmental</span> <span style='color:{get_token('text_disabled')}'>:</span> <span style='color:{c_soc}'>Social</span>")
-        rb_label.setAlignment(Qt.AlignCenter)
-        rb_label.setWordWrap(True)
-        rb_label.setTextFormat(Qt.RichText)
-        rb_label.setFont(_f(FS_MD, FW_BOLD))
-        rb_label.setStyleSheet(f"color: {get_token('text')}; letter-spacing: 1.2px; border: none; background: transparent;")
-        rb_v.addWidget(rb_label)
+        left_v.addWidget(card_eco)
+        left_v.addWidget(card_env)
+        left_v.addWidget(card_soc)
 
-        rb_pct = QLabel(f"<span style='color:{c_eco}'>{p_eco:.1f}%</span> <span style='color:{get_token('text_disabled')}'>:</span> <span style='color:{c_env}'>{p_env:.1f}%</span> <span style='color:{get_token('text_disabled')}'>:</span> <span style='color:{c_soc}'>{p_soc:.1f}%</span>")
-        rb_pct.setAlignment(Qt.AlignCenter)
-        rb_pct.setTextFormat(Qt.RichText)
-        rb_pct.setFont(QFont("Consolas", FS_MD, FW_BOLD))
-        rb_pct.setStyleSheet(f"border: none; background: transparent;")
-        rb_v.addWidget(rb_pct)
+        left_v.addStretch()
 
-        rb_amt = QLabel(f"<span style='color:{c_eco}'>{a_eco}</span> <span style='color:{get_token('text_disabled')}'>:</span> <span style='color:{c_env}'>{a_env}</span> <span style='color:{get_token('text_disabled')}'>:</span> <span style='color:{c_soc}'>{a_soc}</span>")
-        rb_amt.setAlignment(Qt.AlignCenter)
-        rb_amt.setTextFormat(Qt.RichText)
-        rb_amt.setFont(_f(FS_MD, FW_BOLD))
-        rb_amt.setStyleSheet(f"border: none; background: transparent; color: {get_token('text_secondary')};")
-        rb_v.addWidget(rb_amt)
-        left_v.addWidget(ratio_box)
-
-        # self._mode_cb = QCheckBox("Show Percentage Mode")
-        # self._mode_cb.setFont(_f(FS_BASE))
-        # self._mode_cb.setStyleSheet(f"color: {get_token('text_secondary')}; background: transparent; border: none;")
-        # self._mode_cb.setVisible(_pillar_ok)
-        # left_v.addWidget(self._mode_cb, 0, Qt.AlignCenter)
+        # Total cost block
+        total_val = v_eco + v_env + v_soc
+        left_v.addWidget(_create_total_block(total_val, self._currency))
 
         self._stage_cb = QCheckBox("Include stage-wise break-up")
         self._stage_cb.setFont(_f(FS_BASE))
-        self._stage_cb.setStyleSheet(f"color: {get_token('text_secondary')}; background: transparent; border: none;")
+        self._stage_cb.setStyleSheet(
+            f"color: {get_token('text_secondary')}; background: transparent; border: none; padding-top: {SP1}px;"
+        )
         self._stage_cb.setVisible(_pillar_ok)
         self._stage_cb.setEnabled(_nested_ok)
-        left_v.addWidget(self._stage_cb, 0, Qt.AlignCenter)
+        left_v.addWidget(self._stage_cb)
 
         if _pillar_ok and not _nested_ok:
             _stage_note = QLabel("* Stage breakdown unavailable- negative values in stage data.")
-            _stage_note.setAlignment(Qt.AlignCenter)
+            _stage_note.setAlignment(Qt.AlignLeft)
             _stage_note.setWordWrap(True)
             _stage_note.setFont(_f(FS_XS, FW_NORMAL, italic=True))
             _stage_note.setStyleSheet(f"color: {get_token('text_secondary')}; border: none; background: transparent;")
             left_v.addWidget(_stage_note)
 
-        self._content_h.addWidget(self._left_panel, 1)
+        self._card_layout.addWidget(self._left_panel)
         self._plotters = []
 
         if not _pillar_ok:
@@ -669,15 +659,15 @@ class LCCPieWidget(QWidget):
                 chart_cont = QWidget()
                 chart_cont.setStyleSheet("background: transparent; border: none;")
                 cv = QVBoxLayout(chart_cont)
-                cv.setContentsMargins(0, 0, 0, 0)
-                cv.setSpacing(0)
+                cv.setContentsMargins(SP5, SP4, SP5, SP4)
+                cv.setSpacing(SP1)
                 cv.addWidget(c_bar)
                 cv.addWidget(ChartToolbar(c_bar, chart_cont))
-                self._content_h.addWidget(chart_cont, 2)
+                self._card_layout.addWidget(chart_cont, 1)
             else:
                 _no_data = QLabel("No data available.")
                 _no_data.setAlignment(Qt.AlignCenter)
-                self._content_h.addWidget(_no_data, 2)
+                self._card_layout.addWidget(_no_data, 1)
         else:
             self._chart_stack = QStackedWidget()
             self._chart_stack.setMaximumHeight(500)
@@ -741,7 +731,7 @@ class LCCPieWidget(QWidget):
             self._bar_cb.setFont(_f(FS_BASE))
             self._bar_cb.setStyleSheet(f"color: {get_token('text_secondary')}; background: transparent; border: none;")
             self._bar_cb.setVisible(self._bar_chart_idx >= 0)
-            left_v.addWidget(self._bar_cb, 0, Qt.AlignCenter)
+            left_v.addWidget(self._bar_cb)
 
             def _switch_chart():
                 bar   = self._bar_cb.isChecked()
@@ -763,13 +753,35 @@ class LCCPieWidget(QWidget):
             chart_cont = QWidget()
             chart_cont.setStyleSheet("background: transparent; border: none;")
             cv = QVBoxLayout(chart_cont)
-            cv.setContentsMargins(0, 0, 0, 0)
-            cv.setSpacing(0)
-            cv.addWidget(self._chart_stack)
-            cv.addWidget(self._toolbar_stack)
-            self._content_h.addWidget(chart_cont, 2)
+            cv.setContentsMargins(SP5, SP4, SP5, SP4)
+            cv.setSpacing(SP2)
 
-        card_v.addWidget(content_row)
+            top_bar = QHBoxLayout()
+            top_bar.setContentsMargins(0, 0, 0, 0)
+            top_bar.addStretch()
+            unit_lbl = QLabel(f"All values in {self._currency}")
+            unit_lbl.setFont(_f(FS_SM, FW_MEDIUM))
+            unit_lbl.setStyleSheet(f"color: {get_token('text_secondary')}; border: none; background: transparent;")
+            top_bar.addWidget(unit_lbl)
+            cv.addLayout(top_bar)
+
+            cv.addWidget(self._chart_stack, 1)
+
+            footer_frame = QFrame()
+            footer_frame.setStyleSheet(
+                f"border: none; border-top: 1px solid {get_token('surface_mid')}; background: transparent; padding-top: 2px;"
+            )
+            footer_l = QHBoxLayout(footer_frame)
+            footer_l.setContentsMargins(0, 4, 0, 0)
+            footer_hint = QLabel("Hover on chart elements to inspect breakdown")
+            footer_hint.setFont(_f(FS_XS))
+            footer_hint.setStyleSheet(f"color: {get_token('text_disabled')}; border: none; background: transparent;")
+            footer_l.addWidget(footer_hint)
+            footer_l.addStretch()
+            footer_l.addWidget(self._toolbar_stack)
+            cv.addWidget(footer_frame)
+
+            self._card_layout.addWidget(chart_cont, 1)
 
         if not _pillar_ok:
             _note = QLabel("* Negative cost values detected- pie chart unavailable, showing bar chart instead.")
@@ -777,7 +789,7 @@ class LCCPieWidget(QWidget):
             _note.setWordWrap(True)
             _note.setFont(_f(FS_XS, FW_NORMAL, italic=True))
             _note.setStyleSheet(f"color: {get_token('text_secondary')}; border: none; background: transparent;")
-            card_v.addWidget(_note)
+            left_v.addWidget(_note)
 
         self._main_v.addWidget(self.card)
 
@@ -788,13 +800,35 @@ class LCCPieWidget(QWidget):
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        if event.size().width() < 850:
-            self._content_h.setDirection(QBoxLayout.Direction.TopToBottom)
+        if event.size().width() < 880:
+            self._card_layout.setDirection(QBoxLayout.Direction.TopToBottom)
             self._left_panel.setMinimumWidth(0)
             self._left_panel.setMaximumWidth(16777215)
+            self._left_panel.setStyleSheet(
+                f"#pieTextPanel {{"
+                f"  background-color: {get_token('window')};"
+                f"  border-top-left-radius: {RADIUS_XL - 1}px;"
+                f"  border-top-right-radius: {RADIUS_XL - 1}px;"
+                f"  border-bottom-left-radius: 0px;"
+                f"  border-bottom-right-radius: 0px;"
+                f"  border-bottom: 1.5px solid {get_token('surface_mid')};"
+                f"  border-right: none;"
+                f"}}"
+            )
         else:
-            self._content_h.setDirection(QBoxLayout.Direction.LeftToRight)
-            self._left_panel.setFixedWidth(350)
+            self._card_layout.setDirection(QBoxLayout.Direction.LeftToRight)
+            self._left_panel.setFixedWidth(310)
+            self._left_panel.setStyleSheet(
+                f"#pieTextPanel {{"
+                f"  background-color: {get_token('window')};"
+                f"  border-top-left-radius: {RADIUS_XL - 1}px;"
+                f"  border-bottom-left-radius: {RADIUS_XL - 1}px;"
+                f"  border-top-right-radius: 0px;"
+                f"  border-bottom-right-radius: 0px;"
+                f"  border-right: 1.5px solid {get_token('surface_mid')};"
+                f"  border-bottom: none;"
+                f"}}"
+            )
 
     def minimumSizeHint(self):
         return QSize(0, 400)

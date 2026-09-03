@@ -33,10 +33,37 @@ class WheelForwarder(QObject):
                 parent = parent.parent()
         return False
 
+from three_ps_lcca_gui.gui.themes import get_token
+
 class ChartToolbar(NavigationToolbar2QT):
     """Custom Matplotlib toolbar with fewer items and silenced messages."""
     toolitems = [t for t in NavigationToolbar2QT.toolitems
-                 if t[0] not in ("Subplots", "Customize")]
+                 if t[0] in ("Home", "Pan", "Zoom", "Save")]
+
+    def __init__(self, canvas, parent=None):
+        super().__init__(canvas, parent)
+        self.setStyleSheet(f"""
+            QToolBar {{
+                background: transparent;
+                border: none;
+                spacing: 3px;
+            }}
+            QToolButton {{
+                background-color: transparent;
+                border: 1px solid {get_token('surface_mid')};
+                border-radius: 6px;
+                padding: 3px;
+                min-width: 22px;
+                min-height: 22px;
+            }}
+            QToolButton:hover {{
+                background-color: {get_token('surface_mid', 'hover')};
+            }}
+            QToolButton:checked {{
+                background-color: {get_token('surface_mid', 'focus')};
+            }}
+        """)
+
     def set_message(self, s): pass
 
 def currency_note(currency: str) -> str:
