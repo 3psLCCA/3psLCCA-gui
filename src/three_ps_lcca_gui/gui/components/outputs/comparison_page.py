@@ -45,11 +45,12 @@ from three_ps_lcca_gui.gui.themes import get_token, theme_manager
 from three_ps_lcca_gui.gui.styles import font as _f, btn_primary, btn_ghost
 from three_ps_lcca_gui.gui.theme import (
     SP1, SP2, SP3, SP4, SP5, SP6, SP8, SP10,
-    RADIUS_LG, RADIUS_MD,
+    RADIUS_SM, RADIUS_LG, RADIUS_MD,
     FS_XS, FS_SM, FS_BASE, FS_MD, FS_LG, FS_SUBHEAD, FS_DISP,
     FW_NORMAL, FW_MEDIUM, FW_SEMIBOLD, FW_BOLD,
     BTN_SM, BTN_MD, BTN_LG, FONT_FAMILY,
 )
+from three_ps_lcca_gui.gui.components.utils.icons import make_icon
 from three_ps_lcca_gui.core.safechunk_engine import SafeChunkEngine, _decode, LCCA_EXT
 import three_ps_lcca_gui.core.start_manager as _sm
 from three_ps_lcca_core.core.main import run_full_lcc_analysis
@@ -184,34 +185,26 @@ class _ProjectCard(QFrame):
         self._selected   = False
         self._is_locked  = is_locked
         self._build(display_name, analysis_period, currency)
-        # Even if locked, we want the cursor to change if the user hovers over the card/button area
         self.setCursor(Qt.PointingHandCursor)
         self._apply_style()
 
     def _build(self, name: str, ap: int, currency: str):
         self.setObjectName("projCard")
+        self.setFixedHeight(68)
         lay = QHBoxLayout(self)
         lay.setContentsMargins(SP4, SP3, SP4, SP3)
         lay.setSpacing(SP3)
-
-        self._check = QFrame()
-        self._check.setFixedSize(16, 16)
-        self._check.setObjectName("checkBox")
-        lay.addWidget(self._check, 0, Qt.AlignVCenter)
-        if self._is_locked:
-            self._check.hide()
 
         info = QVBoxLayout()
         info.setSpacing(2)
         info.setContentsMargins(0, 0, 0, 0)
 
         self._name_lbl = QLabel(name)
-        self._name_lbl.setFont(_f(FS_BASE, FW_SEMIBOLD))
+        self._name_lbl.setFont(_f(FS_BASE, FW_MEDIUM))
         info.addWidget(self._name_lbl)
 
-        self._meta_lbl = QLabel(f"{ap} years  ·  {currency}")
+        self._meta_lbl = QLabel(f"{ap} yrs  ·  {currency}")
         self._meta_lbl.setFont(_f(FS_SM))
-        self._meta_lbl.setStyleSheet(f"color: {get_token('text_secondary')};")
         info.addWidget(self._meta_lbl)
 
         lay.addLayout(info, 1)
@@ -219,11 +212,18 @@ class _ProjectCard(QFrame):
         if self._is_locked:
             self._ret_btn = QPushButton("Return ›")
             self._ret_btn.setObjectName("retBtn")
-            self._ret_btn.setFixedSize(64, 22)
+            self._ret_btn.setFixedHeight(22)
+            self._ret_btn.setMinimumWidth(64)
             self._ret_btn.setFont(_f(FS_SM, FW_MEDIUM))
             self._ret_btn.setCursor(Qt.PointingHandCursor)
             self._ret_btn.clicked.connect(lambda: self.return_requested.emit(self._project_id))
             lay.addWidget(self._ret_btn, 0, Qt.AlignVCenter)
+        else:
+            # Checkbox on the right side — matches home compare mode
+            self._check = QFrame()
+            self._check.setFixedSize(16, 16)
+            self._check.setObjectName("checkBox")
+            lay.addWidget(self._check, 0, Qt.AlignVCenter)
 
     def _apply_style(self):
         prim = get_token("primary")
@@ -231,28 +231,28 @@ class _ProjectCard(QFrame):
         hov  = QColor(prim).darker(110).name()
 
         if self._is_locked:
-            border = get_token("surface_mid")
-            bg     = get_token("surface_mid")
-            text_col     = get_token("text_disabled")
-            meta_col     = get_token("info")
+            border   = get_token("surface_mid")
+            bg       = get_token("surface")
+            text_col = get_token("text_disabled")
+            meta_col = get_token("text_disabled")
         elif self._selected:
-            border = get_token("primary")
-            bg     = get_token("surface")
-            text_col     = get_token("primary")
-            meta_col     = get_token("text_secondary")
+            border   = get_token("primary")
+            bg       = base
+            text_col = get_token("primary")
+            meta_col = get_token("text_secondary")
         else:
-            border = get_token("surface_mid")
-            bg     = "transparent"
-            text_col     = get_token("text")
-            meta_col     = get_token("text_secondary")
+            border   = get_token("surface_mid")
+            bg       = base
+            text_col = get_token("text")
+            meta_col = get_token("text_secondary")
 
-        # Set unified stylesheet on the card to ensure correct cascading for the child button
         self.setStyleSheet(
-            f"#projCard {{ border: 2px solid {border}; "
+            f"#projCard {{ border: 1px solid {border}; "
             f"border-radius: {RADIUS_LG}px; background: {bg}; }}"
+            f"#projCard:hover {{ border-color: {prim}; }}"
             f"#projCard QLabel {{ background: transparent; }}"
             f"#retBtn {{ background: transparent; color: {prim}; border: 1px solid {prim}; "
-            f"border-radius: 11px; padding: 0; }}"
+            f"border-radius: 11px; padding: 0 10px; }}"
             f"#retBtn:hover {{ background: {prim}; color: {base}; }}"
             f"#retBtn:pressed {{ background: {hov}; color: {base}; }}"
         )
@@ -261,7 +261,7 @@ class _ProjectCard(QFrame):
             check_bg     = get_token("primary") if self._selected else "transparent"
             check_border = get_token("primary") if self._selected else get_token("surface_mid")
             self._check.setStyleSheet(
-                f"#checkBox {{ border: 2px solid {check_border}; "
+                f"#checkBox {{ border: 1.5px solid {check_border}; "
                 f"border-radius: 3px; background: {check_bg}; }}"
             )
 
@@ -848,22 +848,54 @@ class ComparisonPickerPanel(QWidget):
 
         body = QWidget()
         self._body_layout = QVBoxLayout(body)
-        self._body_layout.setContentsMargins(SP6, SP5, SP6, SP5)
+        self._body_layout.setContentsMargins(SP8, SP5, SP8, SP5)
         self._body_layout.setSpacing(SP4)
         scroll.setWidget(body)
         outer.addWidget(scroll)
 
-        # Main Header
-        self._header = QLabel("LCCA Comparison")
-        self._header.setFont(_f(FS_DISP, FW_BOLD))
-        self._header.setStyleSheet(f"color: {get_token('text')};")
-        self._body_layout.addWidget(self._header)
+        # ── Picker Toolbar (matches home page "Recent Projects" bar) ──────
+        picker_toolbar = QWidget()
+        picker_toolbar_h = QHBoxLayout(picker_toolbar)
+        picker_toolbar_h.setContentsMargins(0, 0, 0, 0)
+        picker_toolbar_h.setSpacing(SP2)
 
-        # ── Active Picker Section ─────────────────────────────────────────────
-        picker_header = QLabel("Select Projects to Compare")
-        picker_header.setFont(_f(FS_LG, FW_SEMIBOLD))
-        picker_header.setStyleSheet(f"color: {get_token('text_secondary')};")
-        self._body_layout.addWidget(picker_header)
+        self._picker_label = QLabel("Ready to Compare")
+        self._picker_label.setFont(_f(FS_SM, FW_SEMIBOLD))
+        self._picker_label.setStyleSheet(
+            f"color: {get_token('text_disabled')}; letter-spacing: 2px;"
+        )
+        picker_toolbar_h.addWidget(self._picker_label, 0, Qt.AlignVCenter)
+
+        picker_toolbar_h.addSpacing(SP2)
+
+        self._refresh_btn = QPushButton()
+        self._refresh_btn.setIcon(make_icon("autorenew"))
+        self._refresh_btn.setIconSize(QSize(12, 12))
+        self._refresh_btn.setFixedSize(28, 28)
+        self._refresh_btn.setToolTip("Refresh project list")
+        self._refresh_btn.setCursor(Qt.PointingHandCursor)
+        self._refresh_btn.clicked.connect(self._render_picker)
+        self._refresh_btn.setStyleSheet(
+            f"QPushButton {{ border: 1px solid {get_token('surface_mid')}; border-radius: 14px; "
+            f"padding: 0; min-width: 28px; max-width: 28px; min-height: 28px; max-height: 28px; background: transparent; }} "
+            f"QPushButton:hover {{ border-color: {get_token('primary')}; background: {get_token('surface')}; }} "
+            f"QPushButton:pressed {{ background: {get_token('surface_pressed')}; }}"
+        )
+        picker_toolbar_h.addWidget(self._refresh_btn, 0, Qt.AlignVCenter)
+
+        picker_toolbar_h.addStretch()
+
+        self._run_btn = QPushButton("Run Comparison ↗")
+        self._run_btn.setFixedHeight(BTN_MD)
+        self._run_btn.setMinimumWidth(180)
+        self._run_btn.setFont(_f(FS_BASE, FW_SEMIBOLD))
+        self._run_btn.setEnabled(False)
+        self._run_btn.setCursor(Qt.PointingHandCursor)
+        self._run_btn.setStyleSheet(btn_ghost())
+        self._run_btn.clicked.connect(self._run_active_comparison)
+        picker_toolbar_h.addWidget(self._run_btn, 0, Qt.AlignVCenter)
+
+        self._body_layout.addWidget(picker_toolbar)
 
         self._picker_container = QWidget()
         self._picker_layout = QGridLayout(self._picker_container)
@@ -871,48 +903,29 @@ class ComparisonPickerPanel(QWidget):
         self._picker_layout.setSpacing(SP3)
         self._body_layout.addWidget(self._picker_container)
 
-        # Run Button Row
-        btn_row = QHBoxLayout()
-        btn_row.setContentsMargins(0, 0, 0, 0)
-        
-        self._run_btn = QPushButton("Run Comparison ↗")
-        self._run_btn.setFixedHeight(BTN_LG)
-        self._run_btn.setMinimumWidth(200)
-        self._run_btn.setFont(_f(FS_BASE, FW_BOLD))
-        self._run_btn.setEnabled(False)
-        self._run_btn.setCursor(Qt.PointingHandCursor)
-        self._run_btn.setStyleSheet(btn_ghost())
-        self._run_btn.clicked.connect(self._run_active_comparison)
-        btn_row.addWidget(self._run_btn)
-        btn_row.addStretch()
-        self._body_layout.addLayout(btn_row)
-
-        # ── History Section ───────────────────────────────────────────────────
+        # ── History Section ───────────────────────────────────────────────
         self._hist_sep = self._hline()
         self._hist_sep.hide()
         self._body_layout.addWidget(self._hist_sep)
 
         hist_header_row = QHBoxLayout()
         hist_header_row.setContentsMargins(0, 0, 0, 0)
+        hist_header_row.setSpacing(SP2)
 
         self._hist_header = QLabel("Comparison History")
-        self._hist_header.setFont(_f(FS_LG, FW_SEMIBOLD))
-        self._hist_header.setStyleSheet(f"color: {get_token('text')};")
+        self._hist_header.setFont(_f(FS_SM, FW_SEMIBOLD))
+        self._hist_header.setStyleSheet(
+            f"color: {get_token('text_disabled')}; letter-spacing: 2px;"
+        )
         self._hist_header.hide()
-        hist_header_row.addWidget(self._hist_header)
-        
+        hist_header_row.addWidget(self._hist_header, 0, Qt.AlignVCenter)
+
         hist_header_row.addStretch()
 
         self._clear_all_btn = QPushButton("Clear All")
-        self._clear_all_btn.setFixedHeight(24)
+        self._clear_all_btn.setFixedHeight(BTN_SM)
         self._clear_all_btn.setFont(_f(FS_SM, FW_MEDIUM))
-        self._clear_all_btn.setStyleSheet(
-            f"QPushButton {{ background: transparent; color: {get_token('danger')}; "
-            f"border: 1px solid {get_token('surface_mid')}; border-radius: 12px; "
-            f"padding: 0 12px; }}"
-            f"QPushButton:hover {{ background: {get_token('danger')}; color: {get_token('base')}; "
-            f"border-color: {get_token('danger')}; }}"
-        )
+        self._clear_all_btn.setStyleSheet(btn_ghost())
         self._clear_all_btn.setCursor(Qt.PointingHandCursor)
         self._clear_all_btn.hide()
         self._clear_all_btn.clicked.connect(self._clear_all_history)
@@ -925,36 +938,46 @@ class ComparisonPickerPanel(QWidget):
         ev = QVBoxLayout(self._empty_state)
         ev.setContentsMargins(0, SP10, 0, SP10)
         ev.setSpacing(SP4)
-        
+
         empty_lbl = QLabel("No comparisons yet")
         empty_lbl.setFont(_f(FS_LG, FW_MEDIUM))
         empty_lbl.setStyleSheet(f"color: {get_token('text_disabled')};")
         empty_lbl.setAlignment(Qt.AlignCenter)
         ev.addWidget(empty_lbl)
-        
+
         hint_lbl = QLabel("Select at least two projects above to start a side-by-side analysis.")
         hint_lbl.setFont(_f(FS_BASE))
         hint_lbl.setStyleSheet(f"color: {get_token('text_disabled')};")
         hint_lbl.setAlignment(Qt.AlignCenter)
         ev.addWidget(hint_lbl)
-        
+
         self._body_layout.addWidget(self._empty_state)
 
         self._history_container = QWidget()
         self._history_layout = QVBoxLayout(self._history_container)
         self._history_layout.setContentsMargins(0, 0, 0, 0)
-        self._history_layout.setSpacing(SP2)
+        self._history_layout.setSpacing(SP3)
         self._body_layout.addWidget(self._history_container)
 
         self._body_layout.addStretch()
 
-        # ── Footer: Sponsors Area ──────────────────────────────────────────
+        # ── Footer: Sponsors Area ──────────────────────────────────────
         outer.addWidget(self._hline())
         self.footer = SponsorsFooter()
         outer.addWidget(self.footer)
 
     def _on_theme(self):
-        self._header.setStyleSheet(f"color: {get_token('text')};")
+        _muted = f"color: {get_token('text_disabled')}; letter-spacing: 2px;"
+        self._picker_label.setStyleSheet(_muted)
+        if self._hist_header.isVisible():
+            self._hist_header.setStyleSheet(_muted)
+        self._clear_all_btn.setStyleSheet(btn_ghost())
+        self._refresh_btn.setStyleSheet(
+            f"QPushButton {{ border: 1px solid {get_token('surface_mid')}; border-radius: 14px; "
+            f"padding: 0; min-width: 28px; max-width: 28px; min-height: 28px; max-height: 28px; background: transparent; }} "
+            f"QPushButton:hover {{ border-color: {get_token('primary')}; background: {get_token('surface')}; }} "
+            f"QPushButton:pressed {{ background: {get_token('surface_pressed')}; }}"
+        )
         if hasattr(self, "footer"):
             self.footer.refresh_theme()
         self._apply_run_btn_style()
