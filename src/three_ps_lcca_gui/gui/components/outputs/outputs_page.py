@@ -247,8 +247,8 @@ class ResponsiveTotalCard(QFrame):
         dot.setFixedSize(8, 8)
         dot.setStyleSheet(f"background-color: {get_token('primary')}; border-radius: 4px; border: none;")
         r1.addWidget(dot)
-        title_lbl = QLabel("Total Life Cycle Cost")
-        title_lbl.setFont(_f(FS_MD, FW_MEDIUM))
+        title_lbl = QLabel("<b>Total Life Cycle Cost</b>")
+        title_lbl.setFont(_f(FS_MD, FW_BOLD))
         title_lbl.setStyleSheet(f"color: {get_token('text_secondary')}; border: none; background: transparent;")
         r1.addWidget(title_lbl)
         r1.addStretch()
@@ -774,11 +774,10 @@ class OutputsPage(ScrollableForm):
             f"#resultsHeader {{"
             f"  background-color: {get_token('window')};"
             f"  border: none;"
-            f"  padding-bottom: {SP2}px;"
             f"}}"
         )
         _hdr_h = QHBoxLayout(self._hdr_row)
-        _hdr_h.setContentsMargins(0, 0, 0, 0)
+        _hdr_h.setContentsMargins(0, SP1, 0, SP2)
         _hdr_h.setSpacing(SP3)
 
         self._header = QLabel("Results")
@@ -795,6 +794,7 @@ class OutputsPage(ScrollableForm):
             self._ctx_btn_compare.setToolTip("Close project and add to the comparison workspace")
             self._ctx_btn_compare.setCursor(Qt.PointingHandCursor)
             self._ctx_btn_compare.setEnabled(False)
+            self._ctx_btn_compare.setVisible(False)
             self._ctx_btn_compare.clicked.connect(self._on_compare_clicked)
             _hdr_h.addWidget(self._ctx_btn_compare)
 
@@ -804,6 +804,7 @@ class OutputsPage(ScrollableForm):
         self._ctx_btn_pdf.setStyleSheet(btn_primary())
         self._ctx_btn_pdf.setCursor(Qt.PointingHandCursor)
         self._ctx_btn_pdf.setEnabled(False)
+        self._ctx_btn_pdf.setVisible(False)
         self._ctx_btn_pdf.clicked.connect(self._generate_pdf_report)
         _hdr_h.addWidget(self._ctx_btn_pdf)
 
@@ -878,12 +879,18 @@ class OutputsPage(ScrollableForm):
         return bar
 
     def _update_context_bar(self):
-        """Show context label and enable action buttons after analysis completes."""
-        has_results = bool(self._currency)
+        """Show context label and action buttons only after analysis completes successfully."""
+        has_results = (
+            bool(getattr(self, "_has_results", False))
+            and getattr(self, "_current_status", "") == "calc_success"
+            and bool(self._currency)
+        )
 
-        # ── Enable / disable header action buttons ────────────
+        # ── Show / hide and enable / disable header action buttons ────
+        self._ctx_btn_pdf.setVisible(has_results)
         self._ctx_btn_pdf.setEnabled(has_results)
         if hasattr(self, "_ctx_btn_compare"):
+            self._ctx_btn_compare.setVisible(has_results)
             self._ctx_btn_compare.setEnabled(has_results)
 
         if not has_results:
@@ -924,7 +931,6 @@ class OutputsPage(ScrollableForm):
                 f"#resultsHeader {{"
                 f"  background-color: {get_token('window')};"
                 f"  border: none;"
-                f"  padding-bottom: {SP2}px;"
                 f"}}"
             )
         self._header.setFont(_f(FS_DISP, FW_BOLD))
@@ -1004,8 +1010,10 @@ class OutputsPage(ScrollableForm):
 
     def _show_idle(self):
         self._current_status = "idle"
+        self._has_results = False
         self._clear_status()
         self._set_inputs_visible(True)
+        self._update_context_bar()
 
         card = QFrame()
         card.setObjectName("idleCard")
@@ -1037,8 +1045,10 @@ class OutputsPage(ScrollableForm):
 
     def _show_calculating(self):
         self._current_status = "calculating"
+        self._has_results = False
         self._clear_status()
         self.btn_calculate.setEnabled(False)
+        self._update_context_bar()
 
         container = QWidget()
         v = QVBoxLayout(container)
@@ -1111,9 +1121,11 @@ class OutputsPage(ScrollableForm):
 
     def show_results(self, all_errors: dict, all_warnings: dict):
         self._current_status = "issues"
+        self._has_results = False
         self._status_args = {"errors": all_errors, "warnings": all_warnings}
         self._clear_status()
         self._set_inputs_visible(True)
+        self._update_context_bar()
         self._save_state("issues", {"errors": all_errors, "warnings": all_warnings})
 
         if all_errors:
@@ -1147,8 +1159,10 @@ class OutputsPage(ScrollableForm):
 
     def show_success(self):
         self._current_status = "success"
+        self._has_results = False
         self._clear_status()
         self._set_inputs_visible(True)
+        self._update_context_bar()
         self._save_state("success", {})
         self._status_layout.addWidget(
             self._inline_banner(
@@ -1175,11 +1189,13 @@ class OutputsPage(ScrollableForm):
 
     def _show_calculation_error(self, error: Exception, tb: str = ""):
         self._current_status = "calc_error"
+        self._has_results = False
         self._status_args = {"error": error, "tb": tb}
         self._save_state("calc_error", {"error": str(error)})
         self.btn_calculate.setEnabled(True)
         self._set_inputs_visible(True)
         self._clear_status()
+        self._update_context_bar()
 
         card = QFrame()
         card.setObjectName("calcErrorCard")
@@ -1314,6 +1330,7 @@ class OutputsPage(ScrollableForm):
 
     def _show_calculation_success(self, results):
         self._current_status = "calc_success"
+        self._has_results = True
         self.btn_calculate.setEnabled(True)
         self._set_inputs_visible(False)
         self._last_results = results

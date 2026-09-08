@@ -635,8 +635,8 @@ def _create_total_block(total_val: float, currency: str) -> QFrame:
     tb_v.setContentsMargins(0, SP3, 0, SP2)
     tb_v.setSpacing(SP1)
 
-    tlabel = QLabel("Total cost")
-    tlabel.setFont(_f(FS_SM, FW_MEDIUM))
+    tlabel = QLabel("<b>Total cost</b>")
+    tlabel.setFont(_f(FS_SM, FW_BOLD))
     tlabel.setStyleSheet(f"color: {get_token('text_secondary')}; border: none; background: transparent;")
     tb_v.addWidget(tlabel)
 

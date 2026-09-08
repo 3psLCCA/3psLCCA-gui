@@ -1,5 +1,6 @@
 from three_ps_lcca_gui.gui.themes import get_token
 from three_ps_lcca_gui.gui.theme import FS_MD
+from ..utils.form_builder.form_builder import make_section_header, make_section_label
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -433,7 +434,7 @@ class Recycling(QWidget):
         summary_layout = QHBoxLayout(self.summary_bar)
         summary_layout.setContentsMargins(8, 8, 8, 8)
 
-        self.total_lbl = QLabel("Total Recovered Value: -")
+        self.total_lbl = QLabel("<b>Total Recovered Value:</b> -")
         self.count_lbl = QLabel("Included: - of - items")
         self.details_btn = QPushButton("Show Details ▼")
         self.details_btn.setFlat(True)
@@ -467,7 +468,8 @@ class Recycling(QWidget):
         main_layout.addWidget(self._hline())
 
         # ── Included Section ─────────────────────────────────────────────
-        main_layout.addWidget(self._section_label("Included in Recyclability"))
+        for widget in make_section_header("Included in Recyclability"):
+            main_layout.addWidget(widget)
 
         self.included_table = RecyclingTable(is_included=True)
         self._included_action = _RecyclingActionDelegate(
@@ -477,10 +479,10 @@ class Recycling(QWidget):
             0, self._included_action
         )
         main_layout.addWidget(self.included_table)
-        main_layout.addWidget(self._hline())
 
         # ── Excluded Section ─────────────────────────────────────────────
-        main_layout.addWidget(self._section_label("Excluded from Recyclability"))
+        for widget in make_section_header("Excluded from Recyclability"):
+            main_layout.addWidget(widget)
 
         self.excluded_table = RecyclingTable(is_included=False)
         self._excluded_action = _RecyclingActionDelegate(
@@ -498,9 +500,7 @@ class Recycling(QWidget):
     # ── UI Helpers ───────────────────────────────────────────────────────
 
     def _section_label(self, text: str) -> QLabel:
-        lbl = QLabel(f"<b>{text}</b>")
-        lbl.setStyleSheet(f"font-size: {FS_MD}pt;")
-        return lbl
+        return make_section_label(text)
 
     def _hline(self) -> QFrame:
         f = QFrame()
@@ -708,7 +708,7 @@ class Recycling(QWidget):
         currency: str,
     ):
         self.total_lbl.setText(
-            f"Total Recovered Value: {currency} {fmt_comma(total)}".strip()
+            f"<b>Total Recovered Value:</b> {currency} {fmt_comma(total)}".strip()
         )
         self.count_lbl.setText(f"Included: {included} of {total_count} items")
         self.foundation_lbl.setText(

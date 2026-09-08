@@ -1,4 +1,4 @@
-﻿from PySide6.QtWidgets import (
+from PySide6.QtWidgets import (
     QTabWidget,
     QWidget,
     QVBoxLayout,
@@ -13,6 +13,8 @@ from PySide6.QtCore import QThread, Signal, QSize
 from PySide6.QtGui import QPalette, QColor
 from ..utils.icons import make_icon
 from three_ps_lcca_gui.gui.themes import get_token
+from three_ps_lcca_gui.gui.theme import FS_SM
+from ..utils.form_builder.form_builder import make_section_label
 from ..utils.validation_helpers import LOCK_TOOLTIP, freeze_widgets
 from .excel_importer import parse_excel, verify_schema, ImportPreviewWindow
 from .excel_exporter import EXPORT_FORMATS, format_available, export_all_chunks, count_active_all
@@ -65,14 +67,19 @@ class StructureTabView(QWidget):
             controller.project_loaded.connect(self._on_project_reloaded)
 
         self.main_layout = QVBoxLayout(self)
+        self.main_layout.setContentsMargins(24, 20, 24, 16)
+        self.main_layout.setSpacing(12)
 
         # --- TOP AREA ---
         top_area = QWidget()
         top_layout = QHBoxLayout(top_area)
+        top_layout.setContentsMargins(0, 0, 0, 0)
 
         region_info = QVBoxLayout()
-        region_info.addWidget(QLabel("<b>Construction Works Data</b>"))
-        region_info.addWidget(QLabel("Project: Active Analysis"))
+        region_info.setContentsMargins(0, 0, 0, 0)
+        region_info.setSpacing(2)
+        title_lbl = make_section_label("Construction Works Data")
+        region_info.addWidget(title_lbl)
         top_layout.addLayout(region_info)
 
         top_layout.addStretch()
@@ -92,6 +99,12 @@ class StructureTabView(QWidget):
         top_layout.addWidget(self.trash_btn)
 
         self.main_layout.addWidget(top_area)
+
+        # --- HORIZONTAL DIVIDER (hr) ---
+        hr = QWidget()
+        hr.setFixedHeight(1)
+        hr.setStyleSheet("background-color: palette(mid);")
+        self.main_layout.addWidget(hr)
 
         # --- CONTENT AREA (Tabs + Trash View) ---
         self.content_stack = QStackedWidget()

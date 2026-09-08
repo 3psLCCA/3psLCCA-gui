@@ -690,9 +690,9 @@ QStatusBar {
 
 /* ── Tooltip ────────────────────────────────────────────────────────────── */
 QToolTip {
-    background-color: palette(toolTipBase);
-    color: palette(toolTipText);
-    border: 1px solid palette(mid);
+    background-color: $surface;
+    color: $text;
+    border: 1px solid $border;
     border-radius: 6px;
     padding: 6px 10px;
     font-size: $font-size-md;

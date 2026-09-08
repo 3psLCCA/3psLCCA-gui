@@ -3,6 +3,7 @@ import datetime
 import time
 from three_ps_lcca_gui.gui.themes import get_token
 from three_ps_lcca_gui.gui.theme import FS_MD, FS_SM
+from ...utils.form_builder.form_builder import make_section_label
 
 from PySide6.QtWidgets import (
     QWidget,
@@ -88,9 +89,7 @@ def _vline() -> QFrame:
 
 
 def _section_label(text: str) -> QLabel:
-    lbl = QLabel(f"<b>{text}</b>")
-    lbl.setStyleSheet(f"font-size: {FS_MD}pt;")
-    return lbl
+    return make_section_label(text)
 
 
 # ---------------------------------------------------------------------------
@@ -439,7 +438,7 @@ class TransportEmissions(QWidget):
         summary_layout = QHBoxLayout(summary_bar)
         summary_layout.setContentsMargins(8, 8, 8, 8)
 
-        self.total_lbl = QLabel("Total Transport Emissions: - kgCO₂e")
+        self.total_lbl = QLabel("<b>Total Transport Emissions:</b> - kgCO₂e")
         self.vehicle_lbl = QLabel("Vehicles: -")
         self.add_btn = QPushButton("+ Add Delivery")
         self.add_btn.setMinimumHeight(32)
@@ -552,7 +551,7 @@ class TransportEmissions(QWidget):
 
         # Update summary
         self.total_lbl.setText(
-            f"Total Transport Emissions: {fmt_comma(total_emission)} kgCO₂e"
+            f"<b>Total Transport Emissions:</b> {fmt_comma(total_emission)} kgCO₂e"
         )
         self.vehicle_lbl.setText(f"Vehicles: {active_count}")
         self.foundation_lbl.setText(

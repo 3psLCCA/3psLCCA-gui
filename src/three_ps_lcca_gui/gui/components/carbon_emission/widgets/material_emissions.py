@@ -1,5 +1,6 @@
 from three_ps_lcca_gui.gui.themes import get_token
 from three_ps_lcca_gui.gui.theme import FS_MD
+from ...utils.form_builder.form_builder import make_section_header, make_section_label
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -513,7 +514,7 @@ class MaterialEmissions(QWidget):
         # Summary Bar
         self.summary_bar = QWidget()
         summary_layout = QHBoxLayout(self.summary_bar)
-        self.total_lbl = QLabel("Total: - kgCO₂e")
+        self.total_lbl = QLabel("<b>Total:</b> - kgCO₂e")
         self.count_lbl = QLabel("Included: - of - items")
         self.details_btn = QPushButton("Show Details ▼")
         self.details_btn.setFlat(True)
@@ -540,7 +541,10 @@ class MaterialEmissions(QWidget):
         main_layout.addWidget(self.details_widget)
         main_layout.addWidget(self._hline())
 
-        main_layout.addWidget(self._section_label("Included in Carbon Emissions Calculation"))
+        # ── Included Section ─────────────────────────────────────────────
+        for widget in make_section_header("Included in Carbon Emissions Calculation"):
+            main_layout.addWidget(widget)
+
         self.included_table = CarbonTable(is_included=True)
         self._included_action = _CarbonActionDelegate(
             self.included_table._frozen_overlay, self
@@ -549,9 +553,11 @@ class MaterialEmissions(QWidget):
             0, self._included_action
         )
         main_layout.addWidget(self.included_table)
-        main_layout.addWidget(self._hline())
 
-        main_layout.addWidget(self._section_label("Excluded from Carbon Emissions Calculation"))
+        # ── Excluded Section ─────────────────────────────────────────────
+        for widget in make_section_header("Excluded from Carbon Emissions Calculation"):
+            main_layout.addWidget(widget)
+
         self.excluded_table = CarbonTable(is_included=False)
         self._excluded_action = _CarbonActionDelegate(
             self.excluded_table._frozen_overlay, self
@@ -566,9 +572,7 @@ class MaterialEmissions(QWidget):
         outer_layout.addWidget(scroll)
 
     def _section_label(self, text: str) -> QLabel:
-        lbl = QLabel(f"<b>{text}</b>")
-        lbl.setStyleSheet(f"font-size: {FS_MD}pt;")
-        return lbl
+        return make_section_label(text)
 
     def _hline(self) -> QFrame:
         f = QFrame()
@@ -785,7 +789,7 @@ class MaterialEmissions(QWidget):
     def _update_summary(
         self, total: float, included: int, total_count: int, cat_totals: dict
     ):
-        self.total_lbl.setText(f"Total: {fmt_comma(total)} kgCO₂e")
+        self.total_lbl.setText(f"<b>Total:</b> {fmt_comma(total)} kgCO₂e")
         self.count_lbl.setText(f"Included: {included} of {total_count} items")
         self.foundation_lbl.setText(
             f"Foundation: {fmt_comma(cat_totals.get('Foundation', 0))}"

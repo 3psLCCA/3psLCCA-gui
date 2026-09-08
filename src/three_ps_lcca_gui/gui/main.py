@@ -3,6 +3,12 @@ import os
 import platform
 import ctypes
 
+# Sub-process worker mode for packaged executables (.exe / .sh)
+if "--glossary-worker" in sys.argv:
+    from three_ps_lcca_gui.gui.components.utils.doc_handler.webview_handler import run
+    run()
+    sys.exit(0)
+
 # ── Global App Configuration ──────────────────────────────────────────────────
 # This MUST happen before any other project imports to ensure paths are set correctly
 from three_ps_lcca_gui.gui.version import APP_NAME, APP_AUTHOR, APP_DATA_NAME

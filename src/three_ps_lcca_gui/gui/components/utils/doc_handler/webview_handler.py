@@ -4,6 +4,14 @@ import json
 import subprocess
 import webbrowser
 from pathlib import Path
+
+# Ensure project 'src' is in sys.path when executed directly or in standalone process
+for _p in Path(__file__).resolve().parents:
+    if (_p / "three_ps_lcca_gui").is_dir():
+        if str(_p) not in sys.path:
+            sys.path.insert(0, str(_p))
+        break
+
 from three_ps_lcca_gui.gui.theme import FS_SECTION, FS_MD
 from three_ps_lcca_gui.gui.themes import get_token
 
@@ -60,8 +68,12 @@ def _is_running() -> bool:
     try:
         import psutil
         pid = int(_LOCK_FILE.read_text().strip())
-        proc = psutil.Process(pid)
-        if str(FILE_PATH) in proc.cmdline():
+        cmdline = " ".join(proc.cmdline())
+        if (
+            str(FILE_PATH) in cmdline
+            or "webview_handler" in cmdline
+            or "--glossary-worker" in cmdline
+        ):
             return True
         # PID recycled by a different process - stale lock
         _LOCK_FILE.unlink(missing_ok=True)
@@ -196,7 +208,12 @@ def close_glossary() -> None:
         import psutil
         pid = int(_LOCK_FILE.read_text().strip())
         proc = psutil.Process(pid)
-        if str(FILE_PATH) in proc.cmdline():
+        cmdline = " ".join(proc.cmdline())
+        if (
+            str(FILE_PATH) in cmdline
+            or "webview_handler" in cmdline
+            or "--glossary-worker" in cmdline
+        ):
             proc.terminate()
     except Exception:
         pass
@@ -231,11 +248,39 @@ def open_glossary(slug_parts=None, parent=None) -> None:
             _NAV_FILE.write_text("/".join(slug_parts) + ".md", encoding="utf-8")
         _focus_glossary_window()
         return
+    is_frozen = getattr(sys, "frozen", False)
+    env = os.environ.copy()
+
+    src_dir = None
+    for _p in FILE_PATH.parents:
+        if (_p / "three_ps_lcca_gui").is_dir():
+            src_dir = str(_p)
+            break
+
+    if src_dir:
+        existing = env.get("PYTHONPATH", "")
+        env["PYTHONPATH"] = f"{src_dir}{os.pathsep}{existing}" if existing else src_dir
+
+    slug_arg = json.dumps(slug_parts or [])
+    theme_arg = json.dumps(_get_theme())
+
+    if is_frozen:
+        cmd = [sys.executable, "--glossary-worker", slug_arg, theme_arg]
+    else:
+        cmd = [
+            sys.executable,
+            "-m",
+            "three_ps_lcca_gui.gui.components.utils.doc_handler.webview_handler",
+            slug_arg,
+            theme_arg,
+        ]
+
     proc = subprocess.Popen(
-        [sys.executable, str(FILE_PATH),
-         json.dumps(slug_parts or []), json.dumps(_get_theme())],
+        cmd,
+        cwd=src_dir if (src_dir and not is_frozen) else None,
         creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
         stderr=subprocess.PIPE,
+        env=env,
     )
 
     def _check_startup():
