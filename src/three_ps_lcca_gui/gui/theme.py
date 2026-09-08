@@ -56,15 +56,21 @@ BTN_LG = 40   # primary CTA
 # ── Typography ─────────────────────────────────────────────────────────────
 FONT_FAMILY = "Ubuntu"
 
-# Point sizes
-FS_XS   =  7   # badge pill, tertiary hint
-FS_SM   =  8   # caption, overline label, sort buttons
-FS_BASE =  9   # body text, standard buttons
-FS_MD   = 10   # sidebar row name, banner label
-FS_LG      = 11   # grid card title
+# Point sizes  (≈px at 96 dpi: 1 pt ≈ 1.33 px)
+# Dashboard 8-tier scale reference:
+#   Tier 8 floor      FS_XS   ~9 px   | Tier 7 reference  FS_SM   ~11 px
+#   Tier 6 body       FS_MD   ~13 px  | Tier 5 card title FS_LG   ~15 px
+#   Tier 4 section    FS_SECTION ~18px| Tier 3 page title FS_DISP ~24 px
+#   Tier 2 primary    FS_XL   ~20 px  | Tier 1 hero       FS_DISP_LG ~29 px
+FS_XS      =  7   # badge pill, tertiary hint             (Tier 8 ~9 px)
+FS_SM      =  8   # caption, overline label, sort buttons (Tier 7 ~11 px)
+FS_BASE    =  9   # body text, standard buttons
+FS_MD      = 10   # sidebar row name, body copy           (Tier 6 ~13 px)
+FS_LG      = 11   # grid card title / data label          (Tier 5 ~15 px)
+FS_SECTION = 14   # outputs section heading               (Tier 4 ~18 px)
 FS_SUBHEAD = 16   # content-area section heading, group divider
-FS_XL      = 15   # logo / brand mark
-FS_DISP  = 18   # greeting display heading
+FS_XL      = 15   # logo / brand mark, secondary KPI      (Tier 2 ~20 px)
+FS_DISP    = 18   # page title "Results"                  (Tier 3 ~24 px)
 FS_DISP_LG = 22 # prominent card values
 FS_DISP_XL = 32 # extra large dashboard highlights
 

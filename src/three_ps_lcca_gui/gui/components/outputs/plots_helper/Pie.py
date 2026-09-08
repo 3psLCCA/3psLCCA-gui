@@ -546,8 +546,8 @@ class LCCPieWidget(QWidget):
         self.card.setObjectName("pieCard")
         self.card.setStyleSheet(
             f"#pieCard {{"
-            f"  background: transparent;"
-            f"  border: 1.5px solid {get_token('surface_mid')};"
+            f"  background-color: {get_token('base')};"
+            f"  border: 1px solid {get_token('surface_mid')};"
             f"  border-radius: {RADIUS_XL}px;"
             f"}}"
         )
@@ -562,10 +562,10 @@ class LCCPieWidget(QWidget):
         self._left_panel.setObjectName("pieTextPanel")
         self._left_panel.setStyleSheet(
             f"#pieTextPanel {{"
-            f"  background-color: {get_token('window')};"
+            f"  background-color: {get_token('base')};"
             f"  border-top-left-radius: {RADIUS_XL - 1}px;"
             f"  border-bottom-left-radius: {RADIUS_XL - 1}px;"
-            f"  border-right: 1.5px solid {get_token('surface_mid')};"
+            f"  border-right: 1px solid {get_token('surface_mid')};"
             f"}}"
         )
         self._left_panel.setFixedWidth(310)
@@ -800,12 +800,12 @@ class LCCPieWidget(QWidget):
             self._left_panel.setMaximumWidth(16777215)
             self._left_panel.setStyleSheet(
                 f"#pieTextPanel {{"
-                f"  background-color: {get_token('window')};"
+                f"  background-color: {get_token('base')};"
                 f"  border-top-left-radius: {RADIUS_XL - 1}px;"
                 f"  border-top-right-radius: {RADIUS_XL - 1}px;"
                 f"  border-bottom-left-radius: 0px;"
                 f"  border-bottom-right-radius: 0px;"
-                f"  border-bottom: 1.5px solid {get_token('surface_mid')};"
+                f"  border-bottom: 1px solid {get_token('surface_mid')};"
                 f"  border-right: none;"
                 f"}}"
             )
@@ -814,12 +814,12 @@ class LCCPieWidget(QWidget):
             self._left_panel.setFixedWidth(310)
             self._left_panel.setStyleSheet(
                 f"#pieTextPanel {{"
-                f"  background-color: {get_token('window')};"
+                f"  background-color: {get_token('base')};"
                 f"  border-top-left-radius: {RADIUS_XL - 1}px;"
                 f"  border-bottom-left-radius: {RADIUS_XL - 1}px;"
                 f"  border-top-right-radius: 0px;"
                 f"  border-bottom-right-radius: 0px;"
-                f"  border-right: 1.5px solid {get_token('surface_mid')};"
+                f"  border-right: 1px solid {get_token('surface_mid')};"
                 f"  border-bottom: none;"
                 f"}}"
             )
