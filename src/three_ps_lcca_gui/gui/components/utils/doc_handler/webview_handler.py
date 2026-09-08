@@ -5,6 +5,7 @@ import subprocess
 import webbrowser
 from pathlib import Path
 from three_ps_lcca_gui.gui.theme import FS_SECTION, FS_MD
+from three_ps_lcca_gui.gui.themes import get_token
 
 FILE_PATH     = Path(__file__).resolve()
 DOC_BUILD_DIR = FILE_PATH.parent / "doc_build"
@@ -23,6 +24,10 @@ def _no_build_html() -> str:
             favicon = f'<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,{b64}">'
     except Exception:
         pass
+    bg = get_token("window") or "#1e1e2e"
+    text = get_token("text") or "#cdd6f4"
+    danger = get_token("danger") or "#f38ba8"
+    text_sec = get_token("text_secondary") or "#a6adc8"
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -31,11 +36,11 @@ def _no_build_html() -> str:
 {favicon}
 <style>
 body{{font-family:'Segoe UI',sans-serif;display:flex;align-items:center;
-     justify-content:center;height:100vh;margin:0;background:#1e1e2e;color:#cdd6f4}}
+     justify-content:center;height:100vh;margin:0;background:{bg};color:{text}}}
 .box{{text-align:center;max-width:440px}}
-h2{{margin:0 0 12px;font-size:{FS_SECTION}pt;color:#f38ba8}}
-p{{margin:0 0 8px;font-size:{FS_MD}pt;color:#a6adc8;line-height:1.6}}
-strong{{color:#cdd6f4}}
+h2{{margin:0 0 12px;font-size:{FS_SECTION}pt;color:{danger}}}
+p{{margin:0 0 8px;font-size:{FS_MD}pt;color:{text_sec};line-height:1.6}}
+strong{{color:{text}}}
 </style>
 </head>
 <body>

@@ -1273,7 +1273,7 @@ class SheetPreviewWidget(QWidget):
         shl.addStretch()
 
         self._sheet_count_lbl = QLabel()
-        self._sheet_count_lbl.setStyleSheet(f"font-size: {FS_SM}pt; color: #777;")
+        self._sheet_count_lbl.setStyleSheet(f"font-size: {FS_SM}pt; color: {get_token('text_secondary')};")
         shl.addWidget(self._sheet_count_lbl)
 
         outer.addWidget(sheet_hdr)
@@ -1314,7 +1314,7 @@ class SheetPreviewWidget(QWidget):
                 divider = QFrame()
                 divider.setFrameShape(QFrame.HLine)
                 divider.setFrameShadow(QFrame.Sunken)
-                divider.setStyleSheet("color: #bbb;")
+                divider.setStyleSheet(f"color: {get_token('border-subtle')};")
                 cl.addWidget(divider)
 
             block = ComponentBlock(comp_name, comp_rows, is_uncat=is_uncat)

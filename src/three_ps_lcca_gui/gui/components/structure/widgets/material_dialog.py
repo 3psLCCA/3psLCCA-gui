@@ -885,7 +885,7 @@ class MaterialDialog(QDialog):
                 else:
                     _sor_text  = f"⚠  \"{self._sor_db_key}\"  —  database not found"
                     _sor_style = (
-                        f"font-size: {FS_SM}pt; color: {get_token('error', '#c0392b')};"
+                        f"font-size: {FS_SM}pt; color: {get_token('danger')};"
                         f" font-weight: 600;"
                     )
 

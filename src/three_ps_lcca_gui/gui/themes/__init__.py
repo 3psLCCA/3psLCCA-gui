@@ -253,6 +253,8 @@ def _derive_compat_tokens(raw: dict[str, str], state: dict[str, float]) -> dict[
         "splash-bg":           raw.get("window", ""),
         "splash-progress":     raw.get("success", ""),
         "text-on-primary":     text_on_primary,
+        "error":               raw.get("danger", ""),
+        "icon-muted":          raw.get("text_disabled", ""),
     })
 
     # Add centralized font weights and sizes

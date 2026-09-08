@@ -177,7 +177,7 @@ class _SvgIconEngine(QIconEngine):
         app = QApplication.instance()
         if mode == QIcon.Mode.Disabled:
             from three_ps_lcca_gui.gui.themes import get_token
-            return app.palette().placeholderText().color().name() if app else get_token("icon-muted")
+            return app.palette().placeholderText().color().name() if app else get_token("text_disabled")
         from three_ps_lcca_gui.gui.themes import get_token
         return app.palette().windowText().color().name() if app else get_token("text")
 
