@@ -54,6 +54,7 @@ from three_ps_lcca_gui.core.safechunk_engine import SafeChunkEngine, _decode, LC
 import three_ps_lcca_gui.core.start_manager as _sm
 from three_ps_lcca_core.core.main import run_full_lcc_analysis
 from three_ps_lcca_gui.gui.components.utils.display_format import fmt_currency
+from three_ps_lcca_gui.gui.components.sponsors_footer import SponsorsFooter
 from .data_preparer import DataPreparer
 from .helper_functions.lifecycle_summary import compute_all_summaries
 from .helper_functions.lcc_colors import COLORS as LCC_PALETTE
@@ -948,51 +949,14 @@ class ComparisonPickerPanel(QWidget):
         self._body_layout.addStretch()
 
         # ── Footer: Sponsors Area ──────────────────────────────────────────
-        self.footer = QWidget()
-        self.footer.setFixedHeight(120)
+        outer.addWidget(self._hline())
+        self.footer = SponsorsFooter()
         outer.addWidget(self.footer)
-
-        fl = QHBoxLayout(self.footer)
-        fl.setContentsMargins(SP10, SP6, SP10, SP6)
-
-        # Developed At Section
-        dev_v = QVBoxLayout()
-        dev_v.setSpacing(SP3)
-        dev_lbl = QLabel("DEVELOPED AT")
-        dev_lbl.setFont(_f(FS_XS, FW_BOLD))
-        dev_v.addWidget(dev_lbl)
-        self.iitb_logo = QLabel()
-        dev_v.addWidget(self.iitb_logo, 0, Qt.AlignLeft | Qt.AlignVCenter)
-        fl.addLayout(dev_v)
-
-        fl.addStretch()
-
-        # Supported By Section
-        sup_v = QVBoxLayout()
-        sup_v.setSpacing(SP3)
-        sup_v.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        sup_lbl = QLabel("SUPPORTED BY")
-        sup_lbl.setFont(_f(FS_XS, FW_BOLD))
-        sup_lbl.setAlignment(Qt.AlignRight)
-        sup_v.addWidget(sup_lbl)
-
-        sup_h = QHBoxLayout()
-        sup_h.setSpacing(SP8)
-        sup_h.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        self.cs_logo = QLabel()
-        self.mos_logo = QLabel()
-        self.insdag_logo = QLabel()
-        sup_h.addWidget(self.cs_logo)
-        sup_h.addWidget(self.mos_logo)
-        sup_h.addWidget(self.insdag_logo)
-        sup_v.addLayout(sup_h)
-        fl.addLayout(sup_v)
-
-        self._refresh_footer()
 
     def _on_theme(self):
         self._header.setStyleSheet(f"color: {get_token('text')};")
-        self._refresh_footer()
+        if hasattr(self, "footer"):
+            self.footer.refresh_theme()
         self._apply_run_btn_style()
 
     def _apply_run_btn_style(self):
@@ -1000,73 +964,6 @@ class ComparisonPickerPanel(QWidget):
             self._run_btn.setStyleSheet(btn_primary())
         else:
             self._run_btn.setStyleSheet(btn_ghost())
-
-    def _set_svg_logo(self, label: QLabel, path: str, height: int):
-        """Helper to render a crisp SVG logo into a QLabel with no background."""
-        if not os.path.exists(path):
-            label.hide()
-            return
-        label.show()
-        label.setStyleSheet("background: transparent; border: none;")
-        renderer = QSvgRenderer(path)
-        if not renderer.isValid():
-            return
-        aspect = renderer.defaultSize().width() / max(1, renderer.defaultSize().height())
-        width = int(height * aspect)
-        pixmap = QPixmap(width * 2, height * 2)  # High DPI
-        pixmap.fill(Qt.GlobalColor.transparent)
-        painter = QPainter(pixmap)
-        renderer.render(painter)
-        painter.end()
-        label.setPixmap(pixmap)
-        label.setFixedSize(width, height)
-        label.setScaledContents(True)
-
-    def _set_themed_logo(self, label: QLabel, dark_path: str, light_path: str, height: int, is_dk: bool):
-        """Pick dark or light SVG variant based on theme."""
-        path = dark_path if is_dk else light_path
-        self._set_svg_logo(label, path, height)
-
-    def _refresh_footer(self):
-        """Update theme-aware logos and dynamic QSS."""
-        from three_ps_lcca_gui.gui.themes import is_dark
-        is_dk = is_dark()
-
-        # 1. Footer: Developed At (IITB)
-        self._set_themed_logo(
-            self.iitb_logo,
-            os.path.join(_ASSETS_DIR, "logo", "special", "IITB_logo_dark.svg"),
-            os.path.join(_ASSETS_DIR, "logo", "special", "IITB_logo_light.svg"),
-            50, is_dk
-        )
-
-        # 2. Footer: Supported By (ConstructSteel, MOS, INSDAG)
-        self._set_themed_logo(
-            self.cs_logo,
-            os.path.join(_ASSETS_DIR, "logo", "special", "ConstructSteel_dark.svg"),
-            os.path.join(_ASSETS_DIR, "logo", "special", "ConstructSteel_light.svg"),
-            20, is_dk
-        )
-        self._set_themed_logo(
-            self.mos_logo,
-            os.path.join(_ASSETS_DIR, "logo", "special", "MOS_dark.svg"),
-            os.path.join(_ASSETS_DIR, "logo", "special", "MOS_light.svg"),
-            40, is_dk
-        )
-        self._set_themed_logo(
-            self.insdag_logo,
-            os.path.join(_ASSETS_DIR, "logo", "special", "INSDAG_dark.svg"),
-            os.path.join(_ASSETS_DIR, "logo", "special", "INSDAG_light.svg"),
-            40, is_dk
-        )
-
-        # 3. Style text and background
-        muted = f"color: {get_token('text_disabled')}; letter-spacing: 1px;"
-        for lbl in self.footer.findChildren(QLabel):
-            if lbl.text() in ("DEVELOPED AT", "SUPPORTED BY"):
-                lbl.setStyleSheet(muted)
-
-        self.footer.setStyleSheet(f"background: {get_token('surface')}; border: none;")
 
     @staticmethod
     def _hline() -> QFrame:

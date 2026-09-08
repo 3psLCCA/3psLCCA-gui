@@ -51,6 +51,7 @@ from PySide6.QtWidgets import (
 from three_ps_lcca_gui.core.safechunk_engine import SafeChunkEngine
 import three_ps_lcca_gui.core.start_manager as sm
 from three_ps_lcca_gui.gui.theme import (
+    FONT_FAMILY,
     SP2,
     SP3,
     SP4,
@@ -86,6 +87,7 @@ from three_ps_lcca_gui.gui.styles import (
 )
 from three_ps_lcca_gui.gui.components.settings_dialog import SettingsDialog
 from three_ps_lcca_gui.gui.components.outputs.comparison_page import ComparisonPickerPanel
+from three_ps_lcca_gui.gui.components.sponsors_footer import SponsorsFooter
 
 _GUI_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 _ASSETS_DIR = os.path.join(_GUI_DIR, "assets")
@@ -1126,7 +1128,7 @@ class HomePage(QWidget):
         tl.setContentsMargins(SP10, 0, SP10, 0)
         tl.setSpacing(SP2)
 
-        self.grid_section_lbl = QLabel("RECENT PROJECTS")
+        self.grid_section_lbl = QLabel("Recent Projects")
         self.grid_section_lbl.setFont(_f(FS_SM, FW_SEMIBOLD))
         self.grid_section_lbl.setStyleSheet(
             f"color: {get_token('text_disabled')}; letter-spacing: 2px;"
@@ -1150,7 +1152,7 @@ class HomePage(QWidget):
         self._search_text = ""
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Search projects...")
-        self.search_input.setFixedHeight(BTN_SM)
+        self.search_input.setFixedHeight(32)
         self.search_input.setMinimumWidth(160)
         self.search_input.setMaximumWidth(280)
         self.search_input.setSizePolicy(
@@ -1161,6 +1163,14 @@ class HomePage(QWidget):
 
         tl.addSpacing(SP4)
 
+        # Segmented sort buttons container (Recent / All / Starred / Compare)
+        self.sort_container = QFrame()
+        self.sort_container.setObjectName("sortSegmentedControl")
+        self.sort_container.setFixedHeight(32)
+        sc_layout = QHBoxLayout(self.sort_container)
+        sc_layout.setContentsMargins(0, 0, 0, 0)
+        sc_layout.setSpacing(0)
+
         self._sort_btns = []
         saved_sort = sm.get_pref("sort_order") or "recent"
         for label, key in [
@@ -1170,18 +1180,18 @@ class HomePage(QWidget):
             *([("Compare", "compare")] if COMPARISON_MODE else []),
         ]:
             btn = QPushButton(label)
-            btn.setFixedHeight(BTN_SM)
-            btn.setFont(_f(FS_SM, FW_MEDIUM))
             btn.setCheckable(True)
+            btn.setCursor(Qt.PointingHandCursor)
             btn.setProperty("sort_key", key)
             btn.clicked.connect(self._on_sort_btn)
             btn.setChecked(key == saved_sort)
-            tl.addWidget(btn, 0, Qt.AlignVCenter)
-            tl.addSpacing(SP2)
+            sc_layout.addWidget(btn)
             self._sort_btns.append(btn)
 
         if not any(b.isChecked() for b in self._sort_btns):
             self._sort_btns[0].setChecked(True)
+
+        tl.addWidget(self.sort_container, 0, Qt.AlignVCenter)
 
         layout.addWidget(toolbar)
         layout.addWidget(self._hline())
@@ -1211,46 +1221,9 @@ class HomePage(QWidget):
         self.grid_list.comparison_toggled.connect(self._on_comp_toggle)
         layout.addWidget(self.grid_list, stretch=1)
 
-        # ── Footer: Sponsors Area ──────────────────────────────────────────
-        self.footer = QWidget()
-        self.footer.setFixedHeight(120)
+        layout.addWidget(self._hline())
+        self.footer = SponsorsFooter()
         layout.addWidget(self.footer)
-
-        fl = QHBoxLayout(self.footer)
-        fl.setContentsMargins(SP10, SP6, SP10, SP6)
-
-        # Developed At Section
-        dev_v = QVBoxLayout()
-        dev_v.setSpacing(SP3)
-        dev_lbl = QLabel("DEVELOPED AT")
-        dev_lbl.setFont(_f(FS_XS, FW_BOLD))
-        dev_v.addWidget(dev_lbl)
-        self.iitb_logo = QLabel()
-        dev_v.addWidget(self.iitb_logo, 0, Qt.AlignLeft | Qt.AlignVCenter)
-        fl.addLayout(dev_v)
-
-        fl.addStretch()
-
-        # Supported By Section
-        sup_v = QVBoxLayout()
-        sup_v.setSpacing(SP3)
-        sup_v.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        sup_lbl = QLabel("SUPPORTED BY")
-        sup_lbl.setFont(_f(FS_XS, FW_BOLD))
-        sup_lbl.setAlignment(Qt.AlignRight)
-        sup_v.addWidget(sup_lbl)
-
-        sup_h = QHBoxLayout()
-        sup_h.setSpacing(SP8)
-        sup_h.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        self.cs_logo = QLabel()
-        self.mos_logo = QLabel()
-        self.insdag_logo = QLabel()
-        sup_h.addWidget(self.cs_logo)
-        sup_h.addWidget(self.mos_logo)
-        sup_h.addWidget(self.insdag_logo)
-        sup_v.addLayout(sup_h)
-        fl.addLayout(sup_v)
 
         self._refresh_styles()
         theme_manager().theme_changed.connect(self._refresh_styles)
@@ -1343,38 +1316,11 @@ class HomePage(QWidget):
         self._set_svg_logo(self.logo_lbl, os.path.join(
             _ASSETS_DIR, "logo", "logo-3psLCCA.svg"), 55)
 
-        # 2. Footer: Developed At (IITB)
-        self._set_themed_logo(
-            self.iitb_logo,
-            os.path.join(_ASSETS_DIR, "logo", "special", "IITB_logo_dark.svg"),
-            os.path.join(_ASSETS_DIR, "logo", "special",
-                         "IITB_logo_light.svg"),
-            50, is_dk
-        )
+        # 2. Footer
+        if hasattr(self, "footer"):
+            self.footer.refresh_theme()
 
-        # 3. Footer: Supported By (ConstructSteel, MOS, INSDAG)
-        self._set_themed_logo(
-            self.cs_logo,
-            os.path.join(_ASSETS_DIR, "logo", "special",
-                         "ConstructSteel_dark.svg"),
-            os.path.join(_ASSETS_DIR, "logo", "special",
-                         "ConstructSteel_light.svg"),
-            12, is_dk
-        )
-        self._set_themed_logo(
-            self.mos_logo,
-            os.path.join(_ASSETS_DIR, "logo", "special", "MOS_dark.svg"),
-            os.path.join(_ASSETS_DIR, "logo", "special", "MOS_light.svg"),
-            40, is_dk
-        )
-        self._set_themed_logo(
-            self.insdag_logo,
-            os.path.join(_ASSETS_DIR, "logo", "special", "INSDAG_dark.svg"),
-            os.path.join(_ASSETS_DIR, "logo", "special", "INSDAG_light.svg"),
-            40, is_dk
-        )
-
-        # 4. Refresh Button
+        # 3. Refresh Button
         self.refresh_btn.setStyleSheet(
             f"QPushButton {{ border: 1px solid {get_token('surface_mid')}; border-radius: 14px; "
             f"padding: 0; min-width: 28px; max-width: 28px; min-height: 28px; max-height: 28px; background: transparent; }} "
@@ -1382,25 +1328,60 @@ class HomePage(QWidget):
             f"QPushButton:pressed {{ background: {get_token('surface_pressed')}; }}"
         )
 
-        # 5. Text colors
-        muted = f"color: {get_token('text_disabled')}; letter-spacing: 1px;"
-        for lbl in self.footer.findChildren(QLabel):
-            if lbl.text() in ("DEVELOPED AT", "SUPPORTED BY"):
-                lbl.setStyleSheet(muted)
-
         self.grid_section_lbl.setStyleSheet(
             f"color: {get_token('text_disabled')}; letter-spacing: 2px;")
 
         self.search_input.setStyleSheet(
-            f"QLineEdit {{ border-radius: {RADIUS_MD}px; border: 1px solid palette(mid); padding: 0 8px; }}"
+            f"QLineEdit {{ min-height: 0px; height: 30px; border-radius: {RADIUS_MD}px; border: 1px solid palette(mid); padding: 0 8px; }}"
             f"QLineEdit:focus {{ border: 1px solid {get_token('primary')}; }}"
         )
 
-        for btn in self._sort_btns:
-            btn.setStyleSheet(btn_ghost_checkable(radius=RADIUS_MD))
+        # Segmented sort buttons styling
+        if hasattr(self, "sort_container"):
+            bg_container = get_token("surface")
+            border_container = get_token("surface_mid")
+            active_bg = get_token("base")
+            active_border = get_token("surface_mid")
+            text_active = get_token("text")
+            text_inactive = get_token("text_secondary")
 
-        self.footer.setStyleSheet(
-            f"background: {get_token('surface')}; border: none;")
+            self.sort_container.setStyleSheet(
+                f"#sortSegmentedControl {{"
+                f"  background-color: {bg_container};"
+                f"  border: 1px solid {border_container};"
+                f"  border-radius: {RADIUS_MD}px;"
+                f"  padding: 0px;"
+                f"}}"
+            )
+
+            btn_style = (
+                f"QPushButton {{"
+                f"  min-height: 0px;"
+                f"  height: 30px;"
+                f"  background-color: transparent;"
+                f"  border: none;"
+                f"  margin: 0px;"
+                f"  border-radius: {RADIUS_MD - 1}px;"
+                f"  color: {text_inactive};"
+                f"  padding: 0 14px;"
+                f"  font-family: {FONT_FAMILY};"
+                f"  font-size: {FS_MD}pt;"
+                f"  font-weight: {FW_MEDIUM};"
+                f"}}"
+                f"QPushButton:hover:!checked {{"
+                f"  color: {text_active};"
+                f"}}"
+                f"QPushButton:checked {{"
+                f"  background-color: {active_bg};"
+                f"  border: none;"
+                f"  margin: 0px;"
+                f"  color: {text_active};"
+                f"  font-weight: {FW_SEMIBOLD};"
+                f"}}"
+            )
+            for btn in self._sort_btns:
+                btn.setStyleSheet(btn_style)
+
 
         if hasattr(self, "_comp_fab"):
             self._apply_fab_style()
@@ -1546,13 +1527,13 @@ class HomePage(QWidget):
             projects = [p for p in projects
                         if p.get("user_meta", {}).get("fit_for_comparison")]
             projects.sort(key=lambda p: (p.get("display_name") or "").lower())
-            self.grid_section_lbl.setText("READY TO COMPARE")
+            self.grid_section_lbl.setText("Ready to Compare")
         elif sort_key == "pinned":
             projects = [p for p in projects if p.get("pinned")]
-            self.grid_section_lbl.setText("STARRED PROJECTS")
+            self.grid_section_lbl.setText("Starred Projects")
         elif sort_key == "name":
             projects.sort(key=lambda p: (p.get("display_name") or "").lower())
-            self.grid_section_lbl.setText("ALL PROJECTS - A-Z")
+            self.grid_section_lbl.setText("All Projects - A-Z")
         else:
             def get_latest_time(p):
                 t1 = p.get("last_opened_at") or ""
@@ -1560,13 +1541,14 @@ class HomePage(QWidget):
                 return max(t1, t2)
             projects.sort(key=lambda p: (get_latest_time(p),
                           (p.get("display_name") or "").lower()), reverse=True)
-            self.grid_section_lbl.setText("RECENT PROJECTS")
+            self.grid_section_lbl.setText("Recent Projects")
         q = getattr(self, "_search_text", "").strip().lower()
         if q:
             projects = [p for p in projects if q in (
                 p.get("display_name") or p.get("project_id", "")).lower()]
+            raw_q = getattr(self, "_search_text", "").strip()
             self.grid_section_lbl.setText(
-                f"RESULTS FOR \u201c{q.upper()}\u201d")
+                f"Results for \u201c{raw_q}\u201d")
         # ── Handle Empty States ──────────────────────────────────────────
         if not projects:
             item = QListWidgetItem()
