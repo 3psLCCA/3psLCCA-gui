@@ -56,23 +56,21 @@ BTN_LG = 40   # primary CTA
 # ── Typography ─────────────────────────────────────────────────────────────
 FONT_FAMILY = "Ubuntu"
 
-# Point sizes  (≈px at 96 dpi: 1 pt ≈ 1.33 px)
-# Dashboard 8-tier scale reference:
-#   Tier 8 floor      FS_XS   ~9 px   | Tier 7 reference  FS_SM   ~11 px
-#   Tier 6 body       FS_MD   ~13 px  | Tier 5 card title FS_LG   ~15 px
-#   Tier 4 section    FS_SECTION ~18px| Tier 3 page title FS_DISP ~24 px
-#   Tier 2 primary    FS_XL   ~20 px  | Tier 1 hero       FS_DISP_LG ~29 px
-FS_XS      =  7   # badge pill, tertiary hint             (Tier 8 ~9 px)
-FS_SM      =  8   # caption, overline label, sort buttons (Tier 7 ~11 px)
-FS_BASE    =  9   # body text, standard buttons
-FS_MD      = 10   # sidebar row name, body copy           (Tier 6 ~13 px)
-FS_LG      = 11   # grid card title / data label          (Tier 5 ~15 px)
-FS_SECTION = 14   # outputs section heading               (Tier 4 ~18 px)
-FS_SUBHEAD = 16   # content-area section heading, group divider
-FS_XL      = 15   # logo / brand mark, secondary KPI      (Tier 2 ~20 px)
-FS_DISP    = 18   # page title "Results"                  (Tier 3 ~24 px)
-FS_DISP_LG = 22 # prominent card values
-FS_DISP_XL = 32 # extra large dashboard highlights
+# Point sizes (Strict 4-Tier System across the entire software)
+# 1 pt ≈ 1.33 px at 96 DPI
+FS_DISP    = 18   # Tier 1 (~24px) - Page Titles, Display Headings, Hero Metrics
+FS_SECTION = 14   # Tier 2 (~18px) - Section Headings, Primary Card Values
+FS_MD      = 10   # Tier 3 (~13px) - Body Text, Buttons, Input Fields, Paragraphs
+FS_SM      =  8   # Tier 4 (~11px) - Micro, Captions, Badges, Overlines, Currency, Hints
+
+# Canonical Aliases (for backward compatibility, strictly mapped to the 4 tiers)
+FS_DISP_XL = FS_DISP     # 18 pt
+FS_DISP_LG = FS_DISP     # 18 pt
+FS_SUBHEAD = FS_SECTION  # 14 pt
+FS_XL      = FS_SECTION  # 14 pt
+FS_LG      = FS_MD       # 10 pt
+FS_BASE    = FS_MD       # 10 pt
+FS_XS      = FS_SM       # 8 pt
 
 # Font weights (match QFont.Weight int values)
 # Toned down for subtler hierarchy:
@@ -90,6 +88,14 @@ QSS_WEIGHTS = {
     "weight-medium":   str(FW_MEDIUM),
     "weight-semibold": str(FW_SEMIBOLD),
     "weight-bold":     str(FW_BOLD),
+}
+
+# Centralized font size tokens for QSS substitution
+QSS_FONTS = {
+    "font-size-disp":    f"{FS_DISP}pt",
+    "font-size-section": f"{FS_SECTION}pt",
+    "font-size-md":      f"{FS_MD}pt",
+    "font-size-sm":      f"{FS_SM}pt",
 }
 
 

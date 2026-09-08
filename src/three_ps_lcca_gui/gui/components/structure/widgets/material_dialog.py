@@ -53,7 +53,7 @@ import os
 import uuid as _uuid_mod
 
 from three_ps_lcca_gui.gui.themes import get_token
-from three_ps_lcca_gui.gui.theme import FS_BASE
+from three_ps_lcca_gui.gui.theme import FS_BASE, FS_MD, FS_SM
 
 try:
     from ..registry.custom_material_db import CustomMaterialDB, CUSTOM_PREFIX
@@ -83,7 +83,7 @@ class InfoPopup(QDialog):
         layout.setSpacing(10)
 
         title_lbl = QLabel(f"<b>{defn.get('label', field_key)}</b>")
-        title_lbl.setStyleSheet("font-size: 13px;")
+        title_lbl.setStyleSheet(f"font-size: {FS_MD}pt;")
         layout.addWidget(title_lbl)
 
         line = QFrame()
@@ -95,7 +95,7 @@ class InfoPopup(QDialog):
         expl = defn.get("explanation", "No description available.")
         html = expl + (" " + doc_inline(doc_slug, "Read More →") if doc_slug else "")
         expl_lbl = doc_label(html)
-        expl_lbl.setStyleSheet("font-size: 12px;")
+        expl_lbl.setStyleSheet(f"font-size: {FS_MD}pt;")
         layout.addWidget(expl_lbl)
 
         btn_row = QHBoxLayout()
@@ -115,17 +115,17 @@ class InfoPopup(QDialog):
 
 def _section_header(title: str) -> QLabel:
     lbl = QLabel(f"<b>{title}</b>")
-    lbl.setStyleSheet("font-size: 13px; margin-top: 4px;")
+    lbl.setStyleSheet(f"font-size: {FS_MD}pt; margin-top: 4px;")
     return lbl
 
 
 def _lbl(text: str, key: str = "") -> QLabel:
     slug = FIELD_DEFINITIONS.get(key, {}).get("doc_slug", []) if key else []
     if slug:
-        lbl = doc_label(f'<span style="font-weight:600;font-size:11px;">{text}</span> {doc_inline(slug)}')
+        lbl = doc_label(f'<span style="font-weight:600;font-size:{FS_SM}pt;">{text}</span> {doc_inline(slug)}')
     else:
         lbl = QLabel(text)
-        lbl.setStyleSheet("font-weight: 600; font-size: 11px;")
+        lbl.setStyleSheet(f"font-weight: 600; font-size: {FS_SM}pt;")
     return lbl
 
 
@@ -191,7 +191,7 @@ class CustomUnitDialog(QDialog):
             "its equivalent in the SI base unit."
         )
         desc.setWordWrap(True)
-        desc.setStyleSheet(f"font-size: 11px; color: {get_token('text_secondary')};")
+        desc.setStyleSheet(f"font-size: {FS_SM}pt; color: {get_token('text_secondary')};")
         layout.addWidget(desc)
 
         # ── Symbol + Name ─────────────────────────────────────────────────────
@@ -232,7 +232,7 @@ class CustomUnitDialog(QDialog):
         conv_row = QHBoxLayout()
         conv_row.setSpacing(8)
         self.conv_prefix_lbl = QLabel("1 unit  =")
-        self.conv_prefix_lbl.setStyleSheet(f"color: {get_token('text_secondary')}; font-size: 12px;")
+        self.conv_prefix_lbl.setStyleSheet(f"color: {get_token('text_secondary')}; font-size: {FS_MD}pt;")
         conv_row.addWidget(self.conv_prefix_lbl)
         self.conv_in = QLineEdit()
         self.conv_in.setMinimumHeight(32)
@@ -241,7 +241,7 @@ class CustomUnitDialog(QDialog):
         self.si_sym_lbl = QLabel("kg")
         self.si_sym_lbl.setStyleSheet(
             f"background: {get_token('surface')}; color: {get_token('text_secondary')}; padding: 4px 8px; "
-            f"border: 1px solid {get_token('surface_mid')}; border-radius: 4px; font-size: 12px;"
+            f"border: 1px solid {get_token('surface_mid')}; border-radius: 4px; font-size: {FS_MD}pt;"
         )
         self.si_sym_lbl.setMinimumHeight(32)
         self.si_sym_lbl.setMinimumWidth(48)
@@ -252,7 +252,7 @@ class CustomUnitDialog(QDialog):
         # ── Live preview ──────────────────────────────────────────────────────
         self.preview_lbl = QLabel("")
         self.preview_lbl.setStyleSheet(
-            f"font-size: 12px; color: {get_token('success')}; background: {get_token('success', 'pressed')}; "
+            f"font-size: {FS_MD}pt; color: {get_token('success')}; background: {get_token('success', 'pressed')}; "
             f"padding: 6px 10px; border-radius: 4px;"
         )
         self.preview_lbl.setWordWrap(True)
@@ -261,7 +261,7 @@ class CustomUnitDialog(QDialog):
 
         # ── Note ──────────────────────────────────────────────────────────────
         self._note_lbl = QLabel("")
-        self._note_lbl.setStyleSheet(f"font-size: 10px; color: {get_token('text_disabled')};")
+        self._note_lbl.setStyleSheet(f"font-size: {FS_SM}pt; color: {get_token('text_disabled')};")
         self._note_lbl.setWordWrap(True)
         layout.addWidget(self._note_lbl)
 
@@ -851,7 +851,7 @@ class MaterialDialog(QDialog):
                 # Not configured at all
                 _sor_text  = "─  not set  (configure in Project Settings)"
                 _sor_style = (
-                    f"font-size: 11px; color: {get_token('text_secondary')};"
+                    f"font-size: {FS_SM}pt; color: {get_token('text_secondary')};"
                     f" font-style: italic;"
                 )
             else:
@@ -879,13 +879,13 @@ class MaterialDialog(QDialog):
                 if _db_valid:
                     _sor_text  = self._sor_db_key
                     _sor_style = (
-                        f"font-size: 11px; color: {get_token('text_secondary')};"
+                        f"font-size: {FS_SM}pt; color: {get_token('text_secondary')};"
                         f" font-style: italic;"
                     )
                 else:
                     _sor_text  = f"⚠  \"{self._sor_db_key}\"  —  database not found"
                     _sor_style = (
-                        f"font-size: 11px; color: {get_token('error', '#c0392b')};"
+                        f"font-size: {FS_SM}pt; color: {get_token('error', '#c0392b')};"
                         f" font-weight: 600;"
                     )
 
@@ -902,7 +902,7 @@ class MaterialDialog(QDialog):
             sub_row.setContentsMargins(0, 0, 0, 0)
             sub_row.setSpacing(8)
             sub_lbl = QLabel("Search Category:")
-            sub_lbl.setStyleSheet(f"font-size: 11px; color: {get_token('text_secondary')};")
+            sub_lbl.setStyleSheet(f"font-size: {FS_SM}pt; color: {get_token('text_secondary')};")
             sub_row.addWidget(sub_lbl)
             self.type_filter_cb = QComboBox()
             self.type_filter_cb.setMinimumHeight(26)
@@ -1010,7 +1010,7 @@ class MaterialDialog(QDialog):
 
         carbon_hdr = QHBoxLayout()
         carbon_title = QLabel("Carbon Emission Factor")
-        carbon_title.setStyleSheet("font-weight: 600; font-size: 12px;")
+        carbon_title.setStyleSheet(f"font-weight: 600; font-size: {FS_MD}pt;")
         carbon_hdr.addWidget(carbon_title)
         carbon_hdr.addStretch()
         self.carbon_chk = QCheckBox("Include")
@@ -1109,7 +1109,7 @@ class MaterialDialog(QDialog):
         cf_input_row = QHBoxLayout()
         cf_input_row.setSpacing(6)
         self.cf_prefix_lbl = QLabel("1 unit =")
-        self.cf_prefix_lbl.setStyleSheet(f"color: {get_token('text_secondary')}; font-size: 12px;")
+        self.cf_prefix_lbl.setStyleSheet(f"color: {get_token('text_secondary')}; font-size: {FS_MD}pt;")
         cf_input_row.addWidget(self.cf_prefix_lbl)
 
         cf_val = v.get("conversion_factor", "")
@@ -1121,11 +1121,11 @@ class MaterialDialog(QDialog):
         cf_input_row.addWidget(self.conv_factor_in)
 
         self.cf_suffix_lbl = QLabel("unit")
-        self.cf_suffix_lbl.setStyleSheet(f"color: {get_token('text_secondary')}; font-size: 12px;")
+        self.cf_suffix_lbl.setStyleSheet(f"color: {get_token('text_secondary')}; font-size: {FS_MD}pt;")
         cf_input_row.addWidget(self.cf_suffix_lbl)
 
         self.cf_status_lbl = QLabel("")
-        self.cf_status_lbl.setStyleSheet(f"font-size: 11px; color: {get_token('text_disabled')};")
+        self.cf_status_lbl.setStyleSheet(f"font-size: {FS_SM}pt; color: {get_token('text_disabled')};")
         cf_input_row.addWidget(self.cf_status_lbl)
         cf_input_row.addStretch()
         cf_inner.addLayout(cf_input_row)
@@ -1134,7 +1134,7 @@ class MaterialDialog(QDialog):
 
         self.formula_lbl = QLabel("")
         self.formula_lbl.setWordWrap(True)
-        self.formula_lbl.setStyleSheet(f"font-size: 11px; color: {get_token('text_secondary')};")
+        self.formula_lbl.setStyleSheet(f"font-size: {FS_SM}pt; color: {get_token('text_secondary')};")
         self.formula_lbl.setVisible(False)
         cl.addWidget(self.formula_lbl)
 
@@ -1145,7 +1145,7 @@ class MaterialDialog(QDialog):
 
         recycle_hdr = QHBoxLayout()
         recycle_title = QLabel("Recyclability")
-        recycle_title.setStyleSheet("font-weight: 600; font-size: 12px;")
+        recycle_title.setStyleSheet(f"font-weight: 600; font-size: {FS_MD}pt;")
         recycle_hdr.addWidget(recycle_title)
         recycle_hdr.addStretch()
         self.recycle_chk = QCheckBox("Include")

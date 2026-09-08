@@ -59,6 +59,7 @@ import math
 import uuid
 import datetime
 from three_ps_lcca_gui.gui.themes import get_token
+from three_ps_lcca_gui.gui.theme import FS_SECTION, FS_SM
 
 from PySide6.QtWidgets import (
     QDialog,
@@ -190,7 +191,7 @@ class TransportDialog(QDialog):
             vl.setSpacing(8)
             hdr = QLabel(title)
             hdr.setStyleSheet(
-                f"font-size: 10px; font-weight: bold;"
+                f"font-size: {FS_SM}pt; font-weight: bold;"
                 f" color: {get_token('primary')}; letter-spacing: 1px;"
             )
             vl.addWidget(hdr)
@@ -210,7 +211,7 @@ class TransportDialog(QDialog):
                 if required else label
             )
             lbl = QLabel(lbl_text)
-            lbl.setStyleSheet("font-size: 11px; color: gray; font-weight: bold;")
+            lbl.setStyleSheet(f"font-size: {FS_SM}pt; color: gray; font-weight: bold;")
             vl.addWidget(lbl)
             vl.addWidget(widget)
             return w
@@ -273,7 +274,7 @@ class TransportDialog(QDialog):
             f'{doc_inline(["Carbon_emissions_data", "Transport_vehicle_reference"])}',
             word_wrap=False,
         )
-        ref_lbl.setStyleSheet("font-size: 11px; color: gray; background: transparent;")
+        ref_lbl.setStyleSheet(f"font-size: {FS_SM}pt; color: gray; background: transparent;")
         vehicle_frame.layout().addWidget(ref_lbl)
 
         outer.addWidget(vehicle_frame, 3)
@@ -356,7 +357,7 @@ class TransportDialog(QDialog):
         self.mat_table.setColumnWidth(4, 120)
 
         self.mat_count_lbl = QLabel("")
-        self.mat_count_lbl.setStyleSheet("color: gray; font-size: 11px;")
+        self.mat_count_lbl.setStyleSheet(f"color: gray; font-size: {FS_SM}pt;")
         ll.addWidget(self.mat_count_lbl)
         layout.addWidget(left, 1)
 
@@ -381,9 +382,9 @@ class TransportDialog(QDialog):
             cl.setContentsMargins(12, 5, 12, 5)
             cl.setSpacing(1)
             hdr = QLabel(header)
-            hdr.setStyleSheet("font-size: 9px; color: gray; font-weight: bold; letter-spacing: 1px;")
+            hdr.setStyleSheet(f"font-size: {FS_SM}pt; color: gray; font-weight: bold; letter-spacing: 1px;")
             val = QLabel("-")
-            val.setStyleSheet("font-size: 14px; font-weight: bold;")
+            val.setStyleSheet(f"font-size: {FS_SECTION}pt; font-weight: bold;")
             cl.addWidget(hdr)
             cl.addWidget(val)
             return chip, val
@@ -393,7 +394,7 @@ class TransportDialog(QDialog):
 
         em_chip, self._footer_emission = _chip("TOTAL EMISSION")
         self._footer_emission.setStyleSheet(
-            f"font-size: 14px; font-weight: bold; color: {get_token('primary')};"
+            f"font-size: {FS_SECTION}pt; font-weight: bold; color: {get_token('primary')};"
         )
         row.addWidget(em_chip)
 

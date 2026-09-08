@@ -2,6 +2,7 @@ import math
 import datetime
 import time
 from three_ps_lcca_gui.gui.themes import get_token
+from three_ps_lcca_gui.gui.theme import FS_MD, FS_SM
 
 from PySide6.QtWidgets import (
     QWidget,
@@ -88,7 +89,7 @@ def _vline() -> QFrame:
 
 def _section_label(text: str) -> QLabel:
     lbl = QLabel(f"<b>{text}</b>")
-    lbl.setStyleSheet("font-size: 13px;")
+    lbl.setStyleSheet(f"font-size: {FS_MD}pt;")
     return lbl
 
 
@@ -286,7 +287,7 @@ class VehicleCard(QGroupBox):
         ]
         for spec in specs:
             lbl = QLabel(spec)
-            lbl.setStyleSheet("font-size: 11px;")
+            lbl.setStyleSheet(f"font-size: {FS_SM}pt;")
             specs_row.addWidget(lbl)
             specs_row.addWidget(_vline())
         specs_row.addStretch()
@@ -296,7 +297,7 @@ class VehicleCard(QGroupBox):
         for warn in warnings:
             warn_lbl = QLabel(f"! {warn}")
             warn_lbl.setWordWrap(True)
-            warn_lbl.setStyleSheet("font-size: 11px;")
+            warn_lbl.setStyleSheet(f"font-size: {FS_SM}pt;")
             layout.addWidget(warn_lbl)
 
         # Materials table

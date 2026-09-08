@@ -23,6 +23,7 @@ from typing import Any
 from PySide6.QtCore import Qt, QRegularExpression
 from PySide6.QtGui import QPixmap, QRegularExpressionValidator
 from three_ps_lcca_gui.gui.themes import get_token
+from three_ps_lcca_gui.gui.theme import FS_SECTION
 from PySide6.QtWidgets import (
     QComboBox,
     QDoubleSpinBox,
@@ -56,7 +57,7 @@ def _make_section_header(title: str) -> list[QWidget]:
     """Return [header QLabel, divider QWidget] ready to add to a QFormLayout."""
     header = QLabel(title)
     header.setStyleSheet(
-        f"font-size: 15px; font-weight: {get_token('weight-semibold')}; padding-top: 16px; padding-bottom: 4px;"
+        f"font-size: {FS_SECTION}pt; font-weight: {get_token('weight-semibold')}; padding-top: 16px; padding-bottom: 4px;"
     )
 
     divider = QWidget()

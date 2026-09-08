@@ -1,4 +1,5 @@
-﻿from three_ps_lcca_gui.gui.themes import get_token
+from three_ps_lcca_gui.gui.themes import get_token
+from three_ps_lcca_gui.gui.theme import FS_MD
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -498,7 +499,7 @@ class Recycling(QWidget):
 
     def _section_label(self, text: str) -> QLabel:
         lbl = QLabel(f"<b>{text}</b>")
-        lbl.setStyleSheet("font-size: 13px;")
+        lbl.setStyleSheet(f"font-size: {FS_MD}pt;")
         return lbl
 
     def _hline(self) -> QFrame:

@@ -11,6 +11,8 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import QTimer, Qt
 from PySide6.QtGui import QFont, QColor, QTextCharFormat, QTextCursor
+from three_ps_lcca_gui.gui.theme import FS_SECTION, FS_MD, FW_BOLD
+from three_ps_lcca_gui.gui.styles import font as _f
 from .utils.validation_helpers import confirm_clear_all
 
 
@@ -32,15 +34,12 @@ class Logs(QWidget):
         # Header row
         header_row = QHBoxLayout()
         title = QLabel("Engine Logs")
-        font = QFont()
-        font.setPointSize(11)
-        font.setBold(True)
-        title.setFont(font)
+        title.setFont(_f(FS_SECTION, FW_BOLD))
         header_row.addWidget(title)
         header_row.addStretch()
 
         self.health_label = QLabel("")
-        # self.health_label.setStyleSheet("color: #555; font-size: 11px;")
+        # self.health_label.setStyleSheet(f"color: #555; font-size: {FS_SM}pt;")
         header_row.addWidget(self.health_label)
 
         clear_btn = QPushButton("Clear")
@@ -53,7 +52,7 @@ class Logs(QWidget):
         # Log display
         self.log_view = QTextEdit()
         self.log_view.setReadOnly(True)
-        self.log_view.setFont(QFont("Courier New", 10))
+        self.log_view.setFont(QFont("Courier New", FS_MD))
         # self.log_view.setStyleSheet(
         #     "QTextEdit { background-color: #1e1e1e; color: #d4d4d4; "
         #     "border: 1px solid #444; border-radius: 4px; padding: 6px; }"

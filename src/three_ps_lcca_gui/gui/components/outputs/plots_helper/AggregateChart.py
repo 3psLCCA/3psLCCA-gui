@@ -40,7 +40,7 @@ from PySide6.QtWidgets import (
 
 from three_ps_lcca_gui.gui.theme import (
     FONT_FAMILY,
-    FS_XS, FS_SM, FS_BASE, FS_MD, FS_LG, FS_XL, FS_SUBHEAD, FS_DISP,
+    FS_XS, FS_SM, FS_BASE, FS_MD, FS_LG, FS_SECTION, FS_XL, FS_SUBHEAD, FS_DISP,
     FW_NORMAL, FW_MEDIUM, FW_SEMIBOLD, FW_BOLD,
     SP1, SP2, SP3, SP4, SP5, SP6, RADIUS_SM, RADIUS_MD, RADIUS_LG, RADIUS_XL,
 )
@@ -617,8 +617,8 @@ def _create_total_block(total_val: float, currency: str) -> QFrame:
 
     formatted_total = fmt_currency(total_val, currency, decimals=2, style="short", use_short_suffix=True).title()
     tvalue = QLabel(
-        f"<span style='font-size:13pt; font-weight:700; color:{get_token('text')};'>{formatted_total}</span> "
-        f"<span style='font-size:8.5pt; font-weight:500; color:{get_token('text_secondary')};'>{currency}</span>"
+        f"<span style='font-size:{FS_SECTION}pt; font-weight:700; color:{get_token('text')};'>{formatted_total}</span> "
+        f"<span style='font-size:{FS_SM}pt; font-weight:500; color:{get_token('text_secondary')};'>{currency}</span>"
     )
     tvalue.setTextFormat(Qt.RichText)
     tvalue.setStyleSheet("border: none; background: transparent;")

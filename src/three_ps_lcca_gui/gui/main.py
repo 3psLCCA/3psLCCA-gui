@@ -43,6 +43,7 @@ from three_ps_lcca_gui.gui.project_manager import ProjectManager
 from three_ps_lcca_gui.gui.themes import reapply as _reapply
 from three_ps_lcca_gui.gui.components.utils.unit_resolver import load_custom_units
 from three_ps_lcca_gui.gui.version import VERSION
+from three_ps_lcca_gui.gui.theme import FONT_FAMILY, FS_MD
 
 
 _GUI_DIR = os.path.abspath(os.path.dirname(__file__))
@@ -240,7 +241,7 @@ def main():
     # With font-size removed from the global QSS * rule, this becomes the
     # fallback for any widget that does not call setFont() explicitly.
     # Widgets that do call setFont(_f(...)) will use their own size correctly.
-    app.setFont(QFont("Ubuntu", 9))
+    app.setFont(QFont(FONT_FAMILY, FS_MD))
 
     # Load Custom Units (deferred to start of event loop)
     def _load_custom_units():

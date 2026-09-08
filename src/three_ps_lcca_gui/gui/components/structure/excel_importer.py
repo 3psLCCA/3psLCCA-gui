@@ -1,4 +1,4 @@
-﻿"""
+"""
 excel_importer.py
 =================
 Excel → Material import pipeline.
@@ -68,6 +68,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtWidgets import QButtonGroup, QRadioButton, QGroupBox
 from three_ps_lcca_gui.gui.themes import get_token
+from three_ps_lcca_gui.gui.theme import FS_MD, FS_SM
 from .widgets.material_dialog import build_excel_snapshot
 import sys
 from ..utils.table_widgets import round_table_viewport
@@ -1130,9 +1131,9 @@ class ComponentBlock(QGroupBox):
     ):
         super().__init__(comp_name, parent)
         self.setStyleSheet(
-            f"QGroupBox {{ font-weight: bold; font-size: 12px; color: {get_token('text_disabled')}; }}"
+            f"QGroupBox {{ font-weight: bold; font-size: {FS_MD}pt; color: {get_token('text_disabled')}; }}"
             if is_uncat
-            else "QGroupBox { font-weight: bold; font-size: 12px; }"
+            else f"QGroupBox {{ font-weight: bold; font-size: {FS_MD}pt; }}"
         )
 
         bl = QVBoxLayout(self)
@@ -1147,13 +1148,13 @@ class ComponentBlock(QGroupBox):
 
         self._chk = QCheckBox("Select all")
         self._chk.setTristate(True)  # tristate for visual only; click logic below
-        self._chk.setStyleSheet("font-weight: normal; font-size: 11px;")
+        self._chk.setStyleSheet(f"font-weight: normal; font-size: {FS_SM}pt;")
         hl.addWidget(self._chk)
 
         hl.addStretch()
 
         self._count_lbl = QLabel()
-        self._count_lbl.setStyleSheet(f"font-size: 11px; color: {get_token('text_secondary')};")
+        self._count_lbl.setStyleSheet(f"font-size: {FS_SM}pt; color: {get_token('text_secondary')};")
         hl.addWidget(self._count_lbl)
 
         bl.addWidget(hdr)
@@ -1267,12 +1268,12 @@ class SheetPreviewWidget(QWidget):
 
         self._sheet_chk = QCheckBox("Select all in sheet")
         self._sheet_chk.setTristate(True)
-        self._sheet_chk.setStyleSheet("font-size: 11px;")
+        self._sheet_chk.setStyleSheet(f"font-size: {FS_SM}pt;")
         shl.addWidget(self._sheet_chk)
         shl.addStretch()
 
         self._sheet_count_lbl = QLabel()
-        self._sheet_count_lbl.setStyleSheet("font-size: 11px; color: #777;")
+        self._sheet_count_lbl.setStyleSheet(f"font-size: {FS_SM}pt; color: #777;")
         shl.addWidget(self._sheet_count_lbl)
 
         outer.addWidget(sheet_hdr)
@@ -1494,10 +1495,10 @@ def _build_metadata_tab(metadata: list[dict]) -> QWidget:
 
         key_lbl = QLabel(f"<b>{entry.get('key', '')}</b>")
         key_lbl.setFixedWidth(160)
-        key_lbl.setStyleSheet("font-size: 12px;")
+        key_lbl.setStyleSheet(f"font-size: {FS_MD}pt;")
 
         val_lbl = QLabel(entry.get("value", "") or "-")
-        val_lbl.setStyleSheet(f"font-size: 12px; color: {get_token('text_secondary')};")
+        val_lbl.setStyleSheet(f"font-size: {FS_MD}pt; color: {get_token('text_secondary')};")
 
         row_l.addWidget(key_lbl)
         row_l.addWidget(val_lbl, stretch=1)
@@ -1552,7 +1553,7 @@ class ImportPreviewWindow(QDialog):
             "<span style='color:#d68910'>■</span> Yellow = warnings."
         )
         info.setWordWrap(True)
-        info.setStyleSheet("font-size: 11px; color: #555;")
+        info.setStyleSheet(f"font-size: {FS_SM}pt; color: #555;")
         top_bar.addWidget(info, stretch=1)
 
         # Global select-all checkbox
@@ -1565,7 +1566,7 @@ class ImportPreviewWindow(QDialog):
         top_bar.addWidget(self._select_all_chk)
 
         self._select_all_count_lbl = QLabel()
-        self._select_all_count_lbl.setStyleSheet("font-size: 11px; color: #777;")
+        self._select_all_count_lbl.setStyleSheet(f"font-size: {FS_SM}pt; color: #777;")
         top_bar.addWidget(self._select_all_count_lbl)
 
         top_bar.addSpacing(16)
@@ -1655,7 +1656,7 @@ class ImportPreviewWindow(QDialog):
 
         # ── Summary label ────────────────────────────────────────────────────
         self._summary_lbl = QLabel()
-        self._summary_lbl.setStyleSheet("font-size: 11px;")
+        self._summary_lbl.setStyleSheet(f"font-size: {FS_SM}pt;")
         root.addWidget(self._summary_lbl)
         self._refresh_summary()
 

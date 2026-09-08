@@ -22,6 +22,8 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont, QColor
 from three_ps_lcca_gui.gui.themes import get_token
+from three_ps_lcca_gui.gui.theme import FS_SECTION, FS_SM, FW_BOLD
+from three_ps_lcca_gui.gui.styles import font as _f
 
 
 class RollbackDialog(QDialog):
@@ -52,10 +54,7 @@ class RollbackDialog(QDialog):
 
         # Header
         header = QLabel("Version Rollback")
-        f = QFont()
-        f.setPointSize(12)
-        f.setBold(True)
-        header.setFont(f)
+        header.setFont(_f(FS_SECTION, FW_BOLD))
         layout.addWidget(header)
 
         desc = QLabel(
@@ -208,10 +207,7 @@ class RollbackDialog(QDialog):
     @staticmethod
     def _section_label(text: str) -> QLabel:
         lbl = QLabel(text.upper())
-        f = QFont()
-        f.setPointSize(8)
-        f.setBold(True)
-        lbl.setFont(f)
+        lbl.setFont(_f(FS_SM, FW_BOLD))
         lbl.setEnabled(False)
         return lbl
 

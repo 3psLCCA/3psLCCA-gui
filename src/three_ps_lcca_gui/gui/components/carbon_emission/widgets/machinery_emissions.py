@@ -12,6 +12,7 @@ Currency label pulled from general_info chunk.
 """
 
 from three_ps_lcca_gui.gui.themes import get_token
+from three_ps_lcca_gui.gui.theme import FS_SECTION
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QButtonGroup,
@@ -847,7 +848,7 @@ class MachineryEmissions(ScrollableForm):
         f = self.form
         bold = QFont()
         bold.setBold(True)
-        bold.setPointSize(11)
+        bold.setPointSize(FS_SECTION)
 
         # ── Grand total banner (top) ───────────────────────────────────────
         banner = QGroupBox()

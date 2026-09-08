@@ -484,7 +484,7 @@ QTabBar::tab {
     margin-right: 4px;
     color: $text;
     font-weight: $weight-medium;
-    font-size: 13px;
+    font-size: $font-size-md;
 }
 
 QTabBar::tab:selected {
@@ -567,7 +567,7 @@ QHeaderView::section {
     border-bottom: 2px solid $border-subtle;
     border-right: 1px solid $border-subtle;
     padding: 8px 12px;
-    font-size: 11px;
+    font-size: $font-size-sm;
 }
 
 QHeaderView::section:first {
@@ -685,7 +685,7 @@ QStatusBar {
     background-color: $window;
     border-top: 1px solid $border-subtle;
     color: $text_secondary;
-    font-size: 12px;
+    font-size: $font-size-md;
 }
 
 /* ── Tooltip ────────────────────────────────────────────────────────────── */
@@ -695,7 +695,7 @@ QToolTip {
     border: 1px solid palette(mid);
     border-radius: 6px;
     padding: 6px 10px;
-    font-size: 12px;
+    font-size: $font-size-md;
 }
 
 /* ── Top bar ────────────────────────────────────────────────────────────── */

@@ -38,16 +38,10 @@ from three_ps_lcca_gui.gui.theme import (
     SP6,
     RADIUS_LG,
     RADIUS_MD,
-    FS_XS,
-    FS_SM,
-    FS_BASE,
-    FS_MD,
-    FS_LG,
-    FS_SECTION,
-    FS_SUBHEAD,
-    FS_XL,
-    FS_DISP,
-    FS_DISP_LG,
+    FS_SM,       # 8pt  - Micro / Captions / Badges / Currency
+    FS_MD,       # 10pt - Body copy / Buttons / Hints
+    FS_SECTION,  # 14pt - Section headings / Breakdown values
+    FS_DISP,     # 18pt - Page title / Hero KPI value
     FW_NORMAL,
     FW_MEDIUM,
     FW_SEMIBOLD,
@@ -106,7 +100,7 @@ def _divider() -> QFrame:
 def _section_heading(title: str) -> QLabel:
     lbl = QLabel(title)
     lbl.setWordWrap(True)
-    lbl.setContentsMargins(0, SP6, 0, SP1)
+    lbl.setContentsMargins(0, SP6, 0, SP2)
     lbl.setFont(_f(FS_SECTION, FW_SEMIBOLD))
     lbl.setStyleSheet(f"color: {get_token('text')};")
     return lbl
@@ -117,7 +111,7 @@ def _section_description(text: str) -> QLabel:
     lbl.setWordWrap(True)
     lbl.setFont(_f(FS_MD))
     lbl.setStyleSheet(
-        f"color: {get_token('text_secondary')}; margin-bottom: {SP4}px;"
+        f"color: {get_token('text_secondary')}; line-height: 1.4; margin-bottom: {SP4}px;"
     )
     return lbl
 
@@ -226,38 +220,40 @@ class ResponsiveTotalCard(QFrame):
             f"  border-radius: {RADIUS_LG}px;"
             f"}}"
         )
-        self.setMinimumHeight(105)
+        self.setMinimumHeight(104)
         
         self.main_layout = QGridLayout(self)
-        self.main_layout.setContentsMargins(SP5, SP4, SP5, SP4)
-        self.main_layout.setSpacing(SP4)
+        self.main_layout.setContentsMargins(SP6, SP4, SP6, SP4)
+        self.main_layout.setSpacing(SP5)
 
         # LEFT SIDE: Total
         self.left_widget = QWidget()
         self.left_widget.setStyleSheet("background: transparent; border: none;")
         left_v = QVBoxLayout(self.left_widget)
         left_v.setContentsMargins(0, 0, 0, 0)
-        left_v.setSpacing(SP1)
+        left_v.setSpacing(0)
         
         r1 = QHBoxLayout()
         r1.setContentsMargins(0, 0, 0, 0)
         r1.setSpacing(SP2)
         dot = QLabel()
-        dot.setFixedSize(9, 9)
+        dot.setFixedSize(8, 8)
         dot.setStyleSheet(f"background-color: {get_token('primary')}; border-radius: 4px; border: none;")
         r1.addWidget(dot)
         title_lbl = QLabel("Total Life Cycle Cost")
-        title_lbl.setFont(_f(FS_MD, FW_MEDIUM))
+        title_lbl.setFont(_f(FS_SM, FW_MEDIUM))
         title_lbl.setStyleSheet(f"color: {get_token('text_secondary')}; border: none; background: transparent;")
         r1.addWidget(title_lbl)
         r1.addStretch()
         left_v.addLayout(r1)
+        left_v.addSpacing(SP2)
         
         val_str = fmt_currency(total_value, currency, decimals=0, style="short")
         val_lbl = QLabel(val_str)
-        val_lbl.setFont(_f(FS_DISP_LG, FW_BOLD))
+        val_lbl.setFont(_f(FS_DISP, FW_NORMAL))
         val_lbl.setStyleSheet(f"color: {get_token('text')}; border: none; background: transparent;")
         left_v.addWidget(val_lbl)
+        left_v.addSpacing(2)
 
         curr_lbl = QLabel(currency)
         curr_lbl.setFont(_f(FS_SM, FW_NORMAL))
@@ -277,18 +273,19 @@ class ResponsiveTotalCard(QFrame):
         self.right_widget.setStyleSheet("background: transparent; border: none;")
         right_v = QVBoxLayout(self.right_widget)
         right_v.setContentsMargins(0, 0, 0, 0)
-        right_v.setSpacing(SP2)
+        right_v.setSpacing(0)
         
         lorem_title = QLabel("About This Analysis")
         lorem_title.setFont(_f(FS_SM, FW_MEDIUM))
         lorem_title.setStyleSheet(f"color: {get_token('text_secondary')}; letter-spacing: 1px; border: none; background: transparent;")
         right_v.addWidget(lorem_title)
+        right_v.addSpacing(SP1 + 2)
         
         lorem_lbl = QLabel(_LOREM)
         lorem_lbl.setWordWrap(True)
         lorem_lbl.setAlignment(Qt.AlignJustify)
         lorem_lbl.setFont(_f(FS_MD))
-        lorem_lbl.setStyleSheet(f"color: {get_token('text_secondary')}; border: none; background: transparent;")
+        lorem_lbl.setStyleSheet(f"color: {get_token('text_secondary')}; line-height: 1.4; border: none; background: transparent;")
         right_v.addWidget(lorem_lbl)
         right_v.addStretch()
 
@@ -360,12 +357,12 @@ class LCCSummaryCards(QWidget):
         grand_total = sum(stagewise.values())
 
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(0, SP3, 0, SP5)
-        outer.setSpacing(SP3)
+        outer.setContentsMargins(0, SP3, 0, SP6)
+        outer.setSpacing(SP4)
 
         # ── Row 1: Grand Total + description ─────────────────────────────
         row1 = QHBoxLayout()
-        row1.setSpacing(SP3)
+        row1.setSpacing(SP4)
         row1.addWidget(ResponsiveTotalCard(
             grand_total, self._results, self._currency,
             analysis_period=self._analysis_period,
@@ -375,67 +372,77 @@ class LCCSummaryCards(QWidget):
 
         # ── Row 2: Pillar totals ──────────────────────────────────────────
         row2 = QHBoxLayout()
-        row2.setSpacing(SP3)
+        row2.setSpacing(SP4)
         for title, key, token in [
             ("Economic",      "eco",    "eco"),
             ("Environmental", "env",    "env"),
             ("Social",        "social", "soc"),
         ]:
-            row2.addWidget(self._card(title, pt.get(key, 0), get_token(token)))
+            row2.addWidget(self._card(title, pt.get(key, 0), get_token(token), grand_total=grand_total))
         outer.addLayout(row2)
 
         # ── Row 3: Stage totals ───────────────────────────────────────────
         row3 = QHBoxLayout()
-        row3.setSpacing(SP3)
+        row3.setSpacing(SP4)
         for title, key, token in [
             ("Initial",     "initial",     "init"),
             ("Use",         "use",         "use"),
             ("End-of-Life", "end_of_life", "end"),
         ]:
-            row3.addWidget(self._card(title, stagewise.get(key, 0), get_token(token)))
+            row3.addWidget(self._card(title, stagewise.get(key, 0), get_token(token), grand_total=grand_total))
         outer.addLayout(row3)
 
-    def _card(self, title: str, value: float, accent: str, large: bool = False) -> QFrame:
+    def _card(self, title: str, value: float, accent: str, grand_total: float = 0.0) -> QFrame:
         card = QFrame()
         card.setObjectName("kpiCard")
         card.setStyleSheet(
             f"#kpiCard {{"
             f"  background-color: {get_token('base')};"
             f"  border: 1px solid {get_token('surface_mid')};"
-            f"  border-left: 4px solid {accent};"
-            f"  border-radius: {RADIUS_LG}px;"
+            f"  border-left: 3.5px solid {accent};"
+            f"  border-radius: {RADIUS_MD}px;"
             f"}}"
         )
 
         v = QVBoxLayout(card)
-        v.setContentsMargins(SP4, SP3, SP4, SP3)
-        v.setSpacing(SP1)
+        v.setContentsMargins(SP5, SP4, SP5, SP4)
+        v.setSpacing(0)
 
-        # Row 1: Dot + Title (no %)
+        # Row 1: Dot + Title (left) | Share % (right)
         r1 = QHBoxLayout()
         r1.setContentsMargins(0, 0, 0, 0)
         r1.setSpacing(SP2)
 
         dot = QLabel()
-        dot.setFixedSize(9, 9)
+        dot.setFixedSize(8, 8)
         dot.setStyleSheet(f"background-color: {accent}; border-radius: 4px; border: none;")
         r1.addWidget(dot)
 
         title_lbl = QLabel(title)
-        title_lbl.setFont(_f(FS_MD, FW_MEDIUM))
+        title_lbl.setFont(_f(FS_SM, FW_MEDIUM))
         title_lbl.setStyleSheet(f"color: {get_token('text_secondary')}; border: none; background: transparent;")
         r1.addWidget(title_lbl)
         r1.addStretch()
-        v.addLayout(r1)
 
-        # Row 2: Value in token text color using original million format
+        if grand_total > 0 and value > 0:
+            pct_val = (value / grand_total) * 100
+            pct_lbl = QLabel(f"{pct_val:.1f}%")
+            pct_lbl.setFont(_f(FS_SM, FW_MEDIUM))
+            pct_lbl.setStyleSheet(f"color: {get_token('text_disabled')}; border: none; background: transparent;")
+            r1.addWidget(pct_lbl)
+
+        v.addLayout(r1)
+        v.addSpacing(SP2)
+
+        # Row 2: Value formatted at balanced 14pt (regular weight)
         val_str = fmt_currency(value, self._currency, decimals=0, style="short")
         val_lbl = QLabel(val_str)
-        val_lbl.setFont(_f(FS_XL, FW_BOLD))
+        val_lbl.setFont(_f(FS_SECTION, FW_NORMAL))
         val_lbl.setStyleSheet(f"color: {get_token('text')}; border: none; background: transparent;")
         v.addWidget(val_lbl)
+        v.addSpacing(2)
 
-        # Row 3: Currency note
+        # Row 3: Subtle Currency indicator
         curr_lbl = QLabel(self._currency)
         curr_lbl.setFont(_f(FS_SM, FW_NORMAL))
         curr_lbl.setStyleSheet(
@@ -443,7 +450,7 @@ class LCCSummaryCards(QWidget):
         )
         v.addWidget(curr_lbl)
 
-        card.setMinimumHeight(86)
+        card.setMinimumHeight(84)
         return card
 
 
@@ -1191,14 +1198,14 @@ class OutputsPage(ScrollableForm):
             fb_v.setContentsMargins(SP3, SP2, SP3, SP2)
 
             origin_lbl = QLabel("Origin")
-            origin_lbl.setFont(_f(FS_XS, FW_MEDIUM))
+            origin_lbl.setFont(_f(FS_SM, FW_MEDIUM))
             origin_lbl.setStyleSheet(
                 f"color: {get_token('text_disabled')}; letter-spacing: 1px; background: transparent; border: none;"
             )
             fb_v.addWidget(origin_lbl)
 
             frame_lbl = QLabel(relevant_frame)
-            frame_lbl.setFont(QFont("Courier New", FS_XS))
+            frame_lbl.setFont(QFont("Courier New", FS_SM))
             frame_lbl.setWordWrap(True)
             frame_lbl.setTextInteractionFlags(Qt.TextSelectableByMouse)
             frame_lbl.setStyleSheet(

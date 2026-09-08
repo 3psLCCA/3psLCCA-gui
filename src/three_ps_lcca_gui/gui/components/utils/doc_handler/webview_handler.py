@@ -4,6 +4,7 @@ import json
 import subprocess
 import webbrowser
 from pathlib import Path
+from three_ps_lcca_gui.gui.theme import FS_SECTION, FS_MD
 
 FILE_PATH     = Path(__file__).resolve()
 DOC_BUILD_DIR = FILE_PATH.parent / "doc_build"
@@ -32,8 +33,8 @@ def _no_build_html() -> str:
 body{{font-family:'Segoe UI',sans-serif;display:flex;align-items:center;
      justify-content:center;height:100vh;margin:0;background:#1e1e2e;color:#cdd6f4}}
 .box{{text-align:center;max-width:440px}}
-h2{{margin:0 0 12px;font-size:1.3em;color:#f38ba8}}
-p{{margin:0 0 8px;font-size:14px;color:#a6adc8;line-height:1.6}}
+h2{{margin:0 0 12px;font-size:{FS_SECTION}pt;color:#f38ba8}}
+p{{margin:0 0 8px;font-size:{FS_MD}pt;color:#a6adc8;line-height:1.6}}
 strong{{color:#cdd6f4}}
 </style>
 </head>

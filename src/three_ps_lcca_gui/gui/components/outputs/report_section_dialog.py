@@ -144,7 +144,7 @@ class SectionTreeWidget(QTreeWidget):
                 padding: 8px 12px;
                 border: none;
                 border-bottom: 2px solid {get_token("surface_mid")};
-                font-size: 11px;
+                font-size: {FS_SM}pt;
                 text-transform: uppercase;
             }}
         """)

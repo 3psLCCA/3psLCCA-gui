@@ -255,9 +255,10 @@ def _derive_compat_tokens(raw: dict[str, str], state: dict[str, float]) -> dict[
         "text-on-primary":     text_on_primary,
     })
 
-    # Add centralized font weights
-    from three_ps_lcca_gui.gui.theme import QSS_WEIGHTS
+    # Add centralized font weights and sizes
+    from three_ps_lcca_gui.gui.theme import QSS_WEIGHTS, QSS_FONTS
     tokens.update(QSS_WEIGHTS)
+    tokens.update(QSS_FONTS)
     
     # Add URL-encoded versions of all color tokens for safe use in SVG data URIs
     # e.g., $primary-url will be %23RRGGBB
