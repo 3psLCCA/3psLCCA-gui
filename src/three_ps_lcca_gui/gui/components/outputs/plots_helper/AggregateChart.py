@@ -40,17 +40,41 @@ from PySide6.QtWidgets import (
 
 from three_ps_lcca_gui.gui.theme import (
     FONT_FAMILY,
-    FS_XS, FS_SM, FS_BASE, FS_MD, FS_LG, FS_SECTION, FS_XL, FS_SUBHEAD, FS_DISP,
+    FS_SM, FS_MD, FS_SECTION, FS_DISP,
     FW_NORMAL, FW_MEDIUM, FW_SEMIBOLD, FW_BOLD,
     SP1, SP2, SP3, SP4, SP5, SP6, RADIUS_SM, RADIUS_MD, RADIUS_LG, RADIUS_XL,
 )
-from three_ps_lcca_gui.gui.themes import get_token
+from three_ps_lcca_gui.gui.themes import get_token, theme_manager
 from three_ps_lcca_gui.gui.styles import font as _f
 from three_ps_lcca_gui.gui.components.utils.display_format import fmt_currency
 from ..helper_functions.lifecycle_summary import compute_all_summaries
 from ..helper_functions.ratio_helper import format_ratio_string
 from ..helper_functions.lcc_colors import COLORS as LCC_COLORS
 from .plot_utils import register_ubuntu_fonts, WheelForwarder, ChartToolbar, currency_note
+
+def _checkbox_style() -> str:
+    return f"""
+        QCheckBox {{
+            color: {get_token('text_secondary')};
+            background: transparent;
+            border: none;
+            spacing: {SP2}px;
+        }}
+        QCheckBox::indicator {{
+            width: 16px;
+            height: 16px;
+            border: 1px solid {get_token('text_disabled')};
+            border-radius: {RADIUS_SM}px;
+            background-color: transparent;
+        }}
+        QCheckBox::indicator:hover {{
+            border-color: {get_token('primary')};
+        }}
+        QCheckBox::indicator:checked {{
+            border: 1px solid {get_token('primary')};
+            background-color: {get_token('primary')};
+        }}
+    """
 
 # ── Register Ubuntu fonts ────────────────────────────────────────────────────
 register_ubuntu_fonts()
@@ -166,9 +190,9 @@ class _BasePlotter:
     def _setup_annotation(self, tc):
         self.annot = self.ax.annotate(
             "", xy=(0, 0), xytext=(15, 15), textcoords="offset points",
-            bbox=dict(boxstyle="round,pad=0.5", fc=get_token("base"),
-                      ec=get_token("surface_mid"), alpha=0.95),
-            zorder=10, fontweight="bold", color=tc, fontsize=8,
+            bbox=dict(boxstyle="round,pad=0.4,rounding_size=0.3", fc=get_token("base"),
+                      ec=get_token("surface_mid"), lw=1.0, alpha=0.95),
+            zorder=10, fontweight="bold", color=tc, fontsize=FS_SM,
         )
         self.annot.set_visible(False)
 
@@ -176,21 +200,21 @@ class _BasePlotter:
         leg = self.ax.legend(
             handles=handles,
             loc="upper right", ncol=len(handles),
-            frameon=False, fontsize=8.5, labelcolor=tc,
+            frameon=False, fontsize=FS_SM, labelcolor=tc,
         )
 
     def _setup_axes_style(self, tc, gc, x, xlabels, ylabel=""):
         self.ax.set_xticks(x)
-        self.ax.set_xticklabels(xlabels, fontweight="bold", color=tc, fontsize=9.5)
+        self.ax.set_xticklabels(xlabels, fontweight="bold", color=tc, fontsize=FS_SM)
         self.ax.tick_params(axis="x", colors=tc, length=0)
-        self.ax.tick_params(axis="y", colors=get_token("text_secondary"), labelsize=8.5, length=3)
+        self.ax.tick_params(axis="y", colors=get_token("text_secondary"), labelsize=FS_SM, length=3)
         self.ax.yaxis.grid(True, linestyle="-", alpha=0.3, color=gc)
         self.ax.set_axisbelow(True)
 
     def _setup_y_formatter(self):
         self.ax.yaxis.set_major_formatter(
             matplotlib.ticker.FuncFormatter(
-                lambda v, _: fmt_currency(v, self.currency, decimals=0, style="short", use_short_suffix=True)
+                lambda v, _: fmt_currency(v, self.currency, decimals=0, style="short", use_short_suffix=False)
             )
         )
 
@@ -215,7 +239,7 @@ class StageBarPlotter(_BasePlotter):
             if p is not None and p.contains(event)[0]:
                 text = (
                     f"{self.labels[i]}\n"
-                    f"{fmt_currency(self.raw_values[i], self.currency, decimals=2, style='short', use_short_suffix=True)}"
+                    f"{fmt_currency(self.raw_values[i], self.currency, decimals=2, style='short', use_short_suffix=False)}"
                 )
                 return text, (event.xdata, event.ydata)
         return None
@@ -234,10 +258,10 @@ class StageBarPlotter(_BasePlotter):
         pad   = total_span * 0.15
         for i, raw in enumerate(self.raw_values):
             val = self.values[i]
-            val_str = fmt_currency(raw, self.currency, decimals=2, style="short", use_short_suffix=True).title()
+            val_str = fmt_currency(raw, self.currency, decimals=2, style="short", use_short_suffix=False)
             if val >= total_span * 0.08:
                 self.ax.text(x[i], val + pad * 0.05, val_str,
-                    ha="center", va="bottom", fontsize=10, fontweight="bold", color=tc, zorder=4)
+                    ha="center", va="bottom", fontsize=FS_MD, fontweight="bold", color=tc, zorder=4)
             elif val > 0:
                 # Smart callout for small stage bar
                 self.ax.annotate(
@@ -245,15 +269,15 @@ class StageBarPlotter(_BasePlotter):
                     xy=(x[i], val),
                     xytext=(x[i], val + pad * 0.5),
                     ha="center", va="bottom",
-                    fontsize=9, fontweight="bold", color=tc,
-                    bbox=dict(boxstyle="round,pad=0.25", fc=get_token("surface"),
+                    fontsize=FS_SM, fontweight="bold", color=tc,
+                    bbox=dict(boxstyle="round,pad=0.3,rounding_size=0.3", fc=get_token("base"),
                               ec=get_token("surface_mid"), lw=1.0, alpha=0.95),
                     arrowprops=dict(arrowstyle="-", color=get_token("surface_mid"), lw=1.0),
                     clip_on=False, zorder=5,
                 )
             elif val < 0:
                 self.ax.text(x[i], val - pad * 0.05, val_str,
-                    ha="center", va="top", fontsize=10, fontweight="bold", color=tc, zorder=4)
+                    ha="center", va="top", fontsize=FS_MD, fontweight="bold", color=tc, zorder=4)
 
         self._setup_axes_style(tc, gc, x, self.labels)
         self._setup_y_formatter()
@@ -296,7 +320,7 @@ class SustainabilityBarPlotter(_BasePlotter):
                             raw = self.raw_values[cat][stage_idx]
                             text = (
                                 f"{self.stages[stage_idx]} — {cat}\n"
-                                f"{fmt_currency(raw, self.currency, decimals=2, style='short', use_short_suffix=True)}"
+                                f"{fmt_currency(raw, self.currency, decimals=2, style='short', use_short_suffix=False)}"
                             )
                             return text, (event.xdata, event.ydata)
         return None
@@ -338,10 +362,10 @@ class SustainabilityBarPlotter(_BasePlotter):
                 # Show value inside segment only if tall enough relative to total span (> 10% of chart)
                 for i, (v, b) in enumerate(zip(pos_vals, seg_bot)):
                     if v >= 0.10 * total_span and pos_bottom[i] >= 0.15 * total_span:
-                        seg_text = fmt_currency(v, self.currency, decimals=2, style="short", use_short_suffix=True).title()
+                        seg_text = fmt_currency(v, self.currency, decimals=2, style="short", use_short_suffix=False)
                         self.ax.text(
                             x[i], b + v / 2, seg_text,
-                            ha="center", va="center", fontsize=8.5, fontweight="bold",
+                            ha="center", va="center", fontsize=FS_SM, fontweight="bold",
                             color="white", clip_on=True, zorder=4,
                         )
             if neg_vals.any():
@@ -351,10 +375,10 @@ class SustainabilityBarPlotter(_BasePlotter):
                 neg_bottom += neg_vals
                 for i, (v, b) in enumerate(zip(neg_vals, seg_bot)):
                     if abs(v) >= 0.10 * total_span:
-                        seg_text = fmt_currency(v, self.currency, decimals=2, style="short", use_short_suffix=True).title()
+                        seg_text = fmt_currency(v, self.currency, decimals=2, style="short", use_short_suffix=False)
                         self.ax.text(
                             x[i], b + v / 2, seg_text,
-                            ha="center", va="center", fontsize=8.5, fontweight="bold",
+                            ha="center", va="center", fontsize=FS_SM, fontweight="bold",
                             color="white", clip_on=True, zorder=4,
                         )
 
@@ -366,19 +390,19 @@ class SustainabilityBarPlotter(_BasePlotter):
 
             # If bar is tall (>= 8% of chart span)
             if pos_v >= total_span * 0.08:
-                tot_str = fmt_currency(pos_v, self.currency, decimals=2, style="short", use_short_suffix=True).title()
+                tot_str = fmt_currency(pos_v, self.currency, decimals=2, style="short", use_short_suffix=False)
                 self.ax.text(x[i], pos_v + pad * 0.05, tot_str,
-                    ha="center", va="bottom", fontsize=10, fontweight="bold", color=tc, zorder=4)
+                    ha="center", va="bottom", fontsize=FS_MD, fontweight="bold", color=tc, zorder=4)
             elif net_v != 0:
                 # Smart Callout with leader line for tiny bar (prevents overlapping numbers)
-                val_str = fmt_currency(net_v, self.currency, decimals=2, style="short", use_short_suffix=True).title()
+                val_str = fmt_currency(net_v, self.currency, decimals=2, style="short", use_short_suffix=False)
                 self.ax.annotate(
                     val_str,
                     xy=(x[i], max(pos_v, 0)),
                     xytext=(x[i], max(pos_v, 0) + pad * 0.5),
                     ha="center", va="bottom",
-                    fontsize=9, fontweight="bold", color=tc,
-                    bbox=dict(boxstyle="round,pad=0.25", fc=get_token("surface"),
+                    fontsize=FS_SM, fontweight="bold", color=tc,
+                    bbox=dict(boxstyle="round,pad=0.3,rounding_size=0.3", fc=get_token("base"),
                               ec=get_token("surface_mid"), lw=1.0, alpha=0.95),
                     arrowprops=dict(arrowstyle="-", color=get_token("surface_mid"), lw=1.0),
                     clip_on=False, zorder=5,
@@ -404,7 +428,7 @@ class SustainabilityBarPlotter(_BasePlotter):
 def _lbl_color(hex_color: str) -> str:
     """White text on dark/saturated bars, dark text on light bars."""
     r, g, b = int(hex_color[1:3], 16), int(hex_color[3:5], 16), int(hex_color[5:7], 16)
-    return "#333333" if (0.299*r + 0.587*g + 0.114*b) / 255 > 0.58 else "white"
+    return get_token("text") if (0.299*r + 0.587*g + 0.114*b) / 255 > 0.58 else get_token("base")
 
 
 class PillarBreakdownBarPlotter(_BasePlotter):
@@ -424,7 +448,7 @@ class PillarBreakdownBarPlotter(_BasePlotter):
         for patch in self.ax.patches:
             if patch.contains(event)[0]:
                 for stage in self.stages:
-                    color = STAGE_COLORS.get(stage, "#AAAAAA")
+                    color = STAGE_COLORS.get(stage, get_token("surface_mid"))
                     if np.allclose(patch.get_facecolor()[:3], matplotlib.colors.to_rgb(color)[:3]):
                         x_pos   = patch.get_x() + patch.get_width() / 2
                         cat_idx = int(round(x_pos / 0.75))
@@ -434,7 +458,7 @@ class PillarBreakdownBarPlotter(_BasePlotter):
                             if raw != 0.0:
                                 text = (
                                     f"{cat}\n"
-                                    f"{stage}: {fmt_currency(raw, self.currency, decimals=0, style='short')}"
+                                    f"{stage}: {fmt_currency(raw, self.currency, decimals=2, style='short', use_short_suffix=False)}"
                                 )
                                 return text, (event.xdata, event.ydata)
         return None
@@ -462,7 +486,7 @@ class PillarBreakdownBarPlotter(_BasePlotter):
         neg_bottom = np.zeros(len(self.categories))
 
         for stage in self.stages:
-            color      = STAGE_COLORS.get(stage, "#AAAAAA")
+            color      = STAGE_COLORS.get(stage, get_token("surface_mid"))
             lc         = _lbl_color(color)
             stage_vals = np.array([self.raw_values[cat].get(stage, 0.0) for cat in self.categories])
             pos_vals   = np.where(stage_vals > 0, stage_vals, 0.0)
@@ -474,10 +498,10 @@ class PillarBreakdownBarPlotter(_BasePlotter):
                 pos_bottom += pos_vals
                 for i, (v, b) in enumerate(zip(pos_vals, seg_bot)):
                     if v >= 0.10 * total_span and pos_bottom[i] >= 0.15 * total_span:
-                        seg_text = fmt_currency(v, self.currency, decimals=2, style="short", use_short_suffix=True).title()
+                        seg_text = fmt_currency(v, self.currency, decimals=2, style="short", use_short_suffix=False)
                         self.ax.text(
                             x[i], b + v / 2, seg_text,
-                            ha="center", va="center", fontsize=8.5, fontweight="bold",
+                            ha="center", va="center", fontsize=FS_SM, fontweight="bold",
                             color=lc, clip_on=True, zorder=4,
                         )
             if neg_vals.any():
@@ -486,10 +510,10 @@ class PillarBreakdownBarPlotter(_BasePlotter):
                 neg_bottom += neg_vals
                 for i, (v, b) in enumerate(zip(neg_vals, seg_bot)):
                     if abs(v) >= 0.10 * total_span:
-                        seg_text = fmt_currency(v, self.currency, decimals=2, style="short", use_short_suffix=True).title()
+                        seg_text = fmt_currency(v, self.currency, decimals=2, style="short", use_short_suffix=False)
                         self.ax.text(
                             x[i], b + v / 2, seg_text,
-                            ha="center", va="center", fontsize=8.5, fontweight="bold",
+                            ha="center", va="center", fontsize=FS_SM, fontweight="bold",
                             color=lc, clip_on=True, zorder=4,
                         )
 
@@ -500,18 +524,18 @@ class PillarBreakdownBarPlotter(_BasePlotter):
             net_v = pos_v + neg_v
 
             if pos_v >= total_span * 0.08:
-                tot_str = fmt_currency(pos_v, self.currency, decimals=2, style="short", use_short_suffix=True).title()
+                tot_str = fmt_currency(pos_v, self.currency, decimals=2, style="short", use_short_suffix=False)
                 self.ax.text(x[i], pos_v + pad * 0.05, tot_str,
-                    ha="center", va="bottom", fontsize=10, fontweight="bold", color=tc, zorder=4)
+                    ha="center", va="bottom", fontsize=FS_MD, fontweight="bold", color=tc, zorder=4)
             elif net_v != 0:
-                val_str = fmt_currency(net_v, self.currency, decimals=2, style="short", use_short_suffix=True).title()
+                val_str = fmt_currency(net_v, self.currency, decimals=2, style="short", use_short_suffix=False)
                 self.ax.annotate(
                     val_str,
                     xy=(x[i], max(pos_v, 0)),
                     xytext=(x[i], max(pos_v, 0) + pad * 0.5),
                     ha="center", va="bottom",
-                    fontsize=9, fontweight="bold", color=tc,
-                    bbox=dict(boxstyle="round,pad=0.25", fc=get_token("surface"),
+                    fontsize=FS_SM, fontweight="bold", color=tc,
+                    bbox=dict(boxstyle="round,pad=0.3,rounding_size=0.3", fc=get_token("base"),
                               ec=get_token("surface_mid"), lw=1.0, alpha=0.95),
                     arrowprops=dict(arrowstyle="-", color=get_token("surface_mid"), lw=1.0),
                     clip_on=False, zorder=5,
@@ -523,7 +547,7 @@ class PillarBreakdownBarPlotter(_BasePlotter):
         self._setup_spines(gc)
         self._setup_annotation(tc)
         self._make_legend(
-            [Patch(facecolor=STAGE_COLORS.get(st, "#AAAAAA"), label=st) for st in self.stages],
+            [Patch(facecolor=STAGE_COLORS.get(st, get_token("surface_mid")), label=st) for st in self.stages],
             "Life Cycle Stages", tc,
         )
         return self.fig
@@ -537,17 +561,18 @@ class PillarBreakdownBarPlotter(_BasePlotter):
 
 def _create_metric_card(name: str, color: str, pct: float, amount_str: str) -> QFrame:
     item = QFrame()
+    item.setGraphicsEffect(None)
     item.setStyleSheet(
         f"QFrame {{"
         f"  background-color: {get_token('base')};"
         f"  border: 1px solid {get_token('surface_mid')};"
-        f"  border-left: 4px solid {color};"
-        f"  border-radius: {RADIUS_LG}px;"
+        f"  border-left: 3px solid {color};"
+        f"  border-radius: {RADIUS_SM}px;"
         f"}}"
     )
     item_v = QVBoxLayout(item)
     item_v.setContentsMargins(SP3, SP3, SP3, SP3)
-    item_v.setSpacing(SP1)
+    item_v.setSpacing(SP2)
 
     # Row 1: dot + name on left, percentage on right
     r1 = QHBoxLayout()
@@ -555,32 +580,32 @@ def _create_metric_card(name: str, color: str, pct: float, amount_str: str) -> Q
     r1.setSpacing(SP2)
 
     dot = QLabel()
-    dot.setFixedSize(9, 9)
-    dot.setStyleSheet(f"background-color: {color}; border-radius: 4px; border: none;")
+    dot.setFixedSize(8, 8)
+    dot.setStyleSheet(f"background-color: {color}; border-radius: {RADIUS_SM}px; border: none;")
     r1.addWidget(dot)
 
     name_lbl = QLabel(name)
-    name_lbl.setFont(_f(FS_BASE, FW_SEMIBOLD))
+    name_lbl.setFont(_f(FS_MD, FW_SEMIBOLD))
     name_lbl.setStyleSheet(f"color: {get_token('text')}; border: none; background: transparent;")
     r1.addWidget(name_lbl)
     r1.addStretch()
 
     pct_lbl = QLabel(f"{pct:.1f}%")
-    pct_lbl.setFont(_f(FS_SM, FW_SEMIBOLD))
+    pct_lbl.setFont(_f(FS_SM, FW_MEDIUM))
     pct_lbl.setStyleSheet(f"color: {get_token('text_secondary')}; border: none; background: transparent;")
     r1.addWidget(pct_lbl)
     item_v.addLayout(r1)
 
     # Row 2: Value
     val_lbl = QLabel(amount_str)
-    val_lbl.setFont(_f(FS_XL, FW_BOLD))
-    val_lbl.setStyleSheet(f"color: {get_token('text')}; border: none; background: transparent; padding-top: 1px;")
+    val_lbl.setFont(_f(FS_MD, FW_NORMAL))
+    val_lbl.setStyleSheet(f"color: {get_token('text')}; border: none; background: transparent;")
     item_v.addWidget(val_lbl)
 
     # Row 3: Bar track with progress fill
     track = QFrame()
-    track.setFixedHeight(5)
-    track.setStyleSheet(f"background-color: {get_token('surface_mid')}; border-radius: 2px; border: none;")
+    track.setFixedHeight(6)
+    track.setStyleSheet(f"background-color: {get_token('surface')}; border-radius: {RADIUS_SM}px; border: none;")
     track_l = QHBoxLayout(track)
     track_l.setContentsMargins(0, 0, 0, 0)
     track_l.setSpacing(0)
@@ -591,8 +616,8 @@ def _create_metric_card(name: str, color: str, pct: float, amount_str: str) -> Q
 
     if fill_weight > 0:
         fill = QFrame()
-        fill.setFixedHeight(5)
-        fill.setStyleSheet(f"background-color: {color}; border-radius: 2px; border: none;")
+        fill.setFixedHeight(6)
+        fill.setStyleSheet(f"background-color: {color}; border-radius: {RADIUS_SM}px; border: none;")
         track_l.addWidget(fill, fill_weight)
     if empty_weight > 0:
         track_l.addStretch(empty_weight)
@@ -607,17 +632,17 @@ def _create_total_block(total_val: float, currency: str) -> QFrame:
         f"border: none; border-top: 1px solid {get_token('surface_mid')}; background: transparent;"
     )
     tb_v = QVBoxLayout(total_block)
-    tb_v.setContentsMargins(0, SP3, 0, 0)
-    tb_v.setSpacing(2)
+    tb_v.setContentsMargins(0, SP3, 0, SP2)
+    tb_v.setSpacing(SP1)
 
     tlabel = QLabel("Total cost")
     tlabel.setFont(_f(FS_SM, FW_MEDIUM))
     tlabel.setStyleSheet(f"color: {get_token('text_secondary')}; border: none; background: transparent;")
     tb_v.addWidget(tlabel)
 
-    formatted_total = fmt_currency(total_val, currency, decimals=2, style="short", use_short_suffix=True).title()
+    formatted_total = fmt_currency(total_val, currency, decimals=2, style="short", use_short_suffix=False)
     tvalue = QLabel(
-        f"<span style='font-size:{FS_SECTION}pt; font-weight:700; color:{get_token('text')};'>{formatted_total}</span> "
+        f"<span style='font-size:{FS_DISP}pt; font-weight:700; color:{get_token('text')};'>{formatted_total}</span> "
         f"<span style='font-size:{FS_SM}pt; font-weight:500; color:{get_token('text_secondary')};'>{currency}</span>"
     )
     tvalue.setTextFormat(Qt.RichText)
@@ -644,11 +669,12 @@ class AggregateChartWidget(QWidget):
 
         self.card = QFrame()
         self.card.setObjectName("aggCard")
+        self.card.setGraphicsEffect(None)
         self.card.setStyleSheet(
             f"#aggCard {{"
             f"  background-color: {get_token('base')};"
             f"  border: 1px solid {get_token('surface_mid')};"
-            f"  border-radius: {RADIUS_XL}px;"
+            f"  border-radius: {RADIUS_SM}px;"
             f"}}"
         )
         self.card.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
@@ -663,12 +689,12 @@ class AggregateChartWidget(QWidget):
         self._text_panel.setStyleSheet(
             f"#aggTextPanel {{"
             f"  background-color: {get_token('base')};"
-            f"  border-top-left-radius: {RADIUS_XL - 1}px;"
-            f"  border-bottom-left-radius: {RADIUS_XL - 1}px;"
+            f"  border-top-left-radius: {RADIUS_SM}px;"
+            f"  border-bottom-left-radius: {RADIUS_SM}px;"
             f"  border-right: 1px solid {get_token('surface_mid')};"
             f"}}"
         )
-        self._text_panel.setFixedWidth(310)
+        self._text_panel.setFixedWidth(340)
 
         text_v = QVBoxLayout(self._text_panel)
         text_v.setContentsMargins(SP5, SP5, SP5, SP5)
@@ -676,7 +702,7 @@ class AggregateChartWidget(QWidget):
 
         title = QLabel("Across 3 Stages")
         title.setAlignment(Qt.AlignLeft)
-        title.setFont(_f(FS_XL, FW_BOLD))
+        title.setFont(_f(FS_SECTION))
         title.setStyleSheet(
             f"color: {get_token('text')}; border: none; background: transparent; letter-spacing: -0.2px;"
         )
@@ -685,11 +711,18 @@ class AggregateChartWidget(QWidget):
         sub_desc = QLabel(f"Total cost breakdown across 3 lifecycle stages, in {self._currency}.")
         sub_desc.setAlignment(Qt.AlignLeft)
         sub_desc.setWordWrap(True)
-        sub_desc.setFont(_f(FS_BASE))
+        sub_desc.setFont(_f(FS_MD))
         sub_desc.setStyleSheet(
             f"color: {get_token('text_secondary')}; border: none; background: transparent; line-height: 1.4;"
         )
         text_v.addWidget(sub_desc)
+
+        # Subtle 1px divider separating header from metric cards
+        hr = QFrame()
+        hr.setFixedHeight(1)
+        hr.setStyleSheet(f"background-color: {get_token('surface_mid')}; border: none;")
+        text_v.addWidget(hr)
+        text_v.addSpacing(SP1)
 
         # Stage cards
         summary = compute_all_summaries(self._results)
@@ -708,9 +741,9 @@ class AggregateChartWidget(QWidget):
         p_use = v_use / sum_stages * 100
         p_end = v_end / sum_stages * 100
 
-        a_ini = fmt_currency(v_ini, self._currency, decimals=0, style="short", use_short_suffix=True).title()
-        a_use = fmt_currency(v_use, self._currency, decimals=0, style="short", use_short_suffix=True).title()
-        a_end = fmt_currency(v_end, self._currency, decimals=0, style="short", use_short_suffix=True).title()
+        a_ini = fmt_currency(v_ini, self._currency, decimals=2, style="short", use_short_suffix=False)
+        a_use = fmt_currency(v_use, self._currency, decimals=2, style="short", use_short_suffix=False)
+        a_end = fmt_currency(v_end, self._currency, decimals=2, style="short", use_short_suffix=False)
 
         card_init = _create_metric_card("Initial", c_init, p_ini, a_ini)
         card_use  = _create_metric_card("Use", c_use, p_use, a_use)
@@ -722,25 +755,19 @@ class AggregateChartWidget(QWidget):
 
         text_v.addStretch()
 
-        # Total Cost Block
-        total_val = v_ini + v_use + v_end
-        text_v.addWidget(_create_total_block(total_val, self._currency))
-
         # "Show pillar wise" checkbox
         self._pillar_cb = QCheckBox("Show pillar wise")
-        self._pillar_cb.setFont(_f(FS_BASE))
-        self._pillar_cb.setStyleSheet(
-            f"color: {get_token('text_secondary')}; background: transparent; border: none; padding-top: {SP1}px;"
-        )
+        self._pillar_cb.setFont(_f(FS_MD))
+        self._pillar_cb.setStyleSheet(_checkbox_style())
         text_v.addWidget(self._pillar_cb)
 
         if self._note:
             note_lbl = QLabel(self._note)
             note_lbl.setAlignment(Qt.AlignLeft)
             note_lbl.setWordWrap(True)
-            note_lbl.setFont(_f(FS_XS, FW_NORMAL, italic=True))
+            note_lbl.setFont(_f(FS_SM, FW_NORMAL, italic=True))
             note_lbl.setStyleSheet(
-                f"color: {get_token('text_secondary')}; border: none; background: transparent;"
+                f"color: {get_token('text_secondary')}; border: none; background: transparent; padding-left: 22px;"
             )
             text_v.addWidget(note_lbl)
 
@@ -825,8 +852,8 @@ class AggregateChartWidget(QWidget):
         footer_l = QHBoxLayout(footer_frame)
         footer_l.setContentsMargins(0, 4, 0, 0)
         footer_hint = QLabel("Hover on bars to inspect breakdown")
-        footer_hint.setFont(_f(FS_XS))
-        footer_hint.setStyleSheet(f"color: {get_token('text_disabled')}; border: none; background: transparent;")
+        footer_hint.setFont(_f(FS_SM))
+        footer_hint.setStyleSheet(f"color: {get_token('text_secondary')}; border: none; background: transparent;")
         footer_l.addWidget(footer_hint)
         footer_l.addStretch()
         footer_l.addWidget(self._toolbar_stack)

@@ -38,9 +38,9 @@ from PySide6.QtWidgets import (
 
 from three_ps_lcca_gui.gui.theme import (
     FONT_FAMILY,
-    FS_XS, FS_SM, FS_BASE, FS_LG, FS_SUBHEAD, FS_XL, FS_MD,
+    FS_SM, FS_MD, FS_SECTION, FS_DISP,
     FW_NORMAL, FW_BOLD,
-    SP1, SP2, SP3, SP4, SP5, SP6, RADIUS_LG, RADIUS_XL, FW_MEDIUM, FW_SEMIBOLD
+    SP1, SP2, SP3, SP4, SP5, SP6, RADIUS_SM, RADIUS_MD, RADIUS_LG, RADIUS_XL, FW_MEDIUM, FW_SEMIBOLD
 )
 from three_ps_lcca_gui.gui.themes import get_token, theme_manager
 from three_ps_lcca_gui.gui.styles import font as _f
@@ -51,7 +51,7 @@ from ..helper_functions.lcc_colors import COLORS as LCC_COLORS
 from .AggregateChart import (
     StageBarPlotter, SustainabilityBarPlotter, PillarBreakdownBarPlotter,
     _build_pillar_total_data, _build_pillar_data as _build_pillar_bar_data,
-    _create_metric_card, _create_total_block,
+    _create_metric_card, _create_total_block, _checkbox_style,
 )
 from .plot_utils import register_ubuntu_fonts, WheelForwarder, ChartToolbar, currency_note
 
@@ -194,32 +194,32 @@ def _add_smart_labels(ax, wedges, labels, threshold=None, leader_radius=1.3):
             if len(parts) == 3:
                 stage, name, value = parts
                 entry_artists.append(ax.text(x_txt, y_lbl + 0.16, stage, ha=ha, va="center",
-                        color=text_color, fontsize=8.0, alpha=0.65,
+                        color=text_color, fontsize=FS_SM, alpha=0.75,
                         clip_on=False, zorder=11))
                 entry_artists.append(ax.text(x_txt, y_lbl, name, ha=ha, va="center",
-                        color=text_color, fontsize=9.5, fontweight="bold",
+                        color=text_color, fontsize=FS_MD, fontweight="bold",
                         clip_on=False, zorder=11))
                 entry_artists.append(ax.text(x_txt, y_lbl - 0.16, value, ha=ha, va="center",
-                        color=text_color, fontsize=8.5, alpha=0.65,
+                        color=text_color, fontsize=FS_SM, alpha=0.75,
                         clip_on=False, zorder=11))
             elif len(parts) == 2:
                 name, value = parts
-                entry_artists.append(ax.text(x_txt, y_lbl + 0.09, name, ha=ha, va="center",
-                        color=text_color, fontsize=9.5, fontweight="bold",
+                entry_artists.append(ax.text(x_txt, y_lbl + 0.10, name, ha=ha, va="center",
+                        color=text_color, fontsize=FS_MD, fontweight="bold",
                         clip_on=False, zorder=11))
-                entry_artists.append(ax.text(x_txt, y_lbl - 0.09, value, ha=ha, va="center",
-                        color=text_color, fontsize=8.5, alpha=0.65,
+                entry_artists.append(ax.text(x_txt, y_lbl - 0.10, value, ha=ha, va="center",
+                        color=text_color, fontsize=FS_SM, alpha=0.75,
                         clip_on=False, zorder=11))
             else:
                 entry_artists.append(ax.text(x_txt, y_lbl, parts[0], ha=ha, va="center",
-                        color=text_color, fontsize=9.5, fontweight="bold",
+                        color=text_color, fontsize=FS_MD, fontweight="bold",
                         clip_on=False, zorder=11))
 
             artists[e["idx"]] = entry_artists
 
     right = [e for e in entries if e["cx"] >= 0]
     left  = [e for e in entries if e["cx"] <  0]
-    x_col = leader_radius + 0.22
+    x_col = leader_radius + 0.28
 
     if right:
         g, ys = _resolve(right)
@@ -243,7 +243,7 @@ def _add_inner_band_labels(ax, wedges, labels):
         ax.text(
             cx, cy, labels[i],
             ha="center", va="center",
-            color=text_color, fontsize=6.5, fontweight="bold",
+            color=text_color, fontsize=FS_SM, fontweight="bold",
             clip_on=False, zorder=11,
         )
 
@@ -263,12 +263,12 @@ class SimplePillarPlotter:
         self.fig.patch.set_alpha(0.0)
         self.ax = self.fig.add_subplot(111)
         self.ax.set_facecolor("none")
-        self.fig.subplots_adjust(left=0.12, right=0.88, bottom=0.12, top=0.98)
+        self.fig.subplots_adjust(left=0.08, right=0.92, bottom=0.10, top=0.96)
         self.fig.canvas.mpl_connect("motion_notify_event", self._hover)
 
     def _fmt(self, val: float) -> str:
         if self.mode == "Percentage": return f"{val / (self.total or 1) * 100:.1f}%"
-        return fmt_currency(val, self.currency, decimals=2, style="short", use_short_suffix=True).title()
+        return fmt_currency(val, self.currency, decimals=2, style="short", use_short_suffix=False)
 
     def _hover(self, event):
         if not hasattr(self, "wedges") or not self.wedges:
@@ -326,13 +326,18 @@ class SimplePillarPlotter:
         display_labels = [f"{l}\n{self._fmt(v)}" for l, v in zip(self.labels, self.values)]
         self._label_artists = _add_smart_labels(self.ax, self.wedges, display_labels, threshold=15.0, leader_radius=1.25)
 
-        self._center_text = self.ax.text(0, 0, f"Total\n{self._fmt(self.total)}", ha="center", va="center", fontsize=10, fontweight="bold", color=tc)
+        self._center_text = self.ax.text(
+            0, 0, f"Total\n{self._fmt(self.total)}",
+            ha="center", va="center",
+            fontsize=FS_MD, fontweight="bold", color=tc,
+            linespacing=1.35
+        )
 
         legend_els = [Patch(facecolor=c, label=l) for l, c in zip(self.labels, self.colors)]
-        self.ax.legend(handles=legend_els, loc="upper center", bbox_to_anchor=(0.5, -0.05), ncol=3, frameon=False, fontsize=8, labelcolor=tc)
+        self.ax.legend(handles=legend_els, loc="upper center", bbox_to_anchor=(0.5, -0.05), ncol=3, frameon=False, fontsize=FS_SM, labelcolor=tc)
 
         self.ax.axis("off")
-        self.ax.set_xlim(-1.85, 1.85)
+        self.ax.set_xlim(-2.15, 2.15)
         self.ax.set_ylim(-1.85, 1.85)
         return self.fig
 
@@ -351,7 +356,7 @@ class SustainabilityCircularPlotter:
         self.fig.patch.set_alpha(0.0)
         self.ax = self.fig.add_subplot(111)
         self.ax.set_facecolor("none")
-        self.fig.subplots_adjust(left=0.14, right=0.86, bottom=0.12, top=0.98)
+        self.fig.subplots_adjust(left=0.08, right=0.92, bottom=0.10, top=0.96)
         self.fig.canvas.mpl_connect("motion_notify_event", self._hover)
         self._prepare_data()
 
@@ -363,7 +368,7 @@ class SustainabilityCircularPlotter:
         for entry in self.data:
             self.inner_vals.append(sum(p[1] for p in entry["pillars"]))
             self.inner_labels.append(entry["stage"])
-            self.inner_colors.append(COLORS["stages"].get(entry["stage"], "#DDDDDD"))
+            self.inner_colors.append(COLORS["stages"].get(entry["stage"], get_token("surface_mid")))
             for name, val, color in entry["pillars"]:
                 j = len(self.outer_vals)
                 self._stage_to_outer.setdefault(entry["stage"], []).append(j)
@@ -371,7 +376,7 @@ class SustainabilityCircularPlotter:
 
     def _fmt(self, val: float) -> str:
         if self.mode == "Percentage": return f"{val / (self.total_value or 1) * 100:.1f}%"
-        return fmt_currency(val, self.currency, decimals=2, style="short", use_short_suffix=True).title()
+        return fmt_currency(val, self.currency, decimals=2, style="short", use_short_suffix=False)
 
     def _hover(self, event):
         if not hasattr(self, "outer_wedges") or not self.outer_wedges:
@@ -511,7 +516,12 @@ class SustainabilityCircularPlotter:
                 y = [0.5 * np.sin(angle), 1.1 * np.sin(angle)]
                 self.ax.plot(x, y, color=sep, lw=1.5, alpha=0.5)
 
-        self._center_text = self.ax.text(0, 0, f"Total\n{self._fmt(self.total_value)}", ha="center", va="center", fontsize=10, fontweight="bold", color=tc)
+        self._center_text = self.ax.text(
+            0, 0, f"Total\n{self._fmt(self.total_value)}",
+            ha="center", va="center",
+            fontsize=FS_MD, fontweight="bold", color=tc,
+            linespacing=1.35
+        )
 
         # ncol=3 fills column-by-column, so interleave pillar/stage pairs so each
         # column holds one of each → row 1: pillars, row 2: stages.
@@ -520,12 +530,12 @@ class SustainabilityCircularPlotter:
         legend_els = []
         for pillar, stage in zip(_PILLAR_ORDER, _STAGE_ORDER):
             legend_els.append(Patch(facecolor=COLORS["pillars"][pillar], label=pillar))
-            legend_els.append(Patch(facecolor=COLORS["stages"].get(stage, "#AAA"), label=stage))
-        self.ax.legend(handles=legend_els, loc="upper center", bbox_to_anchor=(0.5, -0.05), ncol=3, frameon=False, fontsize=8, labelcolor=tc)
+            legend_els.append(Patch(facecolor=COLORS["stages"].get(stage, get_token("surface_mid")), label=stage))
+        self.ax.legend(handles=legend_els, loc="upper center", bbox_to_anchor=(0.5, -0.05), ncol=3, frameon=False, fontsize=FS_SM, labelcolor=tc)
 
         self.ax.axis("off")
-        self.ax.set_xlim(-2.1, 2.1)
-        self.ax.set_ylim(-2.1, 2.1)
+        self.ax.set_xlim(-2.15, 2.15)
+        self.ax.set_ylim(-2.15, 2.15)
         return self.fig
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -544,11 +554,12 @@ class LCCPieWidget(QWidget):
 
         self.card = QFrame()
         self.card.setObjectName("pieCard")
+        self.card.setGraphicsEffect(None)
         self.card.setStyleSheet(
             f"#pieCard {{"
             f"  background-color: {get_token('base')};"
             f"  border: 1px solid {get_token('surface_mid')};"
-            f"  border-radius: {RADIUS_XL}px;"
+            f"  border-radius: {RADIUS_SM}px;"
             f"}}"
         )
         self.card.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
@@ -563,12 +574,12 @@ class LCCPieWidget(QWidget):
         self._left_panel.setStyleSheet(
             f"#pieTextPanel {{"
             f"  background-color: {get_token('base')};"
-            f"  border-top-left-radius: {RADIUS_XL - 1}px;"
-            f"  border-bottom-left-radius: {RADIUS_XL - 1}px;"
+            f"  border-top-left-radius: {RADIUS_SM}px;"
+            f"  border-bottom-left-radius: {RADIUS_SM}px;"
             f"  border-right: 1px solid {get_token('surface_mid')};"
             f"}}"
         )
-        self._left_panel.setFixedWidth(310)
+        self._left_panel.setFixedWidth(340)
 
         left_v = QVBoxLayout(self._left_panel)
         left_v.setContentsMargins(SP5, SP5, SP5, SP5)
@@ -577,7 +588,7 @@ class LCCPieWidget(QWidget):
         title_lbl = QLabel(_TAB_META[1]["title"])
         title_lbl.setAlignment(Qt.AlignLeft)
         title_lbl.setWordWrap(True)
-        title_lbl.setFont(_f(FS_XL, FW_BOLD))
+        title_lbl.setFont(_f(FS_SECTION))
         title_lbl.setStyleSheet(
             f"color: {get_token('text')}; border: none; background: transparent; letter-spacing: -0.2px;"
         )
@@ -586,11 +597,18 @@ class LCCPieWidget(QWidget):
         desc_lbl = QLabel(f"Total cost breakdown across 3 sustainability pillars, in {self._currency}.")
         desc_lbl.setWordWrap(True)
         desc_lbl.setAlignment(Qt.AlignLeft)
-        desc_lbl.setFont(_f(FS_BASE))
+        desc_lbl.setFont(_f(FS_MD))
         desc_lbl.setStyleSheet(
             f"color: {get_token('text_secondary')}; border: none; background: transparent; line-height: 1.4;"
         )
         left_v.addWidget(desc_lbl)
+
+        # Subtle 1px divider separating header from metric cards
+        hr = QFrame()
+        hr.setFixedHeight(1)
+        hr.setStyleSheet(f"background-color: {get_token('surface_mid')}; border: none;")
+        left_v.addWidget(hr)
+        left_v.addSpacing(SP1)
 
         summary = compute_all_summaries(self._results)
         pt = summary.get("pillar_totals", {})
@@ -603,9 +621,9 @@ class LCCPieWidget(QWidget):
         sum_pt = sum([v_eco, v_env, v_soc]) or 1.0
         p_eco, p_env, p_soc = v_eco / sum_pt * 100, v_env / sum_pt * 100, v_soc / sum_pt * 100
 
-        a_eco = fmt_currency(v_eco, self._currency, decimals=2, style="short", use_short_suffix=True).title()
-        a_env = fmt_currency(v_env, self._currency, decimals=2, style="short", use_short_suffix=True).title()
-        a_soc = fmt_currency(v_soc, self._currency, decimals=2, style="short", use_short_suffix=True).title()
+        a_eco = fmt_currency(v_eco, self._currency, decimals=2, style="short", use_short_suffix=False)
+        a_env = fmt_currency(v_env, self._currency, decimals=2, style="short", use_short_suffix=False)
+        a_soc = fmt_currency(v_soc, self._currency, decimals=2, style="short", use_short_suffix=False)
 
         card_eco = _create_metric_card("Economic", c_eco, p_eco, a_eco)
         card_env = _create_metric_card("Environmental", c_env, p_env, a_env)
@@ -617,26 +635,36 @@ class LCCPieWidget(QWidget):
 
         left_v.addStretch()
 
-        # Total cost block
-        total_val = v_eco + v_env + v_soc
-        left_v.addWidget(_create_total_block(total_val, self._currency))
+        ctrl_frame = QWidget()
+        ctrl_frame.setStyleSheet("background: transparent; border: none;")
+        ctrl_v = QVBoxLayout(ctrl_frame)
+        ctrl_v.setContentsMargins(0, 0, 0, 0)
+        ctrl_v.setSpacing(SP2)
 
         self._stage_cb = QCheckBox("Include stage-wise break-up")
-        self._stage_cb.setFont(_f(FS_BASE))
-        self._stage_cb.setStyleSheet(
-            f"color: {get_token('text_secondary')}; background: transparent; border: none; padding-top: {SP1}px;"
-        )
+        self._stage_cb.setFont(_f(FS_MD))
+        self._stage_cb.setStyleSheet(_checkbox_style())
         self._stage_cb.setVisible(_pillar_ok)
         self._stage_cb.setEnabled(_nested_ok)
-        left_v.addWidget(self._stage_cb)
+        ctrl_v.addWidget(self._stage_cb)
 
         if _pillar_ok and not _nested_ok:
             _stage_note = QLabel("* Stage breakdown unavailable- negative values in stage data.")
             _stage_note.setAlignment(Qt.AlignLeft)
             _stage_note.setWordWrap(True)
-            _stage_note.setFont(_f(FS_XS, FW_NORMAL, italic=True))
-            _stage_note.setStyleSheet(f"color: {get_token('text_secondary')}; border: none; background: transparent;")
-            left_v.addWidget(_stage_note)
+            _stage_note.setFont(_f(FS_SM, FW_NORMAL, italic=True))
+            _stage_note.setStyleSheet(
+                f"color: {get_token('text_secondary')}; border: none; background: transparent; padding-left: 22px;"
+            )
+            ctrl_v.addWidget(_stage_note)
+
+        self._bar_cb = QCheckBox("Change to bar chart")
+        self._bar_cb.setFont(_f(FS_MD))
+        self._bar_cb.setStyleSheet(_checkbox_style())
+        self._bar_cb.setVisible(False)
+        ctrl_v.addWidget(self._bar_cb)
+
+        left_v.addWidget(ctrl_frame)
 
         self._card_layout.addWidget(self._left_panel)
         self._plotters = []
@@ -721,11 +749,7 @@ class LCCPieWidget(QWidget):
                 self._chart_stack.addWidget(c_sbar)
                 self._toolbar_stack.addWidget(ChartToolbar(c_sbar, self))
 
-            self._bar_cb = QCheckBox("Change to bar chart")
-            self._bar_cb.setFont(_f(FS_BASE))
-            self._bar_cb.setStyleSheet(f"color: {get_token('text_secondary')}; background: transparent; border: none;")
             self._bar_cb.setVisible(self._bar_chart_idx >= 0)
-            left_v.addWidget(self._bar_cb)
 
             def _switch_chart():
                 bar   = self._bar_cb.isChecked()
@@ -768,8 +792,8 @@ class LCCPieWidget(QWidget):
             footer_l = QHBoxLayout(footer_frame)
             footer_l.setContentsMargins(0, 4, 0, 0)
             footer_hint = QLabel("Hover on chart elements to inspect breakdown")
-            footer_hint.setFont(_f(FS_XS))
-            footer_hint.setStyleSheet(f"color: {get_token('text_disabled')}; border: none; background: transparent;")
+            footer_hint.setFont(_f(FS_SM))
+            footer_hint.setStyleSheet(f"color: {get_token('text_secondary')}; border: none; background: transparent;")
             footer_l.addWidget(footer_hint)
             footer_l.addStretch()
             footer_l.addWidget(self._toolbar_stack)
@@ -781,7 +805,7 @@ class LCCPieWidget(QWidget):
             _note = QLabel("* Negative cost values detected- pie chart unavailable, showing bar chart instead.")
             _note.setAlignment(Qt.AlignCenter)
             _note.setWordWrap(True)
-            _note.setFont(_f(FS_XS, FW_NORMAL, italic=True))
+            _note.setFont(_f(FS_SM, FW_NORMAL, italic=True))
             _note.setStyleSheet(f"color: {get_token('text_secondary')}; border: none; background: transparent;")
             left_v.addWidget(_note)
 

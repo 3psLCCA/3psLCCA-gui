@@ -19,8 +19,9 @@ from PySide6.QtWidgets import (
     QSizePolicy,
     QVBoxLayout,
     QWidget,
+    QGraphicsDropShadowEffect,
 )
-from PySide6.QtGui import QFont
+from PySide6.QtGui import QFont, QColor
 from PySide6.QtCore import Qt, QSize, QThread, QTimer, Signal
 
 from three_ps_lcca_gui.gui.themes import get_token, theme_manager
@@ -28,7 +29,7 @@ try:
     from three_ps_lcca_gui.gui._CONFIG import COMPARISON_MODE
 except ImportError:
     COMPARISON_MODE = True
-from three_ps_lcca_gui.gui.styles import font as _f, btn_primary, btn_ghost
+from three_ps_lcca_gui.gui.styles import font as _f, btn_primary, btn_outline, btn_ghost
 from three_ps_lcca_gui.gui.theme import (
     SP1,
     SP2,
@@ -36,8 +37,9 @@ from three_ps_lcca_gui.gui.theme import (
     SP4,
     SP5,
     SP6,
-    RADIUS_LG,
+    RADIUS_SM,
     RADIUS_MD,
+    RADIUS_LG,
     FS_SM,       # 8pt  - Micro / Captions / Badges / Currency
     FS_MD,       # 10pt - Body copy / Buttons / Hints
     FS_SECTION,  # 14pt - Section headings / Breakdown values
@@ -217,9 +219,14 @@ class ResponsiveTotalCard(QFrame):
             f"  background-color: {get_token('base')};"
             f"  border: 1px solid {get_token('surface_mid')};"
             f"  border-left: 4px solid {get_token('primary')};"
-            f"  border-radius: {RADIUS_LG}px;"
+            f"  border-radius: {RADIUS_MD}px;"
             f"}}"
         )
+        shadow = QGraphicsDropShadowEffect(self)
+        shadow.setBlurRadius(8)
+        shadow.setColor(QColor(0, 0, 0, 16))
+        shadow.setOffset(0, 2)
+        self.setGraphicsEffect(shadow)
         self.setMinimumHeight(104)
         
         self.main_layout = QGridLayout(self)
@@ -241,7 +248,7 @@ class ResponsiveTotalCard(QFrame):
         dot.setStyleSheet(f"background-color: {get_token('primary')}; border-radius: 4px; border: none;")
         r1.addWidget(dot)
         title_lbl = QLabel("Total Life Cycle Cost")
-        title_lbl.setFont(_f(FS_SM, FW_MEDIUM))
+        title_lbl.setFont(_f(FS_MD, FW_MEDIUM))
         title_lbl.setStyleSheet(f"color: {get_token('text_secondary')}; border: none; background: transparent;")
         r1.addWidget(title_lbl)
         r1.addStretch()
@@ -250,14 +257,14 @@ class ResponsiveTotalCard(QFrame):
         
         val_str = fmt_currency(total_value, currency, decimals=0, style="short")
         val_lbl = QLabel(val_str)
-        val_lbl.setFont(_f(FS_DISP, FW_NORMAL))
+        val_lbl.setFont(_f(FS_DISP, FW_BOLD))
         val_lbl.setStyleSheet(f"color: {get_token('text')}; border: none; background: transparent;")
         left_v.addWidget(val_lbl)
         left_v.addSpacing(2)
 
         curr_lbl = QLabel(currency)
         curr_lbl.setFont(_f(FS_SM, FW_NORMAL))
-        curr_lbl.setStyleSheet(f"color: {get_token('text_disabled')}; border: none; letter-spacing: 0.5px; background: transparent;")
+        curr_lbl.setStyleSheet(f"color: {get_token('text_secondary')}; border: none; letter-spacing: 0.5px; background: transparent;")
         left_v.addWidget(curr_lbl)
         left_v.addStretch()
 
@@ -395,12 +402,13 @@ class LCCSummaryCards(QWidget):
     def _card(self, title: str, value: float, accent: str, grand_total: float = 0.0) -> QFrame:
         card = QFrame()
         card.setObjectName("kpiCard")
+        card.setGraphicsEffect(None)
         card.setStyleSheet(
             f"#kpiCard {{"
             f"  background-color: {get_token('base')};"
             f"  border: 1px solid {get_token('surface_mid')};"
-            f"  border-left: 3.5px solid {accent};"
-            f"  border-radius: {RADIUS_MD}px;"
+            f"  border-left: 3px solid {accent};"
+            f"  border-radius: {RADIUS_SM}px;"
             f"}}"
         )
 
@@ -419,7 +427,7 @@ class LCCSummaryCards(QWidget):
         r1.addWidget(dot)
 
         title_lbl = QLabel(title)
-        title_lbl.setFont(_f(FS_SM, FW_MEDIUM))
+        title_lbl.setFont(_f(FS_MD, FW_MEDIUM))
         title_lbl.setStyleSheet(f"color: {get_token('text_secondary')}; border: none; background: transparent;")
         r1.addWidget(title_lbl)
         r1.addStretch()
@@ -428,7 +436,7 @@ class LCCSummaryCards(QWidget):
             pct_val = (value / grand_total) * 100
             pct_lbl = QLabel(f"{pct_val:.1f}%")
             pct_lbl.setFont(_f(FS_SM, FW_MEDIUM))
-            pct_lbl.setStyleSheet(f"color: {get_token('text_disabled')}; border: none; background: transparent;")
+            pct_lbl.setStyleSheet(f"color: {get_token('text_secondary')}; border: none; background: transparent;")
             r1.addWidget(pct_lbl)
 
         v.addLayout(r1)
@@ -446,7 +454,7 @@ class LCCSummaryCards(QWidget):
         curr_lbl = QLabel(self._currency)
         curr_lbl.setFont(_f(FS_SM, FW_NORMAL))
         curr_lbl.setStyleSheet(
-            f"color: {get_token('text_disabled')}; border: none; letter-spacing: 0.5px; background: transparent;"
+            f"color: {get_token('text_secondary')}; border: none; letter-spacing: 0.5px; background: transparent;"
         )
         v.addWidget(curr_lbl)
 
@@ -750,6 +758,7 @@ class OutputsPage(ScrollableForm):
         self._currency = ""
         self._current_status = "idle"
         self._status_args: dict = {}
+        self.setStyleSheet(f"background-color: {get_token('window')};")
         self._build_ui()
         theme_manager().theme_changed.connect(self._refresh_styles)
 
@@ -759,15 +768,22 @@ class OutputsPage(ScrollableForm):
         f = self.form
 
         # ── Permanent header row: title + action buttons ──────
-        _hdr_row = QWidget()
-        _hdr_row.setStyleSheet("background: transparent; border: none;")
-        _hdr_h = QHBoxLayout(_hdr_row)
+        self._hdr_row = QWidget()
+        self._hdr_row.setObjectName("resultsHeader")
+        self._hdr_row.setStyleSheet(
+            f"#resultsHeader {{"
+            f"  background-color: {get_token('window')};"
+            f"  border: none;"
+            f"  padding-bottom: {SP2}px;"
+            f"}}"
+        )
+        _hdr_h = QHBoxLayout(self._hdr_row)
         _hdr_h.setContentsMargins(0, 0, 0, 0)
         _hdr_h.setSpacing(SP3)
 
         self._header = QLabel("Results")
         self._header.setFont(_f(FS_DISP, FW_BOLD))
-        self._header.setStyleSheet(f"color: {get_token('text')};")
+        self._header.setStyleSheet(f"color: {get_token('text')}; border: none;")
         _hdr_h.addWidget(self._header)
         _hdr_h.addStretch()
 
@@ -775,7 +791,7 @@ class OutputsPage(ScrollableForm):
             self._ctx_btn_compare = QPushButton("Add to Comparison ↗")
             self._ctx_btn_compare.setFixedHeight(BTN_MD)
             self._ctx_btn_compare.setFont(_f(FS_MD, FW_MEDIUM))
-            self._ctx_btn_compare.setStyleSheet(btn_ghost())
+            self._ctx_btn_compare.setStyleSheet(btn_outline())
             self._ctx_btn_compare.setToolTip("Close project and add to the comparison workspace")
             self._ctx_btn_compare.setCursor(Qt.PointingHandCursor)
             self._ctx_btn_compare.setEnabled(False)
@@ -791,7 +807,7 @@ class OutputsPage(ScrollableForm):
         self._ctx_btn_pdf.clicked.connect(self._generate_pdf_report)
         _hdr_h.addWidget(self._ctx_btn_pdf)
 
-        f.addRow(_hdr_row)
+        f.addRow(self._hdr_row)
 
         self._context_bar = self._make_context_bar()
         self._context_bar.setVisible(False)
@@ -902,15 +918,24 @@ class OutputsPage(ScrollableForm):
     # ── Theme refresh ─────────────────────────────────────────
 
     def _refresh_styles(self):
+        self.setStyleSheet(f"background-color: {get_token('window')};")
+        if hasattr(self, "_hdr_row"):
+            self._hdr_row.setStyleSheet(
+                f"#resultsHeader {{"
+                f"  background-color: {get_token('window')};"
+                f"  border: none;"
+                f"  padding-bottom: {SP2}px;"
+                f"}}"
+            )
         self._header.setFont(_f(FS_DISP, FW_BOLD))
         self._header.setStyleSheet(
-            f"color: {get_token('text')}; margin-bottom: 0px;"
+            f"color: {get_token('text')}; border: none; margin-bottom: 0px;"
         )
         self.btn_calculate.setStyleSheet(btn_primary())
         if hasattr(self, "_ctx_btn_pdf"):
             self._ctx_btn_pdf.setStyleSheet(btn_primary())
         if hasattr(self, "_ctx_btn_compare"):
-            self._ctx_btn_compare.setStyleSheet(btn_ghost())
+            self._ctx_btn_compare.setStyleSheet(btn_outline())
         self._update_context_bar()
         s = self._current_status
         if s == "idle":
@@ -1308,6 +1333,7 @@ class OutputsPage(ScrollableForm):
                 "These charts illustrate the distribution of the total life cycle cost. The Sustainability Matrix disaggregates costs across the Economic, Environmental, and Social Pillars. The aggregation chart compares the relative weight of three life cycle phases: Initial Construction, the combined Use/Maintenance/Reconstruction stage, and the final End-of-Life phase."
             ),
             lambda r: LCCPieWidget(r, currency=self._currency),
+            lambda r: _divider(),
             lambda r: AggregateChartWidget(r, currency=self._currency),
             lambda r: _divider(),
             lambda r: _section_heading("Consolidated stage summary"),
