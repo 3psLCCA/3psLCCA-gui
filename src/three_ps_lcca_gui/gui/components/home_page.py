@@ -87,7 +87,6 @@ from three_ps_lcca_gui.gui.styles import (
     btn_ghost_checkable,
 )
 from three_ps_lcca_gui.gui.components.settings_dialog import SettingsDialog
-from three_ps_lcca_gui.gui.components.outputs.comparison_page import ComparisonPickerPanel
 from three_ps_lcca_gui.gui.components.sponsors_footer import SponsorsFooter
 from three_ps_lcca_gui.gui.components.history_tab import (
     _HomeTabBar, _ComparisonHistoryTab,
@@ -915,6 +914,7 @@ class HomePage(QWidget):
         self.manager = manager
         self._active_project_id = None
         self._all_projects: list[dict] = []  # merged engine + recent + pinned
+        self._open_windows: dict[frozenset, object] = {}  # tracked ComparisonResultWindows
         self._build_ui()
 
     # ── UI construction ───────────────────────────────────────────────────────
@@ -929,10 +929,8 @@ class HomePage(QWidget):
 
         self._stack = QStackedWidget()
         self._stack.addWidget(self._make_right_panel())      # index 0: project grid
-        self._comparison_panel = ComparisonPickerPanel(manager=self.manager)
-        self._stack.addWidget(self._comparison_panel)        # index 1: compare
-        # Wire history tab to the comparison picker for window dedup
-        self._history_tab.set_picker_panel(self._comparison_panel)
+        # Wire history tab to this home page for window dedup & GC prevention
+        self._history_tab.set_picker_panel(self)
         # Seed tab label count on first render
         self._refresh_history_count()
         root.addWidget(self._stack, stretch=1)
@@ -1040,8 +1038,7 @@ class HomePage(QWidget):
         project_set = frozenset(pid_list)
 
         # Raise existing window for the same group if already open
-        panel = self._comparison_panel
-        existing = panel._open_windows.get(project_set)
+        existing = self._open_windows.get(project_set)
         if existing and existing.isVisible():
             existing.raise_()
             existing.activateWindow()
@@ -1049,14 +1046,16 @@ class HomePage(QWidget):
 
         win = ComparisonResultWindow(pids=pid_list, names=name_list,
                                      caches=caches, override_ap=0)
-        # Store in panel._open_windows to keep a Python reference alive
+        # Store in self._open_windows to keep a Python reference alive
         # and prevent the window from being GC'd before its threads start.
-        panel._open_windows[project_set] = win
+        self._open_windows[project_set] = win
         win.show()
 
         label = "  ·  ".join(sorted(name_list))
         comp_sm.add_comparison(label, pid_list, name_list, 0)
-        panel.soft_refresh()
+        self._refresh_history_count()
+        if self._home_content_stack.currentIndex() == 1:
+            self._history_tab.refresh()
 
         # Clear selection and hide FAB
         delegate._comp_selected.clear()
@@ -1064,23 +1063,70 @@ class HomePage(QWidget):
         self.grid_list.viewport().update()
 
     def _switch_to_home(self):
-        self._stack.setCurrentIndex(0)
-        self._nav_home.set_selected(True)
-        if COMPARISON_MODE:
+        if hasattr(self, "_nav_home"):
+            self._nav_home.set_selected(True)
+        if COMPARISON_MODE and hasattr(self, "_nav_compare"):
             self._nav_compare.set_selected(False)
+        saved_sort = sm.get_pref("sort_order") or "recent"
+        if saved_sort == "compare":
+            saved_sort = "recent"
+        for btn in self._sort_btns:
+            btn.setChecked(btn.property("sort_key") == saved_sort)
+        self._on_sort_btn()
+
+    def open_compare_projects(self, preselect_pid: str = None):
+        """Switch to Home project grid in Compare sort mode with preselected project."""
+        if not COMPARISON_MODE:
+            return
+
+        if hasattr(self, "_nav_home"):
+            self._nav_home.set_selected(False)
+        if hasattr(self, "_nav_compare"):
+            self._nav_compare.set_selected(True)
+
+        for btn in self._sort_btns:
+            btn.setChecked(btn.property("sort_key") == "compare")
+
+        delegate = self.grid_list.itemDelegate()
+        delegate.comparison_mode = True
+        delegate._comp_selected.clear()
+        if preselect_pid:
+            delegate._comp_selected.add(preselect_pid)
+        self.grid_list.setSelectionMode(QAbstractItemView.NoSelection)
+
+        # Show tab bar in compare mode, ensure Projects tab (0) is selected
+        self._home_tab_bar.show()
+        self._tab_bar_sep.show()
+        self._home_content_stack.setCurrentIndex(0)
+        self._home_tab_bar.set_current(0)
+        self._refresh_history_count()
+
+        self._render_grid()
+
+        n = len(delegate._comp_selected)
+        if n >= 2:
+            self._comp_fab.setText(f"Compare {n} Projects  →")
+            self._comp_fab.show()
+            self._apply_fab_style()
+            self._reposition_comp_fab()
+        else:
+            self._comp_fab.hide()
+
+        if preselect_pid:
+            for i in range(self.grid_list.count()):
+                it = self.grid_list.item(i)
+                d = it.data(Qt.UserRole)
+                if isinstance(d, dict) and d.get("project_id") == preselect_pid:
+                    self.grid_list.scrollToItem(it)
+                    break
 
     def switch_to_compare(self, preselect_pid: str = None):
         if not COMPARISON_MODE:
             return
-        self._stack.setCurrentIndex(1)
-        self._nav_home.set_selected(False)
-        self._nav_compare.set_selected(True)
-        self._comparison_panel.refresh()
-        if preselect_pid:
-            self._comparison_panel.preselect_project(preselect_pid)
+        self.open_compare_projects(preselect_pid=preselect_pid)
 
     def _switch_to_compare(self):
-        self.switch_to_compare()
+        self.open_compare_projects()
 
     # ── Home content-tab switching (Projects / Comparison History) ────────────
 
@@ -1098,7 +1144,10 @@ class HomePage(QWidget):
         self._home_tab_bar.update_history_count(count)
 
     def _is_project_in_comparison(self, pid: str) -> bool:
-        return self._comparison_panel.is_in_active_comparison(pid)
+        for project_set, win in self._open_windows.items():
+            if pid in project_set and win.isVisible():
+                return True
+        return False
 
     def _safe_open_project(self, pid: str):
         if self._is_project_in_comparison(pid):
@@ -1492,11 +1541,18 @@ class HomePage(QWidget):
 
     def _on_sort_btn(self):
         sender = self.sender()
-        for btn in self._sort_btns:
-            btn.setChecked(btn is sender)
+        if sender in self._sort_btns:
+            for btn in self._sort_btns:
+                btn.setChecked(btn is sender)
+        if not any(btn.isChecked() for btn in self._sort_btns):
+            self._sort_btns[0].setChecked(True)
         key = self._current_sort()
         delegate = self.grid_list.itemDelegate()
         if key == "compare":
+            if hasattr(self, "_nav_home"):
+                self._nav_home.set_selected(False)
+            if hasattr(self, "_nav_compare"):
+                self._nav_compare.set_selected(True)
             delegate.comparison_mode = True
             delegate._comp_selected.clear()
             self.grid_list.setSelectionMode(QAbstractItemView.NoSelection)
@@ -1504,8 +1560,14 @@ class HomePage(QWidget):
             # Show tab bar in compare mode
             self._home_tab_bar.show()
             self._tab_bar_sep.show()
+            self._home_content_stack.setCurrentIndex(0)
+            self._home_tab_bar.set_current(0)
             self._refresh_history_count()
         else:
+            if hasattr(self, "_nav_home"):
+                self._nav_home.set_selected(True)
+            if hasattr(self, "_nav_compare"):
+                self._nav_compare.set_selected(False)
             delegate.comparison_mode = False
             delegate._comp_selected.clear()
             self.grid_list.setSelectionMode(QAbstractItemView.SingleSelection)
@@ -1583,9 +1645,6 @@ class HomePage(QWidget):
 
         # Explicitly re-apply current sort and filter
         self._render_grid()
-        # Keep comparison panel in sync if it is currently visible
-        if self._stack.currentIndex() == 1:
-            self._comparison_panel.soft_refresh()
         if hasattr(self, "_home_tab_bar"):
             self._refresh_history_count()
 
@@ -1593,9 +1652,12 @@ class HomePage(QWidget):
         self.grid_list.clear()
         sort_key = self._current_sort()
         projects = list(self._all_projects)
+        delegate = self.grid_list.itemDelegate()
+        comp_selected = getattr(delegate, "_comp_selected", set())
         if sort_key == "compare" and COMPARISON_MODE:
             projects = [p for p in projects
-                        if p.get("user_meta", {}).get("fit_for_comparison")]
+                        if p.get("user_meta", {}).get("fit_for_comparison")
+                        or p.get("project_id") in comp_selected]
             projects.sort(key=lambda p: (p.get("display_name") or "").lower())
             self.grid_section_lbl.setText("Ready to Compare")
         elif sort_key == "pinned":

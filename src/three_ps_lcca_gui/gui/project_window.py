@@ -1,4 +1,4 @@
-﻿import os
+import os
 
 from PySide6.QtCore import Qt, QRect, QSize, QEvent, QPoint, QTimer, QStandardPaths
 from PySide6.QtWidgets import (
@@ -711,7 +711,7 @@ class ProjectWindow(QMainWindow):
         self.main_stack.setCurrentWidget(self.home_widget)
         self.manager.refresh_all_home_screens()
         if tab == "compare":
-            QTimer.singleShot(0, lambda: self.home_widget.switch_to_compare(
+            QTimer.singleShot(0, lambda: self.home_widget.open_compare_projects(
                 preselect_pid=project_select))
 
     def show_project_view(self):

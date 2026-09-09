@@ -377,6 +377,15 @@ class _HistoryRow(QFrame):
             f"  border-radius: {RADIUS_MD}px;"
             f"}}"
             f"#histCard:hover {{ border-color: {prim}; }}"
+            f"QToolTip {{"
+            f"  background-color: {surf};"
+            f"  color: {text_color};"
+            f"  border: 1px solid {mid};"
+            f"  border-radius: {RADIUS_SM}px;"
+            f"  padding: 5px 9px;"
+            f"  font-family: {FONT_FAMILY};"
+            f"  font-size: {FS_SM}pt;"
+            f"}}"
         )
 
         # Status dots & labels
@@ -832,138 +841,30 @@ class _ComparisonHistoryTab(QWidget):
 
     def _apply_theme(self):
         prim = get_token("primary")
+        surf = get_token("surface")
+        mid = get_token("surface_mid")
+        text_color = get_token("text")
+        self.setStyleSheet(
+            f"QToolTip {{"
+            f"  background-color: {surf};"
+            f"  color: {text_color};"
+            f"  border: 1px solid {mid};"
+            f"  border-radius: {RADIUS_SM}px;"
+            f"  padding: 5px 9px;"
+            f"  font-family: {FONT_FAMILY};"
+            f"  font-size: {FS_SM}pt;"
+            f"}}"
+        )
         self._search.setStyleSheet(
             f"QLineEdit {{"
-            f"  background: {get_token('surface')};"
-            f"  border: 1px solid {get_token('surface_mid')};"
+            f"  background: {surf};"
+            f"  border: 1px solid {mid};"
             f"  border-radius: {RADIUS_MD}px;"
             f"  padding: 0 {SP3}px;"
-            f"  color: {get_token('text')};"
+            f"  color: {text_color};"
             f"  font-size: {FS_BASE}pt;"
             f"}}"
             f"QLineEdit:focus {{ border-color: {prim}; }}"
         )
         if hasattr(self, "_hint_lbl"):
             self._hint_lbl.setStyleSheet(f"color: {get_token('text_secondary')}; padding-left: 2px;")
-
-
-class _RecentComparisonsPreview(QWidget):
-    _PREVIEW_LIMIT = 4
-
-    def __init__(self, switch_to_history_cb=None, parent=None):
-        super().__init__(parent)
-        self._switch_cb = switch_to_history_cb
-        self._picker_panel = None
-        self._build()
-        theme_manager().theme_changed.connect(self._apply_theme)
-        self.hide()
-
-    def set_picker_panel(self, panel):
-        self._picker_panel = panel
-
-    def refresh(self):
-        while self._rows_layout.count():
-            item = self._rows_layout.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
-
-        entries = sm.get_comparison_history(limit=self._PREVIEW_LIMIT)
-        total = sm.get_comparison_count()
-
-        if not entries:
-            self.hide()
-            return
-
-        self.show()
-        suffix = str(total) if total > self._PREVIEW_LIMIT else ""
-        self._view_all_btn.setText(f"View all {suffix} →".strip())
-
-        for entry in entries:
-            row = _HistoryRow(entry)
-            row.rerun_requested.connect(self._on_rerun)
-            row.delete_requested.connect(self._on_delete)
-            row.rename_requested.connect(self._on_rename)
-            row.star_toggled.connect(self._on_star)
-            self._rows_layout.addWidget(row)
-
-    def _build(self):
-        lay = QVBoxLayout(self)
-        lay.setContentsMargins(SP6 + SP4, SP3, SP6 + SP4, SP4)
-        lay.setSpacing(SP3)
-
-        sep = QFrame()
-        sep.setFrameShape(QFrame.HLine)
-        sep.setFrameShadow(QFrame.Plain)
-        sep.setStyleSheet("color: palette(mid);")
-        sep.setFixedHeight(1)
-        lay.addWidget(sep)
-
-        hdr_h = QHBoxLayout()
-        hdr_h.setContentsMargins(0, 0, 0, 0)
-        hdr_h.setSpacing(SP2)
-
-        self._hdr_lbl = QLabel("RECENT COMPARISONS")
-        self._hdr_lbl.setFont(_f(FS_SM, FW_SEMIBOLD))
-        hdr_h.addWidget(self._hdr_lbl)
-        hdr_h.addStretch()
-
-        self._view_all_btn = QPushButton("View all →")
-        self._view_all_btn.setFont(_f(FS_SM, FW_MEDIUM))
-        self._view_all_btn.setCursor(Qt.PointingHandCursor)
-        self._view_all_btn.clicked.connect(self._on_view_all)
-        hdr_h.addWidget(self._view_all_btn)
-        lay.addLayout(hdr_h)
-
-        self._rows_container = QWidget()
-        self._rows_layout = QVBoxLayout(self._rows_container)
-        self._rows_layout.setContentsMargins(0, 0, 0, 0)
-        self._rows_layout.setSpacing(SP2)
-        lay.addWidget(self._rows_container)
-
-        self._apply_theme()
-
-    def _on_view_all(self):
-        if self._switch_cb:
-            self._switch_cb()
-
-    def _on_rerun(self, entry: dict):
-        _do_rerun(entry, picker_panel=self._picker_panel, parent_widget=self)
-
-    def _on_delete(self, history_id: int):
-        entries = sm.get_comparison_history()
-        entry = next((e for e in entries if e["id"] == history_id), None)
-        label = entry["label"] if entry else "this comparison"
-        res = QMessageBox.warning(
-            self, "Remove Comparison",
-            f"Remove '{label}' from history?\n\n"
-            "This only removes the history record. Project data is unaffected.",
-            QMessageBox.Ok | QMessageBox.Cancel, QMessageBox.Cancel,
-        )
-        if res == QMessageBox.Ok:
-            sm.delete_comparison(history_id)
-            self.refresh()
-
-    def _on_rename(self, history_id: int, current_label: str):
-        new_label, ok = QInputDialog.getText(
-            self, "Rename Comparison", "New name:", text=current_label
-        )
-        if ok and new_label.strip() and new_label.strip() != current_label:
-            sm.rename_comparison(history_id, new_label.strip())
-            self.refresh()
-
-    def _on_star(self, history_id: int, starred: bool):
-        sm.star_comparison(history_id, starred)
-
-    def _apply_theme(self):
-        prim = get_token("primary")
-        self._hdr_lbl.setStyleSheet(
-            f"color: {get_token('text_disabled')}; letter-spacing: 2px;"
-        )
-        self._view_all_btn.setStyleSheet(
-            f"QPushButton {{ background: transparent; border: none; color: {prim}; padding: 0; }}"
-            f"QPushButton:hover {{ color: {get_token('primary', 'hover')}; }}"
-        )
-
-
-
-
