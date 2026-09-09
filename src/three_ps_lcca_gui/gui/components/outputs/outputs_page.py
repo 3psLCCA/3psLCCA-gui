@@ -1368,19 +1368,16 @@ class OutputsPage(ScrollableForm):
         QTimer.singleShot(0, lambda: self._build_result_widgets(results, sections))
 
     def _build_result_widgets(self, results, sections):
-        insert_pos = 1  # pdf_row is at 0; insert result sections after it
         for factory in sections:
             try:
                 widget = factory(results)
                 if widget:
-                    self._status_layout.insertWidget(insert_pos, widget)
-                    insert_pos += 1
+                    self._status_layout.addWidget(widget)
             except Exception as e:
                 err = QLabel(f"Render error: {e}")
                 err.setFont(_f(FS_MD, italic=True))
                 err.setStyleSheet(f"color: {get_token('text_secondary')};")
-                self._status_layout.insertWidget(insert_pos, err)
-                insert_pos += 1
+                self._status_layout.addWidget(err)
 
         scroll = self.layout.itemAt(0).widget()
         if scroll and hasattr(scroll, "verticalScrollBar"):

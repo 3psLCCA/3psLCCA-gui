@@ -71,6 +71,16 @@ def _ensure_tables():
                 analysis_period INTEGER NOT NULL DEFAULT 0
             );
         """)
+        # ── Schema migration: add is_starred (safe on existing installs) ──
+        existing_cols = {
+            row[1]
+            for row in c.execute("PRAGMA table_info(comparison_history)")
+        }
+        if "is_starred" not in existing_cols:
+            c.execute(
+                "ALTER TABLE comparison_history "
+                "ADD COLUMN is_starred INTEGER NOT NULL DEFAULT 0"
+            )
 
 
 # ── Bootstrap ──────────────────────────────────────────────────────────────────
@@ -230,3 +240,28 @@ def delete_all_comparisons():
     """Clear the entire comparison history table."""
     with _conn() as c:
         c.execute("DELETE FROM comparison_history")
+
+
+def get_comparison_count() -> int:
+    """Return the total number of saved comparison history rows."""
+    with _conn() as c:
+        row = c.execute("SELECT COUNT(*) FROM comparison_history").fetchone()
+        return row[0] if row else 0
+
+
+def star_comparison(history_id: int, starred: bool):
+    """Set or clear the starred flag on a history row."""
+    with _conn() as c:
+        c.execute(
+            "UPDATE comparison_history SET is_starred = ? WHERE id = ?",
+            (1 if starred else 0, history_id),
+        )
+
+
+def rename_comparison(history_id: int, label: str):
+    """Rename a comparison history entry."""
+    with _conn() as c:
+        c.execute(
+            "UPDATE comparison_history SET label = ? WHERE id = ?",
+            (label.strip(), history_id),
+        )

@@ -46,6 +46,7 @@ from PySide6.QtWidgets import (
     QDialog,
     QFormLayout,
     QSizePolicy,
+    QScrollArea,
     QStackedWidget,
 )
 from three_ps_lcca_gui.core.safechunk_engine import SafeChunkEngine
@@ -88,6 +89,9 @@ from three_ps_lcca_gui.gui.styles import (
 from three_ps_lcca_gui.gui.components.settings_dialog import SettingsDialog
 from three_ps_lcca_gui.gui.components.outputs.comparison_page import ComparisonPickerPanel
 from three_ps_lcca_gui.gui.components.sponsors_footer import SponsorsFooter
+from three_ps_lcca_gui.gui.components.history_tab import (
+    _HomeTabBar, _ComparisonHistoryTab,
+)
 
 _GUI_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 _ASSETS_DIR = os.path.join(_GUI_DIR, "assets")
@@ -927,6 +931,10 @@ class HomePage(QWidget):
         self._stack.addWidget(self._make_right_panel())      # index 0: project grid
         self._comparison_panel = ComparisonPickerPanel(manager=self.manager)
         self._stack.addWidget(self._comparison_panel)        # index 1: compare
+        # Wire history tab to the comparison picker for window dedup
+        self._history_tab.set_picker_panel(self._comparison_panel)
+        # Seed tab label count on first render
+        self._refresh_history_count()
         root.addWidget(self._stack, stretch=1)
 
     # ── Left sidebar ──────────────────────────────────────────────────────────
@@ -1074,6 +1082,21 @@ class HomePage(QWidget):
     def _switch_to_compare(self):
         self.switch_to_compare()
 
+    # ── Home content-tab switching (Projects / Comparison History) ────────────
+
+    def _on_home_tab_changed(self, idx: int):
+        """Switch between Projects page (0) and Comparison History page (1)."""
+        self._home_content_stack.setCurrentIndex(idx)
+        self._home_tab_bar.set_current(idx)
+        if idx == 1:
+            self._history_tab.refresh()
+        self._refresh_history_count()
+
+    def _refresh_history_count(self):
+        """Update the History tab label with the live total comparison count."""
+        count = sm.get_comparison_count()
+        self._home_tab_bar.update_history_count(count)
+
     def _is_project_in_comparison(self, pid: str) -> bool:
         return self._comparison_panel.is_in_active_comparison(pid)
 
@@ -1194,7 +1217,25 @@ class HomePage(QWidget):
         tl.addWidget(self.sort_container, 0, Qt.AlignVCenter)
 
         layout.addWidget(toolbar)
-        layout.addWidget(self._hline())
+        # ── Tab bar: Projects | Comparison History (N) (only shown in Compare mode) ──
+        self._home_tab_bar = _HomeTabBar()
+        self._home_tab_bar.tab_changed.connect(self._on_home_tab_changed)
+        layout.addWidget(self._home_tab_bar)
+        self._tab_bar_sep = self._hline()
+        layout.addWidget(self._tab_bar_sep)
+
+        # Initially hide tab bar unless compare mode is active
+        self._home_tab_bar.hide()
+        self._tab_bar_sep.hide()
+
+        # ── Content stack (Projects page / History page) ───────────────────
+        self._home_content_stack = QStackedWidget()
+
+        # ── Projects page (index 0): grid + recent comparisons preview ─────
+        _projects_page = QWidget()
+        _proj_v = QVBoxLayout(_projects_page)
+        _proj_v.setContentsMargins(0, 0, 0, 0)
+        _proj_v.setSpacing(0)
 
         # ── Project grid list ─────────────────────────────────────────────
         self.grid_list = _GridList()
@@ -1219,7 +1260,17 @@ class HomePage(QWidget):
         self.grid_list.open_requested.connect(self._safe_open_project)
         self.grid_list.pin_toggled.connect(self._toggle_pin_by_id)
         self.grid_list.comparison_toggled.connect(self._on_comp_toggle)
-        layout.addWidget(self.grid_list, stretch=1)
+        # Grid fills the projects page (not the root panel layout directly)
+        _proj_v.addWidget(self.grid_list, 1)
+
+        self._home_content_stack.addWidget(_projects_page)   # index 0
+
+        # ── History page (index 1): search + paginated row list ────────────
+        self._history_tab = _ComparisonHistoryTab(manager=self.manager)
+        self._history_tab.history_changed.connect(self._refresh_history_count)
+        self._home_content_stack.addWidget(self._history_tab)  # index 1
+
+        layout.addWidget(self._home_content_stack, stretch=1)
 
         layout.addWidget(self._hline())
         self.footer = SponsorsFooter()
@@ -1241,6 +1292,14 @@ class HomePage(QWidget):
 
         self._panel_resize_filter = _ResizeFilter(self._reposition_comp_fab, panel)
         panel.installEventFilter(self._panel_resize_filter)
+
+        # Ensure tab bar visibility matches saved sort order
+        if self._is_compare_mode():
+            self._home_tab_bar.show()
+            self._tab_bar_sep.show()
+        else:
+            self._home_tab_bar.hide()
+            self._tab_bar_sep.hide()
 
         return panel
 
@@ -1442,11 +1501,20 @@ class HomePage(QWidget):
             delegate._comp_selected.clear()
             self.grid_list.setSelectionMode(QAbstractItemView.NoSelection)
             self._comp_fab.hide()   # hidden until ≥2 selected
+            # Show tab bar in compare mode
+            self._home_tab_bar.show()
+            self._tab_bar_sep.show()
+            self._refresh_history_count()
         else:
             delegate.comparison_mode = False
             delegate._comp_selected.clear()
             self.grid_list.setSelectionMode(QAbstractItemView.SingleSelection)
             self._comp_fab.hide()
+            # Hide tab bar in all other modes (Recent, All, Starred)
+            self._home_tab_bar.hide()
+            self._tab_bar_sep.hide()
+            self._home_content_stack.setCurrentIndex(0)
+            self._home_tab_bar.set_current(0)
             sm.set_pref("sort_order", key)
         self._render_grid()
 
@@ -1518,6 +1586,8 @@ class HomePage(QWidget):
         # Keep comparison panel in sync if it is currently visible
         if self._stack.currentIndex() == 1:
             self._comparison_panel.soft_refresh()
+        if hasattr(self, "_home_tab_bar"):
+            self._refresh_history_count()
 
     def _render_grid(self):
         self.grid_list.clear()
