@@ -9,12 +9,13 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 
-from PySide6.QtCore import Qt, QSize, Signal
+from PySide6.QtCore import Qt, QSize, Signal, QEvent
 from PySide6.QtGui import QPainter
 from PySide6.QtWidgets import (
     QWidget, QFrame, QLabel, QPushButton, QLineEdit,
     QVBoxLayout, QHBoxLayout, QScrollArea,
     QInputDialog, QMessageBox, QMenu, QSizePolicy,
+    QToolTip,
 )
 
 import three_ps_lcca_gui.core.start_manager as sm
@@ -95,13 +96,18 @@ class _ElidedLabel(QLabel):
         self._full_text = text
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.setMinimumWidth(20)
-        self.setToolTip(text)
 
     def setText(self, text):
         self._full_text = text
         super().setText(text)
-        self.setToolTip(text)
         self.update()
+
+    def event(self, event):
+        if event.type() == QEvent.ToolTip:
+            QToolTip.hideText()
+            event.accept()
+            return True
+        return super().event(event)
 
     def minimumSizeHint(self):
         h = super().minimumSizeHint().height()
@@ -317,14 +323,14 @@ class _HistoryRow(QFrame):
         self._date_lbl.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         right_h.addWidget(self._date_lbl, 0, Qt.AlignVCenter)
 
-        # Star toggle
-        self._star_btn = QPushButton("★" if self._starred else "☆")
-        self._star_btn.setFixedSize(24, 24)
-        self._star_btn.setFont(_f(FS_BASE))
-        self._star_btn.setCursor(Qt.PointingHandCursor)
-        self._star_btn.setToolTip("Star comparison" if not self._starred else "Unstar comparison")
-        self._star_btn.clicked.connect(self._on_star_clicked)
-        right_h.addWidget(self._star_btn, 0, Qt.AlignVCenter)
+        # # Star toggle
+        # self._star_btn = QPushButton("★" if self._starred else "☆")
+        # self._star_btn.setFixedSize(24, 24)
+        # self._star_btn.setFont(_f(FS_BASE))
+        # self._star_btn.setCursor(Qt.PointingHandCursor)
+        # self._star_btn.setToolTip("Star comparison" if not self._starred else "Unstar comparison")
+        # self._star_btn.clicked.connect(self._on_star_clicked)
+        # right_h.addWidget(self._star_btn, 0, Qt.AlignVCenter)
 
         # Warning / error icon
         self._warn_lbl = None
@@ -441,10 +447,11 @@ class _HistoryRow(QFrame):
         )
 
         # Star button styling
-        self._star_btn.setStyleSheet(
-            f"QPushButton {{ background: transparent; border: none; color: {star_col}; padding: 0; }}"
-            f"QPushButton:hover {{ color: {get_token('warning')}; }}"
-        )
+        if hasattr(self, "_star_btn"):
+            self._star_btn.setStyleSheet(
+                f"QPushButton {{ background: transparent; border: none; color: {star_col}; padding: 0; }}"
+                f"QPushButton:hover {{ color: {get_token('warning')}; }}"
+            )
 
     def _on_star_clicked(self):
         self._starred = not self._starred
@@ -453,7 +460,7 @@ class _HistoryRow(QFrame):
         self.star_toggled.emit(self._entry["id"], self._starred)
 
     def contextMenuEvent(self, event):
-        menu = QMenu(self)
+        menu = QMenu(self.window())
         if self._avail_count >= 2:
             menu.addAction("Re-run  ↗", lambda: self.rerun_requested.emit(self._entry))
         menu.addAction("Rename", lambda: self.rename_requested.emit(
