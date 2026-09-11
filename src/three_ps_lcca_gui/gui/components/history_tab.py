@@ -130,7 +130,7 @@ class _HomeTabBar(QWidget):
     def _build(self):
         self.setFixedHeight(40)
         lay = QHBoxLayout(self)
-        lay.setContentsMargins(SP6 + SP4, 0, SP6 + SP4, 0)
+        lay.setContentsMargins(SP6, 0, SP6, 0)
         lay.setSpacing(0)
 
         for i, label in enumerate(["Projects", "Comparison History"]):
@@ -696,7 +696,7 @@ class _ComparisonHistoryTab(QWidget):
 
     def _build(self):
         lay = QVBoxLayout(self)
-        lay.setContentsMargins(SP6 + SP4, SP4, SP6 + SP4, SP3)
+        lay.setContentsMargins(SP6, SP4, SP6, SP3)
         lay.setSpacing(SP3)
 
         self._search = QLineEdit()
@@ -708,6 +708,7 @@ class _ComparisonHistoryTab(QWidget):
 
         self._hint_lbl = QLabel("ℹ  Each project uses its own analysis period · hover ⚠ for details")
         self._hint_lbl.setFont(_f(FS_SM))
+        self._hint_lbl.setWordWrap(True)
         lay.addWidget(self._hint_lbl)
 
         scroll = QScrollArea()

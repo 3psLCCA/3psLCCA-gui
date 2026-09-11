@@ -24,6 +24,9 @@ from PySide6.QtWidgets import QApplication, QGraphicsOpacityEffect, QPushButton
 
 _ICONS: dict[str, str] = {
     # ── Navigation / UI ──────────────────────────────────────────────────────
+    "menu": (
+        '<path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/>'
+    ),
     "home": (
         '<path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>'
     ),

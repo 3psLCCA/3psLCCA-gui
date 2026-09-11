@@ -445,7 +445,7 @@ class ComparisonResultWindow(QWidget):
         super().__init__(parent, Qt.Window)
         label = "  ·  ".join(sorted(names))
         self.setWindowTitle(f"Comparison: {label}")
-        self.setMinimumSize(980, 680)
+        self.setMinimumSize(680, 520)
 
         self._pids       = pids
         self._names      = names        # parallel to pids

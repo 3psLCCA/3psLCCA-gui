@@ -15,6 +15,7 @@ from PySide6.QtWidgets import QWidget, QFrame, QHBoxLayout, QVBoxLayout, QLabel
 
 from three_ps_lcca_gui.gui.theme import (
     SP3,
+    SP4,
     SP6,
     SP8,
     SP10,
@@ -40,7 +41,7 @@ class SponsorsFooter(QFrame):
 
     def _build_ui(self):
         fl = QHBoxLayout(self)
-        fl.setContentsMargins(SP10, SP6, SP10, SP6)
+        fl.setContentsMargins(SP6, SP6, SP6, SP6)
 
         # Developed At Section
         dev_v = QVBoxLayout()
@@ -64,7 +65,7 @@ class SponsorsFooter(QFrame):
         sup_v.addWidget(self.sup_lbl)
 
         sup_h = QHBoxLayout()
-        sup_h.setSpacing(SP8)
+        sup_h.setSpacing(SP4)
         sup_h.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         self.cs_logo = QLabel()
         self.mos_logo = QLabel()

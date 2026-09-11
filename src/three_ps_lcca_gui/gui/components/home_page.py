@@ -732,6 +732,12 @@ class _GridList(QListWidget):
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
+        if self.count() == 1:
+            it = self.item(0)
+            if it and not isinstance(it.data(Qt.UserRole), dict):
+                vw = self.viewport().width()
+                vh = self.viewport().height()
+                it.setSizeHint(QSize(max(200, vw - 40), max(400, vh - 40)))
         # Force re-layout of items to recalculate width from sizeHint
         self.doItemsLayout()
 
@@ -863,11 +869,13 @@ class _EmptyState(QWidget):
             head_lbl = QLabel(heading)
             head_lbl.setFont(_f(FS_LG, FW_SEMIBOLD))
             head_lbl.setAlignment(Qt.AlignCenter)
+            head_lbl.setWordWrap(True)
             layout.addWidget(head_lbl)
 
         self._sub_lbl = QLabel(subtext)
         self._sub_lbl.setFont(_f(FS_BASE))
         self._sub_lbl.setAlignment(Qt.AlignCenter)
+        self._sub_lbl.setWordWrap(True)
         layout.addWidget(self._sub_lbl)
 
         if show_cta and manager:
@@ -1173,7 +1181,7 @@ class HomePage(QWidget):
         greet_bar = QWidget()
         greet_bar.setFixedHeight(96)
         gb = QHBoxLayout(greet_bar)
-        gb.setContentsMargins(SP10, 0, SP10, 0)
+        gb.setContentsMargins(SP6, 0, SP6, 0)
 
         self.greeting_lbl = QLabel()
         self.greeting_lbl.setTextFormat(Qt.RichText)
@@ -1197,7 +1205,7 @@ class HomePage(QWidget):
         toolbar = QWidget()
         toolbar.setFixedHeight(52)
         tl = QHBoxLayout(toolbar)
-        tl.setContentsMargins(SP10, 0, SP10, 0)
+        tl.setContentsMargins(SP6, 0, SP6, 0)
         tl.setSpacing(SP2)
 
         self.grid_section_lbl = QLabel("Recent Projects")
@@ -1225,7 +1233,7 @@ class HomePage(QWidget):
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Search projects...")
         self.search_input.setFixedHeight(32)
-        self.search_input.setMinimumWidth(160)
+        self.search_input.setMinimumWidth(80)
         self.search_input.setMaximumWidth(280)
         self.search_input.setSizePolicy(
             QSizePolicy.Expanding, QSizePolicy.Fixed)
@@ -1471,7 +1479,7 @@ class HomePage(QWidget):
                 f"  margin: 0px;"
                 f"  border-radius: {RADIUS_MD - 1}px;"
                 f"  color: {text_inactive};"
-                f"  padding: 0 14px;"
+                f"  padding: 0 10px;"
                 f"  font-family: {FONT_FAMILY};"
                 f"  font-size: {FS_MD}pt;"
                 f"  font-weight: {FW_MEDIUM};"
