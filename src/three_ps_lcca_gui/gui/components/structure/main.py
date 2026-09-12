@@ -5,14 +5,15 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QPushButton,
     QLabel,
+    QFrame,
     QStackedWidget,
     QFileDialog,
     QMessageBox,
 )
-from PySide6.QtCore import QThread, Signal, QSize
+from PySide6.QtCore import QThread, Signal, QSize, Qt
 from PySide6.QtGui import QPalette, QColor
 from ..utils.icons import make_icon
-from three_ps_lcca_gui.gui.themes import get_token
+from three_ps_lcca_gui.gui.themes import get_token, theme_manager
 from three_ps_lcca_gui.gui.theme import FS_SM
 from ..utils.form_builder.form_builder import make_section_label
 from ..utils.validation_helpers import LOCK_TOOLTIP, freeze_widgets
@@ -55,6 +56,139 @@ class _ExcelParseWorker(QThread):
             self.error.emit(str(exc))
 
 
+class _TrashBadgeButton(QWidget):
+    """Action button for Trash Bin with an overlapping count badge.
+
+    All styling (base, surface_mid, text_secondary, info, success)
+    dynamically reads YAML theme tokens via get_token().
+    """
+    clicked = Signal()
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._count = 0
+        self._is_back_mode = False
+
+        self.btn = QPushButton(self)
+        self.btn.clicked.connect(self.clicked)
+        self.btn.setCursor(Qt.PointingHandCursor)
+
+        self.badge = QLabel(self)
+        self.badge.setAlignment(Qt.AlignCenter)
+        self.badge.setAttribute(Qt.WA_TransparentForMouseEvents, True)
+        self.badge.hide()
+
+        self._update_geometry()
+        self.apply_theme()
+
+    def set_count(self, count: int):
+        self._count = count
+        if self._is_back_mode or count <= 0:
+            self.badge.hide()
+        else:
+            text = str(count) if count < 100 else "99+"
+            self.badge.setText(text)
+            w = 18 if len(text) <= 1 else max(18, 10 + len(text) * 7)
+            self.badge.setFixedSize(w, 18)
+            bx = 36 - (w // 2)
+            self.badge.move(bx, 0)
+            self.badge.show()
+
+    def set_back_mode(self, is_back: bool):
+        self._is_back_mode = is_back
+        self._update_geometry()
+        self.apply_theme()
+        if is_back:
+            self.badge.hide()
+        else:
+            self.set_count(self._count)
+
+    def _update_geometry(self):
+        if self._is_back_mode:
+            self.setFixedSize(124, 44)
+            self.btn.setFixedSize(124, 36)
+            self.btn.move(0, 8)
+            self.btn.setText("Back to Work")
+            self.btn.setIcon(make_icon("restore", color=get_token("success")))
+            self.btn.setIconSize(QSize(16, 16))
+            self.btn.setToolTip("Return to Construction Works Data")
+        else:
+            self.setFixedSize(50, 44)
+            self.btn.setFixedSize(36, 36)
+            self.btn.move(0, 8)
+            self.btn.setText("")
+            self.btn.setIcon(make_icon("trash-outline", color=get_token("text_secondary")))
+            self.btn.setIconSize(QSize(18, 18))
+            self.btn.setToolTip("View Trash Bin")
+
+    def apply_theme(self):
+        border_col = get_token("surface_mid")
+        base_col = get_token("base")
+        hover_col = get_token("surface")
+        press_col = get_token("surface_pressed")
+        text_sec = get_token("text_secondary")
+        success_col = get_token("success")
+        info_col = get_token("info")
+
+        if self._is_back_mode:
+            self.btn.setIcon(make_icon("restore", color=success_col))
+            self.btn.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: {base_col};
+                    border: 1px solid {border_col};
+                    border-radius: 8px;
+                    color: {success_col};
+                    font-weight: 600;
+                    font-size: 12px;
+                    padding: 0 10px;
+                }}
+                QPushButton:hover {{
+                    background-color: {hover_col};
+                }}
+                QPushButton:pressed {{
+                    background-color: {press_col};
+                }}
+            """)
+        else:
+            self.btn.setIcon(make_icon("trash-outline", color=text_sec))
+            self.btn.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: {base_col};
+                    border: 1px solid {border_col};
+                    border-radius: 8px;
+                    padding: 0px;
+                    margin: 0px;
+                }}
+                QPushButton:hover {{
+                    background-color: {hover_col};
+                }}
+                QPushButton:pressed {{
+                    background-color: {press_col};
+                }}
+            """)
+            self.badge.setStyleSheet(f"""
+                QLabel {{
+                    background-color: {info_col};
+                    color: #ffffff;
+                    font-size: 11px;
+                    font-weight: bold;
+                    border-radius: 9px;
+                    min-height: 18px;
+                    max-height: 18px;
+                }}
+            """)
+
+    def setText(self, text: str):
+        if "Back" in text:
+            self.set_back_mode(True)
+        elif text == "🗑️" or not text:
+            self.set_back_mode(False)
+
+    def setStyleSheet(self, style: str):
+        if not style:
+            self.apply_theme()
+
+
 class StructureTabView(QWidget):
     tab_changed = Signal(str)  # emits the tab name when user clicks a tab
 
@@ -68,7 +202,7 @@ class StructureTabView(QWidget):
 
         self.main_layout = QVBoxLayout(self)
         self.main_layout.setContentsMargins(24, 20, 24, 16)
-        self.main_layout.setSpacing(12)
+        self.main_layout.setSpacing(16)
 
         # --- TOP AREA ---
         top_area = QWidget()
@@ -78,25 +212,48 @@ class StructureTabView(QWidget):
         region_info = QVBoxLayout()
         region_info.setContentsMargins(0, 0, 0, 0)
         region_info.setSpacing(2)
-        title_lbl = make_section_label("Construction Works Data")
+        title_lbl = make_section_label("Construction Works Data", pad_top=4, pad_bottom=14)
         region_info.addWidget(title_lbl)
         top_layout.addLayout(region_info)
 
         top_layout.addStretch()
 
-        # Action Buttons
-        self.excel_btn = QPushButton("  Import Excel")
-        self.excel_btn.setIcon(make_icon("download"))
-        self.excel_btn.setIconSize(QSize(18, 18))
+        # Action Buttons - Segmented Pill Container (Import & Export)
+        self.action_pill = QFrame()
+        self.action_pill.setObjectName("actionPill")
+        self.action_pill.setFixedHeight(36)
+        pill_layout = QHBoxLayout(self.action_pill)
+        pill_layout.setContentsMargins(4, 2, 4, 2)
+        pill_layout.setSpacing(4)
 
-        self.download_btn = QPushButton("  Export Excel")
-        self.download_btn.setIcon(make_icon("upload"))
-        self.download_btn.setIconSize(QSize(18, 18))
-        self.trash_btn = QPushButton("🗑️")
+        self.excel_btn = QPushButton("Import")
+        self.excel_btn.setCursor(Qt.PointingHandCursor)
+        self.excel_btn.setIconSize(QSize(16, 16))
+        self.excel_btn.setFixedHeight(30)
+        self.excel_btn.setToolTip("Import structure data from Excel (.xlsx, .xls, .ods)")
 
-        top_layout.addWidget(self.excel_btn)
-        top_layout.addWidget(self.download_btn)
-        top_layout.addWidget(self.trash_btn)
+        self.pill_divider = QFrame()
+        self.pill_divider.setFixedWidth(1)
+        self.pill_divider.setFixedHeight(18)
+
+        self.download_btn = QPushButton("Export")
+        self.download_btn.setCursor(Qt.PointingHandCursor)
+        self.download_btn.setIconSize(QSize(16, 16))
+        self.download_btn.setFixedHeight(30)
+        self.download_btn.setToolTip("Export structure data to Excel (.xlsx)")
+
+        pill_layout.addWidget(self.excel_btn)
+        pill_layout.addWidget(self.pill_divider, 0, Qt.AlignVCenter)
+        pill_layout.addWidget(self.download_btn)
+
+        # Trash Button with Count Badge
+        self.trash_btn = _TrashBadgeButton()
+
+        top_layout.addWidget(self.action_pill, 0, Qt.AlignBottom)
+        top_layout.addWidget(self.trash_btn, 0, Qt.AlignBottom)
+
+        self._apply_theme_colors()
+        theme_manager().theme_changed.connect(self._apply_theme_colors)
 
         self.main_layout.addWidget(top_area)
 
@@ -144,6 +301,45 @@ class StructureTabView(QWidget):
         self.download_btn.clicked.connect(self._download_excel)
         self.trash_btn.clicked.connect(self.toggle_trash_view)
         self.tab_view.currentChanged.connect(self._on_tab_changed)
+
+    def _apply_theme_colors(self):
+        """Applies theme colors from active YAML palette tokens to the action buttons."""
+        border_col = get_token("surface_mid")
+        base_col = get_token("base")
+        hover_col = get_token("surface")
+        press_col = get_token("surface_pressed")
+        text_col = get_token("text")
+        success_col = get_token("success")
+        warning_col = get_token("warning")
+
+        self.action_pill.setStyleSheet(f"""
+            QFrame#actionPill {{
+                background-color: {base_col};
+                border: 1px solid {border_col};
+                border-radius: 8px;
+            }}
+            QPushButton {{
+                background: transparent;
+                border: none;
+                border-radius: 6px;
+                padding: 0px 16px;
+                font-size: 13px;
+                font-weight: 500;
+                color: {text_col};
+                min-height: 0px;
+                height: 30px;
+            }}
+            QPushButton:hover {{
+                background-color: {hover_col};
+            }}
+            QPushButton:pressed {{
+                background-color: {press_col};
+            }}
+        """)
+        self.excel_btn.setIcon(make_icon("download", color=success_col))
+        self.download_btn.setIcon(make_icon("upload", color=warning_col))
+        self.pill_divider.setStyleSheet(f"background-color: {border_col}; border: none;")
+        self.trash_btn.apply_theme()
 
     def _save_str_summary(self):
         if not self.controller or not self.controller.engine:
@@ -230,27 +426,19 @@ class StructureTabView(QWidget):
         if self.content_stack.currentIndex() == 0:
             self.trash_view.on_refresh()
             self.content_stack.setCurrentIndex(1)
-            self.excel_btn.setVisible(False)
-            self.download_btn.setVisible(False)
+            self.action_pill.setVisible(False)
+            self.trash_btn.set_back_mode(True)
         else:
             self.content_stack.setCurrentIndex(0)
-            self.excel_btn.setVisible(True)
-            self.download_btn.setVisible(True)
+            self.action_pill.setVisible(True)
+            self.trash_btn.set_back_mode(False)
 
         self.update_trash_count()
 
     def update_trash_count(self):
-        """Calculates total trashed items and updates the button text."""
+        """Calculates total trashed items and updates the badge count."""
         if not self.controller or not self.controller.engine:
             return
-
-        # Change button text if we are currently inside the trash view
-        if self.content_stack.currentIndex() == 1:
-            self.trash_btn.setText("Back to Work")
-            self.trash_btn.setStyleSheet(f"color: {get_token('success')};")
-            return
-        
-        self.trash_btn.setStyleSheet("")
 
         total_count = 0
         chunks = [
@@ -267,10 +455,7 @@ class StructureTabView(QWidget):
                     if item.get("state", {}).get("in_trash"):
                         total_count += 1
 
-        if total_count > 0:
-            self.trash_btn.setText(f"🗑️ ({total_count})")
-        else:
-            self.trash_btn.setText("🗑️")
+        self.trash_btn.set_count(total_count)
 
     def _open_excel_import(self):
         path, _ = QFileDialog.getOpenFileName(
@@ -292,7 +477,7 @@ class StructureTabView(QWidget):
 
     def _on_excel_parsed(self, result: dict):
         self.excel_btn.setEnabled(True)
-        self.excel_btn.setText("  Import Excel")
+        self.excel_btn.setText("Import")
 
         materials = result["materials"]
         metadata = result.get("metadata", [])
@@ -318,7 +503,7 @@ class StructureTabView(QWidget):
 
     def _on_excel_error(self, msg: str):
         self.excel_btn.setEnabled(True)
-        self.excel_btn.setText("  Import Excel")
+        self.excel_btn.setText("Import")
         if msg == "empty":
             QMessageBox.warning(
                 self, "Empty File", "No data found in the selected file."
@@ -363,7 +548,7 @@ class StructureTabView(QWidget):
         try:
             total, sheets = export_all_chunks(self.controller.engine, path, fmt)
             self.download_btn.setEnabled(True)
-            self.download_btn.setText("  Export Excel")
+            self.download_btn.setText("  Export")
             QMessageBox.information(
                 self,
                 "Export Complete",
@@ -371,7 +556,7 @@ class StructureTabView(QWidget):
             )
         except Exception as exc:
             self.download_btn.setEnabled(True)
-            self.download_btn.setText("  Export Excel")
+            self.download_btn.setText("  Export")
             QMessageBox.critical(self, "Export Error", str(exc))
 
     def freeze(self, frozen: bool = True):
@@ -504,7 +689,8 @@ class StructureTabView(QWidget):
         """Resets the view to normal tabs (exits Trash view)."""
         if self.content_stack.currentIndex() == 1:
             self.content_stack.setCurrentIndex(0)
-            self.trash_btn.setStyleSheet("")
+            self.action_pill.setVisible(True)
+            self.trash_btn.set_back_mode(False)
             self.update_trash_count()
 
     def select_tab(self, name: str):
@@ -518,6 +704,9 @@ class StructureTabView(QWidget):
         idx = mapping.get(name)
         if idx is not None:
             self.content_stack.setCurrentIndex(0)
+            self.action_pill.setVisible(True)
+            self.trash_btn.set_back_mode(False)
             self.tab_view.setCurrentIndex(idx)
+            self.update_trash_count()
 
 

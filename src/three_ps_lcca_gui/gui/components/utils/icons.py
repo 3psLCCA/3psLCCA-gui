@@ -65,6 +65,15 @@ _ICONS: dict[str, str] = {
         '<path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1'
         '-1h-5l-1 1H5v2h14V4z"/>'
     ),
+    "trash-outline": (
+        '<g fill="none" stroke="{color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'
+        '<path d="M3 6h18"/>'
+        '<path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>'
+        '<path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>'
+        '<line x1="10" y1="11" x2="10" y2="17"/>'
+        '<line x1="14" y1="11" x2="14" y2="17"/>'
+        '</g>'
+    ),
     "exclude": (
         '<polygon points="12,19 2,5 22,5"/>'
     ),
@@ -188,7 +197,8 @@ class _SvgIconEngine(QIconEngine):
     def _render(cls, body: str, color: str, w: int, h: int) -> QPixmap:
         key = (body, color, w, h)
         if key not in cls._cache:
-            svg = _TEMPLATE.format(color=color, body=body).encode()
+            resolved_body = body.replace("{color}", color) if "{color}" in body else body
+            svg = _TEMPLATE.format(color=color, body=resolved_body).encode()
             renderer = QSvgRenderer(QByteArray(svg))
             pix = QPixmap(w, h)
             pix.fill(Qt.GlobalColor.transparent)
@@ -291,7 +301,8 @@ def make_icon(name: str, color: str | None = None, size: int = 64) -> QIcon:
         return QIcon(_SvgIconEngine(body))
 
     # Fixed-colour rendering (e.g. branded window icon)
-    svg = _TEMPLATE.format(color=color, body=body).encode()
+    resolved_body = body.replace("{color}", color) if "{color}" in body else body
+    svg = _TEMPLATE.format(color=color, body=resolved_body).encode()
     renderer = QSvgRenderer(QByteArray(svg))
     pix = QPixmap(size, size)
     pix.fill(Qt.GlobalColor.transparent)
