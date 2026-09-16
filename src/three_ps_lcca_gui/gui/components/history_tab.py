@@ -678,7 +678,6 @@ def _do_rerun(entry: dict, manager=None, picker_panel=None, parent_widget=None):
 
 
 class _ComparisonHistoryTab(QWidget):
-    PAGE_SIZE = 10
     history_changed = Signal()
 
     def __init__(self, manager=None, parent=None):
@@ -686,8 +685,6 @@ class _ComparisonHistoryTab(QWidget):
         self._manager = manager
         self._picker_panel = None
         self._search_text = ""
-        self._page = 1
-        self._total = 0
         self._build()
         theme_manager().theme_changed.connect(self._apply_theme)
 
@@ -698,7 +695,6 @@ class _ComparisonHistoryTab(QWidget):
         self._manager = manager
 
     def refresh(self):
-        self._page = 1
         self._render()
 
     def _build(self):
@@ -733,20 +729,11 @@ class _ComparisonHistoryTab(QWidget):
         scroll.setWidget(self._rows_container)
         lay.addWidget(scroll, 1)
 
-        self._pager = _PaginationBar()
-        self._pager.page_changed.connect(self._go_page)
-        lay.addWidget(self._pager)
-
         self._apply_theme()
         self._render()
 
     def _on_search(self, text: str):
         self._search_text = text.strip().lower()
-        self._page = 1
-        self._render()
-
-    def _go_page(self, page: int):
-        self._page = page
         self._render()
 
     def _render(self):
@@ -780,19 +767,14 @@ class _ComparisonHistoryTab(QWidget):
                 or any(q in n.lower() for n in e.get("project_names", []))
             ]
 
-        self._total = len(all_entries)
-
-        start = (self._page - 1) * self.PAGE_SIZE
-        page_entries = all_entries[start: start + self.PAGE_SIZE]
-
-        if not page_entries:
+        if not all_entries:
             empty = QLabel("No comparisons found.")
             empty.setAlignment(Qt.AlignCenter)
             empty.setFont(_f(FS_BASE))
             empty.setStyleSheet(f"color: {get_token('text_disabled')};")
             self._rows_layout.addWidget(empty)
         else:
-            for entry in page_entries:
+            for entry in all_entries:
                 row = _HistoryRow(
                     entry,
                     manager=self._manager,
@@ -806,10 +788,6 @@ class _ComparisonHistoryTab(QWidget):
                 self._rows_layout.addWidget(row)
 
         self._rows_layout.addStretch()
-
-        total_pages = max(1, (self._total + self.PAGE_SIZE - 1) // self.PAGE_SIZE)
-        self._pager.set_state(self._page, total_pages)
-        self._pager.setVisible(total_pages > 1)
 
     def _on_rerun(self, entry: dict):
         _do_rerun(
@@ -831,8 +809,6 @@ class _ComparisonHistoryTab(QWidget):
         )
         if res == QMessageBox.Ok:
             sm.delete_comparison(history_id)
-            if self._page > 1 and (self._total - 1) <= (self._page - 1) * self.PAGE_SIZE:
-                self._page = max(1, self._page - 1)
             self._render()
             self.history_changed.emit()
 
