@@ -491,41 +491,85 @@ class ProjectWindow(QMainWindow):
         self.menuFile = QMenu("&File", self.menubar)
 
         action_new = QAction("New Project", self)
+        action_new.setShortcut(QKeySequence("Ctrl+Shift+N"))
         action_new.triggered.connect(
             lambda: self.manager.open_project(is_new=True))
         self.menuFile.addAction(action_new)
 
         action_open = QAction("Open Project", self)
+        action_open.setShortcut(QKeySequence("Ctrl+Shift+O"))
         action_open.triggered.connect(self.show_home)
         self.menuFile.addAction(action_open)
 
         self.menuFile.addSeparator()
 
         self.actionSave = QAction("Save", self)
+        self.actionSave.setShortcut(QKeySequence("Ctrl+S"))
         self.actionSave.triggered.connect(self._save_now)
         self.menuFile.addAction(self.actionSave)
 
-        self.actionSaveCheckpoint = QAction("Save Checkpoint", self)
-        self.actionSaveCheckpoint.triggered.connect(self._open_save_checkpoint_dialog)
-        self.menuFile.addAction(self.actionSaveCheckpoint)
-
-        self.actionCheckpoints = QAction("View Checkpoints", self)
-        self.actionCheckpoints.triggered.connect(self._open_checkpoint_manager_dialog)
-        self.menuFile.addAction(self.actionCheckpoints)
-
         self.menuFile.addSeparator()
 
+        action_close = QAction("Close Project", self)
+        action_close.setShortcut(QKeySequence("Ctrl+W"))
+        action_close.triggered.connect(self._close_project)
+        self.menuFile.addAction(action_close)
+
+        # ── Project menu ──────────────────────────────────────────────────
+        self.menuProject = QMenu("&Project", self.menubar)
+
+        action_info = QAction("Info", self)
+        action_info.setShortcut(QKeySequence("Ctrl+I"))
+        action_info.triggered.connect(self._show_project_info)
+        self.menuProject.addAction(action_info)
+
+        action_rename = QAction("Rename", self)
+        action_rename.setShortcut(QKeySequence("F2"))
+        action_rename.triggered.connect(self._rename_project)
+        self.menuProject.addAction(action_rename)
+
+        action_share = QAction("Share", self)
+        action_share.triggered.connect(self._export_project)
+        self.menuProject.addAction(action_share)
+
+        self.menuProject.addSeparator()
+
+        self.actionSaveCheckpoint = QAction("Save Checkpoint", self)
+        self.actionSaveCheckpoint.setShortcut(QKeySequence("Ctrl+Shift+S"))
+        self.actionSaveCheckpoint.triggered.connect(self._open_save_checkpoint_dialog)
+        self.menuProject.addAction(self.actionSaveCheckpoint)
+
+        self.actionCheckpoints = QAction("View Checkpoints", self)
+        self.actionCheckpoints.setShortcut(QKeySequence("Ctrl+Shift+H"))
+        self.actionCheckpoints.triggered.connect(self._open_checkpoint_manager_dialog)
+        self.menuProject.addAction(self.actionCheckpoints)
+
+        self.actionVersionHistory = QAction("Version History", self)
+        self.actionVersionHistory.setShortcut(QKeySequence("Ctrl+H"))
+        self.actionVersionHistory.triggered.connect(self._open_rollback_dialog)
+        self.menuProject.addAction(self.actionVersionHistory)
+
+        self.menuProject.addSeparator()
+
+        self.actionBlobManager = QAction("Blob Manager", self)
+        self.actionBlobManager.triggered.connect(self._open_blob_manager)
+        self.menuProject.addAction(self.actionBlobManager)
+
+        self.menuProject.addSeparator()
+
         # ── Export submenu ────────────────────────────────────────────────
-        self.menuExport = QMenu("Export", self.menuFile)
+        self.menuExport = QMenu("Export", self.menuProject)
         self.menuExport.setStyleSheet(
             f"QMenu::item:disabled {{ color: {get_token('text_disabled')}; }}"
         )
 
         self.actionExportInputsJSON = QAction("Export Inputs as JSON", self)
+        self.actionExportInputsJSON.setShortcut(QKeySequence("Ctrl+E"))
         self.actionExportInputsJSON.triggered.connect(self._export_inputs_json)
         self.menuExport.addAction(self.actionExportInputsJSON)
 
         self.actionExportResultsJSON = QAction("Export Results as JSON", self)
+        self.actionExportResultsJSON.setShortcut(QKeySequence("Ctrl+Shift+E"))
         self.actionExportResultsJSON.setEnabled(False)
         self.actionExportResultsJSON.triggered.connect(
             self._export_results_json)
@@ -537,52 +581,28 @@ class ProjectWindow(QMainWindow):
             self._export_all_data_json)
         self.menuExport.addAction(self.actionExportAllDataJSON)
 
-        self.menuFile.addMenu(self.menuExport)
+        self.menuProject.addMenu(self.menuExport)
 
-        self.menuFile.addSeparator()
-
-        action_rename = QAction("Rename", self)
-        action_rename.triggered.connect(self._rename_project)
-        self.menuFile.addAction(action_rename)
-
-        action_export = QAction("Share", self)
-        action_export.triggered.connect(self._export_project)
-        self.menuFile.addAction(action_export)
-
-        self.menuFile.addSeparator()
-
-        self.actionVersionHistory = QAction("Version History", self)
-        self.actionVersionHistory.triggered.connect(self._open_rollback_dialog)
-        self.menuFile.addAction(self.actionVersionHistory)
-
-        self.actionBlobManager = QAction("Blob Manager", self)
-        self.actionBlobManager.triggered.connect(self._open_blob_manager)
-        self.menuFile.addAction(self.actionBlobManager)
-
-        self.menuFile.addSeparator()
+        # ── View menu ─────────────────────────────────────────────────────
+        self.menuView = QMenu("&View", self.menubar)
 
         self.actionToggleSidebar = QAction("Hide Sidebar", self)
         self.actionToggleSidebar.setIcon(make_icon("menu"))
         self.actionToggleSidebar.setShortcut(QKeySequence("Ctrl+B"))
         self.actionToggleSidebar.triggered.connect(self._toggle_sidebar)
-        self.menuFile.addAction(self.actionToggleSidebar)
+        self.menuView.addAction(self.actionToggleSidebar)
 
-        self.menuFile.addSeparator()
+        self.menuView.addSeparator()
 
-        action_info = QAction("Info", self)
-        action_info.triggered.connect(self._show_project_info)
-        self.menuFile.addAction(action_info)
-
-        self.menuFile.addSeparator()
-
-        action_close = QAction("Close Project", self)
-        action_close.triggered.connect(self._close_project)
-        self.menuFile.addAction(action_close)
+        self.log_action = QAction("&Logs", self)
+        self.log_action.setShortcut(QKeySequence("Ctrl+L"))
+        self.menuView.addAction(self.log_action)
 
         # ── Help menu ─────────────────────────────────────────────────────
         self.menuHelp = QMenu("&Help", self.menubar)
 
         action_glossary = QAction("Glossary", self)
+        action_glossary.setShortcut(QKeySequence("F1"))
         action_glossary.triggered.connect(lambda: open_glossary(parent=self))
         self.menuHelp.addAction(action_glossary)
 
@@ -614,11 +634,10 @@ class ProjectWindow(QMainWindow):
         home_action.setIcon(make_icon("home"))
         home_action.triggered.connect(self.show_home)
 
-        self.log_action = QAction("&Logs", self)
-
         self.menubar.addAction(home_action)
         self.menubar.addMenu(self.menuFile)
-        self.menubar.addAction(self.log_action)
+        self.menubar.addMenu(self.menuProject)
+        self.menubar.addMenu(self.menuView)
         self.menubar.addMenu(self.menuHelp)
         if self.menuDev:
             self.menubar.addMenu(self.menuDev)
@@ -640,16 +659,20 @@ class ProjectWindow(QMainWindow):
         top_bar_layout.addWidget(
             self.btn_sidebar_toggle, alignment=Qt.AlignmentFlag.AlignVCenter)
 
-        self.shortcut_sidebar = QShortcut(QKeySequence("Ctrl+B"), self)
-        self.shortcut_sidebar.activated.connect(self._toggle_sidebar)
-
         top_bar_layout.addWidget(
             self.menubar, alignment=Qt.AlignmentFlag.AlignCenter)
         top_bar_layout.addStretch()
 
         self.btn_calculate = QPushButton("Calculate")
+        self.btn_calculate.setToolTip("Calculate (F5 / Ctrl+Enter)")
         self.btn_calculate.clicked.connect(self._run_calculate)
         top_bar_layout.addWidget(self.btn_calculate)
+
+        self.shortcut_calc_f5 = QShortcut(QKeySequence("F5"), self)
+        self.shortcut_calc_f5.activated.connect(self._run_calculate)
+
+        self.shortcut_calc_enter = QShortcut(QKeySequence("Ctrl+Return"), self)
+        self.shortcut_calc_enter.activated.connect(self._run_calculate)
 
         self._frozen = False
         self._lock_tooltip = "Click to lock this project and prevent accidental edits."
