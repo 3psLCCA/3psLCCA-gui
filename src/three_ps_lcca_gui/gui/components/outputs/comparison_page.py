@@ -32,11 +32,12 @@ matplotlib.use("QtAgg")
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import numpy as np
+from matplotlib.figure import Figure
 
 try:
-    from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg, NavigationToolbar2QT
+    from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 except ImportError:
-    from matplotlib.backends.backend_qt import FigureCanvasQTAgg, NavigationToolbar2QT
+    from matplotlib.backends.backend_qt import FigureCanvasQTAgg
 
 import matplotlib.colors as mcolors
 from matplotlib import font_manager as _fm
@@ -70,6 +71,7 @@ from .helper_functions.lifecycle_summary import compute_all_summaries
 from .helper_functions.lcc_colors import COLORS as LCC_PALETTE
 from .lcc_data import _get, _MASTER_ROWS, BREAKDOWN_STAGES
 from .lcc_plot import _VerticalTextDelegate, LCCBreakdownTable, LCCDetailsTable
+from .plots_helper.plot_utils import ChartToolbar, WheelForwarder
 
 # ── Register Ubuntu fonts for matplotlib ──────────────────────────────────────
 _UBUNTU_FONT_DIR = os.path.abspath(
@@ -363,30 +365,37 @@ class _HeroCardsSection(QWidget):
 
 class _GroupedBarChart(QWidget):
     """
-    Generic grouped bar chart.
+    Interactive grouped bar chart with smart annotator, hover tooltips,
+    active series highlight, and responsive toolbar.
+
     groups       – list of group labels (x-axis groups)
     group_data   – list of dicts: {name, color, values=[one per group]}
     title        – chart title
     ylabel       – y-axis label
     group_colors – optional list of hex colors, one per group (e.g. from LCC_PALETTE)
+    currency     – project currency code for formatted tooltips and smart callouts
     """
 
-    def __init__(self, groups, group_data, title, ylabel, group_colors=None, parent=None):
+    def __init__(self, groups, group_data, title, ylabel, group_colors=None, currency="", parent=None):
         super().__init__(parent)
-        self._groups       = groups
-        self._group_data   = group_data
-        self._title        = title
-        self._ylabel       = ylabel
-        self._group_colors = group_colors
-        self._fig          = None
+        self._groups        = groups
+        self._group_data    = group_data
+        self._title         = title
+        self._ylabel        = ylabel
+        self._group_colors  = group_colors
+        self._currency      = currency
+        self._fig           = None
+        self.canvas         = None
+        self._all_bar_items = []
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(SP2)
         self._build()
         theme_manager().theme_changed.connect(self._rebuild)
 
     def _rebuild(self):
         if self._fig:
-            plt.close(self._fig)
+            self._fig.clear()
             self._fig = None
         while self.layout().count():
             item = self.layout().takeAt(0)
@@ -396,30 +405,48 @@ class _GroupedBarChart(QWidget):
 
     def _build(self):
         text_color = get_token("text")
+        text_sec   = get_token("text_secondary")
         bg_color   = get_token("base")    # match card container, not page background
         mid_color  = get_token("surface_mid")
+        primary_c  = get_token("primary")
 
         n_groups   = len(self._groups)
         n_series   = len(self._group_data)
-        bar_w      = 0.65 / max(1, n_series)
+        bar_w      = 0.70 / max(1, n_series)
         x          = np.arange(n_groups)
 
-        fig_w = max(5, n_groups * 2.2)
-        fig, ax = plt.subplots(figsize=(fig_w, 4.4))
+        fig_w = max(6.0, n_groups * max(2.2, n_series * 0.75))
+        fig = Figure(figsize=(fig_w, 4.4))
         fig.patch.set_facecolor(bg_color)
+        ax = fig.add_subplot(111)
         ax.set_facecolor(bg_color)
         self._fig = fig
+        self.ax = ax
 
+        self._all_bar_items = []
         legend_patches = []
         border_color = get_token("text")
 
+        # Pre-compute totals per project
+        proj_totals = [sum(_safe_float(v) for v in s["values"]) for s in self._group_data]
+
+        # Pre-compute group minimums (lowest positive value in each group)
+        group_mins = []
+        for g in range(n_groups):
+            g_vals = [_safe_float(s["values"][g]) for s in self._group_data]
+            pos_vals = [v for v in g_vals if v > 0]
+            group_mins.append(min(pos_vals) if pos_vals else 0.0)
+
+        all_scaled_vals = []
+
         for i, series in enumerate(self._group_data):
-            vals   = np.array([_safe_float(v) / 1_000_000 for v in series["values"]])
+            raw_vals    = np.array([_safe_float(v) for v in series["values"]])
+            scaled_vals = raw_vals / 1_000_000.0
+            all_scaled_vals.extend(scaled_vals)
             offset = (i - (n_series - 1) / 2) * bar_w
             hatch  = _PROJECT_HATCHES[i % len(_PROJECT_HATCHES)]
 
             if self._group_colors and len(self._group_colors) == n_groups:
-                # All projects share the exact same stage or pillar color for each group; distinguished by hatch pattern
                 bar_colors = [self._group_colors[g] for g in range(n_groups)]
                 swatch_bg  = get_token("surface")
             else:
@@ -427,20 +454,24 @@ class _GroupedBarChart(QWidget):
                 bar_colors = color
                 swatch_bg  = color
 
-            bars = ax.bar(x + offset, vals, bar_w, color=bar_colors,
-                          edgecolor=border_color, hatch=hatch, linewidth=0.8)
+            bars = ax.bar(x + offset, scaled_vals, bar_w, color=bar_colors,
+                          edgecolor=border_color, hatch=hatch, linewidth=0.8, zorder=3)
 
-            # Bar value labels
-            for bar, val in zip(bars, vals):
-                if val > 0:
-                    ax.text(
-                        bar.get_x() + bar.get_width() / 2,
-                        bar.get_height() + ax.get_ylim()[1] * 0.015,
-                        f"{val:.2f}M" if val >= 0.1 else f"{val:.2f}M",
-                        ha="center", va="bottom",
-                        fontsize=7, color=text_color,
-                        fontfamily=FONT_FAMILY,
-                    )
+            for g, (bar, raw_v, s_val) in enumerate(zip(bars, raw_vals, scaled_vals)):
+                self._all_bar_items.append({
+                    "patch": bar,
+                    "series_idx": i,
+                    "group_idx": g,
+                    "project_name": series["name"],
+                    "group_name": self._groups[g],
+                    "raw_val": raw_v,
+                    "scaled_val": s_val,
+                    "proj_total": proj_totals[i],
+                    "is_lowest": (len(self._group_data) > 1 and group_mins[g] > 0 and abs(raw_v - group_mins[g]) < 1e-3),
+                    "min_val": group_mins[g],
+                    "edgecolor": border_color,
+                    "hatch": hatch,
+                })
 
             legend_patches.append(
                 mpatches.Patch(
@@ -452,36 +483,228 @@ class _GroupedBarChart(QWidget):
                 )
             )
 
+        # Smart Bar-Top Labels & Y-Axis Headroom
+        max_v = max(all_scaled_vals) if all_scaled_vals else 1.0
+        min_v = min(all_scaled_vals) if all_scaled_vals else 0.0
+        total_span = max(max_v - min_v, 1.0)
+        pad = total_span * 0.18
+
+        for item in self._all_bar_items:
+            bar = item["patch"]
+            val = item["scaled_val"]
+            bx  = bar.get_x() + bar.get_width() / 2.0
+            val_str = f"{val:.2f}M"
+
+            if val >= total_span * 0.08:
+                ax.text(
+                    bx, val + pad * 0.03,
+                    val_str,
+                    ha="center", va="bottom",
+                    fontsize=FS_SM, fontweight="bold",
+                    color=text_color, fontfamily=FONT_FAMILY,
+                    zorder=4,
+                )
+            elif val > 0:
+                ax.annotate(
+                    val_str,
+                    xy=(bx, val),
+                    xytext=(bx, val + pad * 0.25),
+                    ha="center", va="bottom",
+                    fontsize=FS_SM, fontweight="bold", color=text_color,
+                    bbox=dict(boxstyle="round,pad=0.2,rounding_size=0.2",
+                              fc=bg_color, ec=mid_color, lw=0.6, alpha=0.9),
+                    arrowprops=dict(arrowstyle="-", color=mid_color, lw=0.6),
+                    clip_on=False, zorder=5,
+                )
+            elif val < 0:
+                ax.text(
+                    bx, val - pad * 0.04,
+                    val_str,
+                    ha="center", va="top",
+                    fontsize=FS_SM, fontweight="bold",
+                    color=text_color, fontfamily=FONT_FAMILY,
+                    zorder=4,
+                )
+
         ax.set_xticks(x)
         ax.set_xticklabels(self._groups, color=text_color,
-                           fontsize=9, fontfamily=FONT_FAMILY)
-        ax.set_ylabel(self._ylabel, color=text_color, fontsize=8, fontfamily=FONT_FAMILY)
-        ax.tick_params(colors=text_color, labelsize=8)
-        ax.margins(y=0.18)
+                           fontsize=FS_SM, fontweight="bold", fontfamily=FONT_FAMILY)
+        ax.set_ylabel(self._ylabel, color=text_color, fontsize=FS_SM, fontfamily=FONT_FAMILY)
+        ax.tick_params(colors=text_color, labelsize=FS_SM)
+
+        y_bottom = min(0.0, min_v) - (pad * 0.2 if min_v < 0 else 0)
+        y_top    = max(0.0, max_v) + pad
+        ax.set_ylim(y_bottom, y_top)
+
         for spine in ax.spines.values():
             spine.set_color(mid_color)
         ax.yaxis.grid(True, color=mid_color, linewidth=0.5, alpha=0.5)
         ax.set_axisbelow(True)
 
-        ax.legend(handles=legend_patches, fontsize=8, facecolor=bg_color,
-                  labelcolor=text_color, framealpha=0.0,
-                  edgecolor="none", loc="upper center",
-                  bbox_to_anchor=(0.5, -0.12), ncol=max(1, n_series))
+        if min_v < 0:
+            ax.axhline(0, color=mid_color, linewidth=0.8, linestyle="--", zorder=2)
+
+        # Legend
+        self._legend = ax.legend(
+            handles=legend_patches, fontsize=FS_SM, facecolor=bg_color,
+            labelcolor=text_color, framealpha=0.0,
+            edgecolor="none", loc="upper center",
+            bbox_to_anchor=(0.5, -0.12), ncol=max(1, min(n_series, 4))
+        )
+
+        # Smart Hover Annotation (Floating Tooltip)
+        self.annot = ax.annotate(
+            "", xy=(0, 0), xytext=(20, 20), textcoords="offset points",
+            bbox=dict(boxstyle="round,pad=0.6,rounding_size=0.3",
+                      fc=bg_color, ec=primary_c, lw=1.2, alpha=0.96),
+            arrowprops=dict(arrowstyle="->", color=primary_c, lw=1.2, connectionstyle="arc3,rad=0.05"),
+            zorder=20, color=text_color, fontsize=FS_SM, fontfamily=FONT_FAMILY,
+        )
+        self.annot.set_visible(False)
+
         fig.tight_layout(pad=1.5)
 
-        class _Toolbar(NavigationToolbar2QT):
-            toolitems = [t for t in NavigationToolbar2QT.toolitems
-                         if t[0] not in ("Subplots", "Customize")]
-            def set_message(self, s): pass
+        # Canvas with WheelForwarder
+        self.canvas = FigureCanvasQTAgg(fig)
+        self.canvas.setMinimumHeight(320)
+        self.canvas.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        self.canvas.installEventFilter(WheelForwarder(self))
 
-        canvas = FigureCanvasQTAgg(fig)
-        canvas.setMinimumHeight(300)
-        canvas.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        canvas.wheelEvent = lambda event: event.ignore()
-        toolbar = _Toolbar(canvas, self)
+        # Event connections
+        fig.canvas.mpl_connect("motion_notify_event", self._hover)
+        fig.canvas.mpl_connect("figure_leave_event", lambda event: self._reset_highlight())
 
-        self.layout().addWidget(toolbar)
-        self.layout().addWidget(canvas)
+        # Footer Frame with hint and toolbar
+        footer = QFrame()
+        footer.setStyleSheet(
+            f"border: none; border-top: 1px solid {mid_color}; background: transparent; padding-top: 2px;"
+        )
+        footer_l = QHBoxLayout(footer)
+        footer_l.setContentsMargins(0, 4, 0, 0)
+        footer_l.setSpacing(SP2)
+
+        footer_hint = QLabel("Hover on bars to inspect breakdown")
+        footer_hint.setFont(_f(FS_SM))
+        footer_hint.setStyleSheet(f"color: {text_sec}; border: none; background: transparent;")
+        footer_l.addWidget(footer_hint)
+        footer_l.addStretch()
+
+        toolbar = ChartToolbar(self.canvas, self)
+        footer_l.addWidget(toolbar)
+
+        self.layout().addWidget(self.canvas)
+        self.layout().addWidget(footer)
+
+    def _hover(self, event):
+        if not hasattr(self, "annot") or not hasattr(self, "_all_bar_items"):
+            return
+
+        if event.inaxes != self.ax:
+            self._reset_highlight()
+            return
+
+        hit_item = None
+        for item in self._all_bar_items:
+            patch = item["patch"]
+            if patch.contains(event)[0]:
+                hit_item = item
+                break
+
+        if hit_item:
+            hit_series = hit_item["series_idx"]
+            primary_c = get_token("primary")
+
+            for item in self._all_bar_items:
+                p = item["patch"]
+                if item is hit_item:
+                    p.set_alpha(1.0)
+                    p.set_linewidth(2.0)
+                    p.set_edgecolor(primary_c)
+                elif item["series_idx"] == hit_series:
+                    p.set_alpha(0.85)
+                    p.set_linewidth(0.8)
+                    p.set_edgecolor(item["edgecolor"])
+                else:
+                    p.set_alpha(0.25)
+                    p.set_linewidth(0.8)
+                    p.set_edgecolor(item["edgecolor"])
+
+            self._set_legend_alpha(hit_series)
+
+            # Build smart annotation text
+            val_m     = hit_item["scaled_val"]
+            raw_val   = hit_item["raw_val"]
+            proj_tot  = hit_item["proj_total"]
+            pct_str   = f" ({raw_val / proj_tot * 100:.1f}%)" if proj_tot > 0 else ""
+
+            curr = self._currency
+            curr_tag = f" {curr}" if curr else ""
+            fmt_exact = fmt_currency(raw_val, curr, decimals=2, style="comma") if curr else f"{raw_val:,.2f}"
+
+            lines = [
+                f"{hit_item['project_name']}",
+                f"{hit_item['group_name']}: {val_m:.2f}M{curr_tag}{pct_str}",
+                f"Exact: {fmt_exact}",
+            ]
+
+            if hit_item["is_lowest"]:
+                lines.append("Lowest cost in this category")
+            elif len(self._group_data) > 1 and hit_item["min_val"] > 0:
+                min_m = hit_item["min_val"] / 1_000_000.0
+                delta_pct = ((raw_val - hit_item["min_val"]) / hit_item["min_val"]) * 100
+                lines.append(f"+{delta_pct:.1f}% vs lowest ({min_m:.2f}M)")
+
+            self.annot.set_text("\n".join(lines))
+
+            # Smart tooltip placement
+            patch = hit_item["patch"]
+            bx = patch.get_x() + patch.get_width() / 2.0
+            by = patch.get_height()
+            self.annot.xy = (bx, by)
+
+            x_min, x_max = self.ax.get_xlim()
+            y_min, y_max = self.ax.get_ylim()
+
+            dx = -160 if bx > (x_min + x_max) * 0.6 else 20
+            dy = -70 if by > (y_min + y_max) * 0.75 else 20
+            self.annot.set_position((dx, dy))
+
+            self.annot.set_visible(True)
+        else:
+            self._reset_highlight()
+
+        if hasattr(self, "canvas") and self.canvas:
+            self.canvas.draw_idle()
+
+    def _reset_highlight(self):
+        if not hasattr(self, "_all_bar_items"):
+            return
+        changed = False
+        if hasattr(self, "annot") and self.annot.get_visible():
+            self.annot.set_visible(False)
+            changed = True
+
+        for item in self._all_bar_items:
+            p = item["patch"]
+            if p.get_alpha() != 1.0 or p.get_linewidth() != 0.8:
+                p.set_alpha(1.0)
+                p.set_linewidth(0.8)
+                p.set_edgecolor(item["edgecolor"])
+                changed = True
+
+        self._set_legend_alpha(-1)
+        if changed and hasattr(self, "canvas") and self.canvas:
+            self.canvas.draw_idle()
+
+    def _set_legend_alpha(self, hit_series_idx: int):
+        if not hasattr(self, "_legend") or not self._legend:
+            return
+        handles = getattr(self._legend, "legend_handles", getattr(self._legend, "legendHandles", []))
+        texts = self._legend.get_texts()
+        for i, (handle, text) in enumerate(zip(handles, texts)):
+            a = 1.0 if (hit_series_idx == -1 or i == hit_series_idx) else 0.25
+            handle.set_alpha(a)
+            text.set_alpha(a)
 
 
 def _make_chart_card(title: str, subtitle: str, chart_widget: QWidget) -> QWidget:
@@ -547,6 +770,7 @@ class _PillarChartSection(QWidget):
             title="Pillar cost comparison",
             ylabel=f"Cost  (Million {currency})",
             group_colors=_PILLAR_COLORS,
+            currency=currency,
         )
 
         card = _make_chart_card(
@@ -591,6 +815,7 @@ class _StageChartSection(QWidget):
             title="Stage cost comparison",
             ylabel=f"Cost  (Million {currency})",
             group_colors=_STAGE_COLORS,
+            currency=currency,
         )
 
         card = _make_chart_card(
@@ -687,7 +912,7 @@ class _ConsolidatedTable(QWidget):
             QHeaderView::section {{
                 background: {get_token('surface_mid')};
                 color: {get_token('text')};
-                font-size: {FS_MD}pt;
+                font-size: {FS_SM}pt;
                 font-weight: {FW_SEMIBOLD};
                 padding: {SP2}px {SP3}px;
                 border: none;
@@ -699,7 +924,7 @@ class _ConsolidatedTable(QWidget):
         # Headers
         table.setHorizontalHeader(WordWrapHeaderView(Qt.Horizontal, parent=table))
         table.horizontalHeader().setDefaultAlignment(Qt.AlignCenter)
-        table.horizontalHeader().setFont(_f(FS_MD, FW_SEMIBOLD))
+        table.horizontalHeader().setFont(_f(FS_SM, FW_SEMIBOLD))
         table.horizontalHeader().setMinimumSectionSize(90)
         table.setHorizontalHeaderItem(0, QTableWidgetItem("Metric"))
         for ci, name in enumerate(names):
@@ -1060,7 +1285,7 @@ class _DetailedBreakdownSection(QWidget):
             QHeaderView::section {{
                 background: {get_token('surface_mid')};
                 color: {get_token('text')};
-                font-size: {FS_MD}pt;
+                font-size: {FS_SM}pt;
                 font-weight: {FW_SEMIBOLD};
                 padding: {SP2}px {SP3}px;
                 border: none;
@@ -1080,7 +1305,7 @@ class _DetailedBreakdownSection(QWidget):
         # Headers
         table.setHorizontalHeader(WordWrapHeaderView(Qt.Horizontal, parent=table))
         table.horizontalHeader().setDefaultAlignment(Qt.AlignCenter)
-        table.horizontalHeader().setFont(_f(FS_MD, FW_SEMIBOLD))
+        table.horizontalHeader().setFont(_f(FS_SM, FW_SEMIBOLD))
         table.horizontalHeader().setMinimumSectionSize(90)
         table.setHorizontalHeaderItem(0, QTableWidgetItem("Stage"))
         table.setHorizontalHeaderItem(1, QTableWidgetItem("Cost Item"))
@@ -1133,7 +1358,7 @@ class _DetailedBreakdownSection(QWidget):
             stage_cell = QTableWidgetItem(stage_label)
             stage_cell.setFont(_f(FS_MD, FW_BOLD))
             stage_cell.setBackground(stage_tint)
-            stage_cell.setForeground(QColor("#1a1a1a"))
+            stage_cell.setForeground(_contrast(stage_tint))
             stage_cell.setTextAlignment(Qt.AlignCenter)
             table.setItem(curr_row, 0, stage_cell)
 
@@ -1213,6 +1438,7 @@ class _DetailLegend(QWidget):
         lbl_profit.setStyleSheet(f"color: {_green_hex};")
         row.addWidget(lbl_profit)
 
+        _purple_hex = "#{:02x}{:02x}{:02x}".format(*_WARM_COST_STOPS[-1][1])
         grad_bar = QFrame()
         grad_bar.setFixedHeight(12)
         grad_bar.setFixedWidth(260)
@@ -1224,16 +1450,16 @@ class _DetailLegend(QWidget):
                 stop:0.62 #f6c23e,
                 stop:0.75 #e67e22,
                 stop:0.88 #c0392b,
-                stop:1.00 #5b146f);
+                stop:1.00 {_purple_hex});
             border: 1px solid {_border};
-            border-radius: 4px;
+            border-radius: {RADIUS_SM}px;
         """)
         row.addWidget(grad_bar)
 
         # lbl_cost = QLabel("Gold ➔ Orange ➔ Red ➔ Purple (Peak) ►")
         lbl_cost = QLabel("(Peak) ►")
         lbl_cost.setFont(_f(FS_SM, FW_SEMIBOLD))
-        lbl_cost.setStyleSheet("color: #7b2cbf;")
+        lbl_cost.setStyleSheet(f"color: {_purple_hex};")
         row.addWidget(lbl_cost)
 
         zero_lbl = QLabel("(White = 0)")
@@ -1443,7 +1669,7 @@ class ComparisonResultWindow(QWidget):
         pdf_btn = QPushButton("Generate PDF Report")
         pdf_btn.setFixedHeight(BTN_MD)
         pdf_btn.setStyleSheet(btn_primary())
-        pdf_btn.setFont(_f(FS_SM, FW_SEMIBOLD))
+        pdf_btn.setFont(_f(FS_MD, FW_SEMIBOLD))
         pdf_btn.setCursor(Qt.PointingHandCursor)
         hdr_row.addWidget(pdf_btn)
 
