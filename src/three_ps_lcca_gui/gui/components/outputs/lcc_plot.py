@@ -293,30 +293,35 @@ class _VerticalTextDelegate(QStyledItemDelegate):
 
     def paint(self, painter, option, index):
         painter.save()
+        painter.setClipRect(option.rect)
         bg = index.data(Qt.BackgroundRole)
         if bg:
             c = bg.color() if hasattr(bg, "color") else QColor(bg)
             painter.fillRect(option.rect, c)
 
-        painter.translate(
-            option.rect.x() + option.rect.width() / 2,
-            option.rect.y() + option.rect.height() / 2,
-        )
-        painter.rotate(-90)
-
-        text_rect = QRect(
-            -option.rect.height() // 2,
-            -option.rect.width() // 2,
-            option.rect.height(),
-            option.rect.width(),
-        )
         text = (index.data(Qt.DisplayRole) or "").replace("\n", " ")
         font = index.data(Qt.FontRole)
         if font:
             painter.setFont(font)
         fg = index.data(Qt.ForegroundRole)
-        painter.setPen(fg.color() if fg and hasattr(fg, "color") else option.palette.text().color())
-        painter.drawText(text_rect, Qt.AlignCenter, text)
+        painter.setPen(fg.color() if (fg and hasattr(fg, "color")) else option.palette.text().color())
+
+        if option.rect.height() < 55:
+            painter.drawText(option.rect.adjusted(2, 2, -2, -2), Qt.AlignCenter | Qt.TextWordWrap, text)
+        else:
+            painter.translate(
+                option.rect.x() + option.rect.width() / 2,
+                option.rect.y() + option.rect.height() / 2,
+            )
+            painter.rotate(-90)
+
+            text_rect = QRect(
+                -option.rect.height() // 2,
+                -option.rect.width() // 2,
+                option.rect.height(),
+                option.rect.width(),
+            )
+            painter.drawText(text_rect, Qt.AlignCenter, text)
         painter.restore()
 
     def sizeHint(self, option, index):

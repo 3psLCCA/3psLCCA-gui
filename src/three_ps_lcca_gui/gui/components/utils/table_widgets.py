@@ -25,7 +25,7 @@ from PySide6.QtWidgets import (
     QToolTip,
 )
 from PySide6.QtCore import Qt, QSize, QRect, QPoint, QEvent
-from PySide6.QtGui import QPainter, QBrush, QColor, QPalette
+from PySide6.QtGui import QPainter, QBrush, QColor, QPalette, QFontMetrics
 from three_ps_lcca_gui.gui.themes import get_token
 
 
@@ -114,17 +114,45 @@ def contrast_color(bg: QColor) -> QColor:
 
 
 class WordWrapHeaderView(QHeaderView):
-    """Horizontal header that paints column labels with word wrap and left alignment."""
+    """Horizontal header that paints column labels with word wrap and dynamic height."""
 
     _MIN_HEIGHT = 44
 
-    def __init__(self, orientation=Qt.Horizontal, font=None, parent=None):
-        super().__init__(orientation, parent)
+    def __init__(self, orientation_or_parent=Qt.Horizontal, font=None, parent=None):
+        if isinstance(orientation_or_parent, Qt.Orientation):
+            orientation = orientation_or_parent
+            actual_parent = parent
+        else:
+            orientation = Qt.Horizontal
+            actual_parent = orientation_or_parent
+        super().__init__(orientation, actual_parent)
         self._font = font
+        self.sectionResized.connect(self._on_section_resized)
+        self._updating = False
+
+    def _on_section_resized(self, logicalIndex: int, oldSize: int, newSize: int):
+        if not self._updating:
+            self._updating = True
+            try:
+                self.geometriesChanged.emit()
+            finally:
+                self._updating = False
 
     def sizeHint(self):
         s = super().sizeHint()
-        return QSize(s.width(), max(s.height(), self._MIN_HEIGHT))
+        if not self.model():
+            return QSize(s.width(), max(s.height(), self._MIN_HEIGHT))
+        fm = QFontMetrics(self._font if self._font else self.font())
+        max_h = self._MIN_HEIGHT
+        for i in range(self.count()):
+            if self.isSectionHidden(i):
+                continue
+            txt = str(self.model().headerData(i, self.orientation(), Qt.DisplayRole) or "")
+            col_w = self.sectionSize(i)
+            w = max(30, (col_w if col_w > 10 else 100) - 12)
+            rect = fm.boundingRect(0, 0, w, 2000, self.defaultAlignment() | Qt.TextWordWrap, txt)
+            max_h = max(max_h, rect.height() + 14)
+        return QSize(s.width(), max_h)
 
     def paintSection(self, painter, rect, logical_index):
         bg = self.model().headerData(logical_index, self.orientation(), Qt.BackgroundRole)
@@ -142,13 +170,21 @@ class WordWrapHeaderView(QHeaderView):
             painter.drawText(rect.adjusted(6, 4, -6, -4), self.defaultAlignment() | Qt.TextWordWrap, str(text))
             painter.restore()
         else:
-            # Normal path: delegate entirely to Qt's C++ rendering pipeline.
-            # super().paintSection() is Fusion-safe — same proven approach as GroupedHeaderView.
-            if self._font:
-                painter.setFont(self._font)
             painter.save()
-            super().paintSection(painter, rect, logical_index)
+            opt = QStyleOptionHeader()
+            self.initStyleOption(opt)
+            opt.section = logical_index
+            opt.rect = rect
+            text = str(self.model().headerData(logical_index, self.orientation(), Qt.DisplayRole) or "")
+            opt.text = ""  # blank text so style paints background/frame without drawing single-line text
+            self.style().drawControl(QStyle.CE_Header, opt, painter, self)
+            painter.setFont(self._font if self._font else self.font())
+            fg = self.model().headerData(logical_index, self.orientation(), Qt.ForegroundRole)
+            fg_color = fg.color() if (fg and hasattr(fg, "color")) else QColor(get_token("text_secondary"))
+            painter.setPen(fg_color)
+            painter.drawText(rect.adjusted(6, 4, -6, -4), self.defaultAlignment() | Qt.TextWordWrap, text)
             painter.restore()
+
 
 
 # ---------------------------------------------------------------------------

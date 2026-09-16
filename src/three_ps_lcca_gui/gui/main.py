@@ -129,8 +129,10 @@ class _TableHeaderWordWrapFilter(QObject):
         hidden       = [hdr.isSectionHidden(i) for i in range(count)]
         stretch_last = hdr.stretchLastSection()
         min_size     = hdr.minimumSectionSize()
+        should_be_visible = not hdr.isHidden()
         new_hdr = WordWrapHeaderView(Qt.Horizontal, parent=obj)
         obj.setHorizontalHeader(new_hdr)
+        new_hdr.setVisible(should_be_visible)
         new_hdr.setStretchLastSection(stretch_last)
         new_hdr.setMinimumSectionSize(min_size)
         for i in range(count):

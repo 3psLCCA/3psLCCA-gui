@@ -1060,7 +1060,7 @@ class OutputsPage(ScrollableForm):
         h.setContentsMargins(0, 0, 0, 0)
         h.setSpacing(SP2)
 
-        status_lbl = QLabel("Running life-cycle cost analysis…")
+        status_lbl = QLabel("Running lifecycle cost analysis…")
         status_lbl.setFont(_f(FS_MD, FW_MEDIUM))
         h.addWidget(status_lbl)
         h.addStretch()
