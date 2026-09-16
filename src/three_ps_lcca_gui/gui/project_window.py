@@ -29,7 +29,7 @@ from PySide6.QtGui import QAction, QColor, QIcon, QPainter, QPalette, QKeySequen
 
 from three_ps_lcca_gui.gui.components.utils.icons import make_icon, make_icon_btn
 from three_ps_lcca_gui.gui.theme import (
-    FS_SM, FS_BASE, FS_MD,
+    FS_SM, FS_MD, FS_MD,
     FW_NORMAL, FW_MEDIUM, FW_SEMIBOLD,
     SP4,
 )
@@ -172,7 +172,7 @@ class _SidebarDelegate(QStyledItemDelegate):
         elif depth == 1:
             painter.setFont(_f(FS_MD, FW_SEMIBOLD if is_sel else FW_MEDIUM))
         else:
-            painter.setFont(_f(FS_BASE, FW_MEDIUM if is_sel else FW_NORMAL))
+            painter.setFont(_f(FS_MD, FW_MEDIUM if is_sel else FW_NORMAL))
 
         # Text colour - PRIMARY on selected, normal otherwise
         text_col = QColor(get_token("primary")

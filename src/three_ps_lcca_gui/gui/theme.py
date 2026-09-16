@@ -63,15 +63,6 @@ FS_SECTION = 14   # Tier 2 (~18px) - Section Headings, Primary Card Values
 FS_MD      = 10   # Tier 3 (~13px) - Body Text, Buttons, Input Fields, Paragraphs
 FS_SM      =  8   # Tier 4 (~11px) - Micro, Captions, Badges, Overlines, Currency, Hints
 
-# Canonical Aliases (for backward compatibility, strictly mapped to the 4 tiers)
-# FS_DISP_XL = FS_DISP     # 18 pt
-# FS_DISP_LG = FS_DISP     # 18 pt
-FS_SUBHEAD = FS_SECTION  # 14 pt
-FS_XL      = FS_SECTION  # 14 pt
-FS_LG      = FS_MD       # 10 pt
-FS_BASE    = FS_MD       # 10 pt
-FS_XS      = FS_SM       # 8 pt
-
 # Font weights (match QFont.Weight int values)
 # Toned down for subtler hierarchy:
 # - MEDIUM:   500 -> 450

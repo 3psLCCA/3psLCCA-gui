@@ -25,7 +25,7 @@ from three_ps_lcca_gui.gui.theme import (
     SP1, SP2, SP3, SP4, SP5, SP6,
     RADIUS_SM, RADIUS_MD, RADIUS_LG,
     BTN_SM, BTN_MD,
-    FS_SM, FS_BASE, FS_MD, FS_LG,
+    FS_SM, FS_MD, FS_MD, FS_MD,
     FW_NORMAL, FW_MEDIUM, FW_SEMIBOLD, FW_BOLD,
     FONT_FAMILY,
 )
@@ -142,7 +142,7 @@ class _HomeTabBar(QWidget):
         for i, label in enumerate(["Projects", "Comparison History"]):
             btn = QPushButton(label)
             btn.setCheckable(True)
-            btn.setFont(_f(FS_BASE, FW_MEDIUM))
+            btn.setFont(_f(FS_MD, FW_MEDIUM))
             btn.setCursor(Qt.PointingHandCursor)
             btn.setFixedHeight(40)
             btn.setProperty("tab_idx", i)
@@ -196,7 +196,7 @@ class _HomeTabBar(QWidget):
                 f"  padding: 0 {SP4}px;"
                 f"  font-weight: {weight};"
                 f"  font-family: {FONT_FAMILY};"
-                f"  font-size: {FS_BASE}pt;"
+                f"  font-size: {FS_MD}pt;"
                 f"}}"
                 f"QPushButton:hover {{"
                 f"  color: {active};"
@@ -326,7 +326,7 @@ class _HistoryRow(QFrame):
         # # Star toggle
         # self._star_btn = QPushButton("★" if self._starred else "☆")
         # self._star_btn.setFixedSize(24, 24)
-        # self._star_btn.setFont(_f(FS_BASE))
+        # self._star_btn.setFont(_f(FS_MD))
         # self._star_btn.setCursor(Qt.PointingHandCursor)
         # self._star_btn.setToolTip("Star comparison" if not self._starred else "Unstar comparison")
         # self._star_btn.clicked.connect(self._on_star_clicked)
@@ -342,7 +342,7 @@ class _HistoryRow(QFrame):
                 note_text = f"{self._n_missing} project{s_plural} no longer available on disk - will be excluded"
 
             self._warn_lbl = QLabel("⚠")
-            self._warn_lbl.setFont(_f(FS_BASE, FW_BOLD))
+            self._warn_lbl.setFont(_f(FS_MD, FW_BOLD))
             self._warn_lbl.setCursor(Qt.PointingHandCursor)
             self._warn_lbl.setToolTip(f"⚠ {note_text}")
             right_h.addWidget(self._warn_lbl, 0, Qt.AlignVCenter)
@@ -489,7 +489,7 @@ class _PaginationBar(QWidget):
 
         self._prev = QPushButton("‹")
         self._prev.setFixedSize(self._BTN_SZ, self._BTN_SZ)
-        self._prev.setFont(_f(FS_LG))
+        self._prev.setFont(_f(FS_MD))
         self._prev.setCursor(Qt.PointingHandCursor)
         self._prev.clicked.connect(lambda: self._emit(self._current - 1))
         lay.addWidget(self._prev)
@@ -502,7 +502,7 @@ class _PaginationBar(QWidget):
 
         self._next = QPushButton("›")
         self._next.setFixedSize(self._BTN_SZ, self._BTN_SZ)
-        self._next.setFont(_f(FS_LG))
+        self._next.setFont(_f(FS_MD))
         self._next.setCursor(Qt.PointingHandCursor)
         self._next.clicked.connect(lambda: self._emit(self._current + 1))
         lay.addWidget(self._next)
@@ -770,7 +770,7 @@ class _ComparisonHistoryTab(QWidget):
         if not all_entries:
             empty = QLabel("No comparisons found.")
             empty.setAlignment(Qt.AlignCenter)
-            empty.setFont(_f(FS_BASE))
+            empty.setFont(_f(FS_MD))
             empty.setStyleSheet(f"color: {get_token('text_disabled')};")
             self._rows_layout.addWidget(empty)
         else:
@@ -846,7 +846,7 @@ class _ComparisonHistoryTab(QWidget):
             f"  border-radius: {RADIUS_MD}px;"
             f"  padding: 0 {SP3}px;"
             f"  color: {text_color};"
-            f"  font-size: {FS_BASE}pt;"
+            f"  font-size: {FS_MD}pt;"
             f"}}"
             f"QLineEdit:focus {{ border-color: {prim}; }}"
         )

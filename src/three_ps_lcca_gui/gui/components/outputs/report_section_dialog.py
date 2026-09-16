@@ -34,7 +34,7 @@ from PySide6.QtGui import QPainter, QColor, QPalette
 
 from three_ps_lcca_gui.gui.themes import get_token, theme_manager
 from three_ps_lcca_gui.gui.theme import (
-    FS_DISP, FS_MD, FS_BASE, FS_SM,
+    FS_DISP, FS_MD, FS_MD, FS_SM,
     FW_BOLD, FW_SEMIBOLD, FW_MEDIUM, FW_NORMAL,
     SP4, RADIUS_MD, BTN_LG
 )
@@ -91,7 +91,7 @@ class SectionTreeWidget(QTreeWidget):
                 background-color: transparent;
                 border: none;
                 font-family: 'Ubuntu';
-                font-size: {FS_BASE}pt;
+                font-size: {FS_MD}pt;
                 color: {get_token("text")};
                 outline: none;
             }}
@@ -190,8 +190,8 @@ class SectionTreeWidget(QTreeWidget):
         self.clear()
 
         from PySide6.QtGui import QFont as _QFont, QColor as _QColor
-        font_section = _QFont("Ubuntu", FS_BASE); font_section.setWeight(_QFont.Weight.DemiBold)
-        font_sub    = _QFont("Ubuntu", FS_BASE)
+        font_section = _QFont("Ubuntu", FS_MD); font_section.setWeight(_QFont.Weight.DemiBold)
+        font_sub    = _QFont("Ubuntu", FS_MD)
         font_table  = _QFont("Ubuntu", FS_SM)
         col_section = _QColor(get_token("text"))
         col_sub     = _QColor(get_token("text"))
@@ -440,7 +440,7 @@ class ReportSectionDialog(QDialog):
         self.lbl_subtitle = QLabel(
             "Select the sections and data tables to include in your final modular LCCA PDF report."
         )
-        self.lbl_subtitle.setFont(_f(FS_BASE, FW_NORMAL))
+        self.lbl_subtitle.setFont(_f(FS_MD, FW_NORMAL))
         self.lbl_subtitle.setStyleSheet(f"color: {get_token('text_secondary')};")
         self.lbl_subtitle.setWordWrap(True)
         main_layout.addWidget(self.lbl_subtitle)
@@ -634,7 +634,7 @@ class ReportSectionDialog(QDialog):
 
         lbl = QLabel(error_msg)
         lbl.setWordWrap(True)
-        lbl.setFont(_f(FS_BASE))
+        lbl.setFont(_f(FS_MD))
         lay.addWidget(lbl)
 
         note = QLabel(

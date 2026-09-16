@@ -11,8 +11,7 @@ matplotlib.use("QtAgg")
 from three_ps_lcca_gui.gui.themes import get_token, theme_manager
 from three_ps_lcca_gui.gui.theme import (
     FONT_FAMILY,
-    FS_XS, FS_SM, FS_BASE, FS_MD, FS_LG, FS_XL,
-    FW_NORMAL, FW_MEDIUM, FW_SEMIBOLD, FW_BOLD, SP4, SP2
+    FS_SM, FS_SM, FS_MD, FS_MD, FW_NORMAL, FW_SEMIBOLD, FW_BOLD
 )
 from three_ps_lcca_gui.gui.components.utils.display_format import fmt_currency
 from three_ps_lcca_gui.gui.components.utils.table_widgets import round_table_viewport, contrast_color
@@ -247,8 +246,8 @@ class LCCDetailsTable(QWidget):
 
         self.table.setRowCount(len(rows) + 1)
 
-        f_base = QFont(FONT_FAMILY, FS_BASE, FW_SEMIBOLD)
-        f_bold = QFont(FONT_FAMILY, FS_BASE, FW_BOLD)
+        f_base = QFont(FONT_FAMILY, FS_MD, FW_SEMIBOLD)
+        f_bold = QFont(FONT_FAMILY, FS_MD, FW_BOLD)
 
         _stage_bg = {
             "initial_stage": LCC_PALETTE["init_color"],
@@ -530,7 +529,7 @@ class LCCBreakdownTable(QWidget):
         item_w = x_val - self._STAGE_W - self._PAD_X * 2
         item_w = max(item_w, 1)
 
-        fm = QFontMetrics(QFont(FONT_FAMILY, FS_BASE, FW_NORMAL))
+        fm = QFontMetrics(QFont(FONT_FAMILY, FS_MD, FW_NORMAL))
         curr_y = self._PAD_TOP + self._MIN_ROW_H  # header height
         self._row_layouts = []
 
@@ -575,7 +574,7 @@ class LCCBreakdownTable(QWidget):
 
                 # Cost Item column → show full label when clipped
                 if self._STAGE_W <= pos.x() < x_val:
-                    fm = QFontMetrics(QFont(FONT_FAMILY, FS_BASE, FW_NORMAL))
+                    fm = QFontMetrics(QFont(FONT_FAMILY, FS_MD, FW_NORMAL))
                     item_w = x_val - self._STAGE_W - self._PAD_X * 2
                     elided = fm.elidedText(label, Qt.ElideRight, item_w)
                     tip = label if elided != label or "\n" in label else ""
@@ -701,7 +700,7 @@ class LCCBreakdownTable(QWidget):
         lx = self._STAGE_W + self._PAD_X
         p.save()
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        p.setFont(QFont(FONT_FAMILY, FS_BASE, FW_NORMAL))
+        p.setFont(QFont(FONT_FAMILY, FS_MD, FW_NORMAL))
         for pillar, color in pillar_colors.items():
             p.fillRect(lx, legend_y, 16, 16, QColor(color))
             p.setPen(color_text)
@@ -714,7 +713,7 @@ class LCCBreakdownTable(QWidget):
         # ── header ────────────────────────────────────────────────────────────
         hdr_y = self._PAD_TOP
         p.fillRect(0, hdr_y, W, self._MIN_ROW_H, color_header_bg)
-        p.setFont(QFont(FONT_FAMILY, FS_BASE, FW_SEMIBOLD))
+        p.setFont(QFont(FONT_FAMILY, FS_MD, FW_SEMIBOLD))
         p.setPen(color_text)
         p.drawText(QRect(self._PAD_X, hdr_y, self._STAGE_W - self._PAD_X * 2, self._MIN_ROW_H),
                    Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, "Stage")
@@ -730,7 +729,7 @@ class LCCBreakdownTable(QWidget):
                    Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, "")
 
         # ── data rows ─────────────────────────────────────────────────────────
-        row_font = QFont(FONT_FAMILY, FS_BASE, FW_NORMAL)
+        row_font = QFont(FONT_FAMILY, FS_MD, FW_NORMAL)
 
         for idx, (cat, label, value, stage_color_hex) in enumerate(self._rows):
             ry, rh = self._row_layouts[idx]
@@ -744,7 +743,7 @@ class LCCBreakdownTable(QWidget):
                     min(255, sc.blue()  * 40 // 100 + 153),
                 )
                 p.fillRect(self._STAGE_W, ry, W - self._STAGE_W, rh, band)
-                p.setFont(QFont(FONT_FAMILY, FS_BASE, FW_SEMIBOLD))
+                p.setFont(QFont(FONT_FAMILY, FS_MD, FW_SEMIBOLD))
                 p.setPen(QColor("#1a1a1a"))
                 p.drawText(
                     QRect(self._STAGE_W + self._PAD_X, ry,
@@ -784,7 +783,7 @@ class LCCBreakdownTable(QWidget):
             if value != 0:
                 filled = max(filled, 1)
 
-            p.setFont(QFont(FONT_FAMILY, FS_BASE, FW_SEMIBOLD))
+            p.setFont(QFont(FONT_FAMILY, FS_MD, FW_SEMIBOLD))
             if value < 0:
                 # Bar grows left from x_bar - same width scale as positive bars
                 p.fillRect(

@@ -56,7 +56,7 @@ from three_ps_lcca_gui.gui.styles import font as _f, btn_primary, btn_ghost
 from three_ps_lcca_gui.gui.theme import (
     SP1, SP2, SP3, SP4, SP5, SP6, SP8, SP10,
     RADIUS_SM, RADIUS_LG, RADIUS_MD,
-    FS_XS, FS_SM, FS_BASE, FS_MD, FS_LG, FS_SUBHEAD, FS_DISP,
+    FS_SM, FS_SM, FS_MD, FS_DISP,
     FW_NORMAL, FW_MEDIUM, FW_SEMIBOLD, FW_BOLD,
     BTN_SM, BTN_MD, BTN_LG, FONT_FAMILY, FS_SECTION
 )
@@ -256,7 +256,7 @@ def _section_header(title: str, subtitle: str = "") -> QWidget:
     v.setSpacing(SP2)
 
     t = QLabel(title)
-    t.setFont(_f(FS_SUBHEAD, FW_BOLD))
+    t.setFont(_f(FS_SECTION, FW_BOLD))
     t.setStyleSheet(f"color: {get_token('text')};")
     v.addWidget(t)
 
@@ -498,13 +498,13 @@ def _make_chart_card(title: str, subtitle: str, chart_widget: QWidget) -> QWidge
     cv.setSpacing(SP2)
 
     t = QLabel(title)
-    t.setFont(_f(FS_BASE, FW_SEMIBOLD))
+    t.setFont(_f(FS_MD, FW_SEMIBOLD))
     t.setStyleSheet(f"color: {get_token('text')};")
     cv.addWidget(t)
 
     if subtitle:
         s = QLabel(subtitle)
-        s.setFont(_f(FS_XS, FW_NORMAL))
+        s.setFont(_f(FS_SM, FW_NORMAL))
         s.setStyleSheet(f"color: {get_token('text_secondary')};")
         cv.addWidget(s)
 
@@ -671,7 +671,7 @@ class _ConsolidatedTable(QWidget):
         table.setShowGrid(True)
         table.setAlternatingRowColors(False)
         table.setWordWrap(True)
-        table.setFont(_f(FS_BASE, FW_NORMAL))
+        table.setFont(_f(FS_MD, FW_NORMAL))
         table.setSizeAdjustPolicy(QAbstractScrollArea.AdjustToContents)
         table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
         table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.MinimumExpanding)
@@ -687,7 +687,7 @@ class _ConsolidatedTable(QWidget):
             QHeaderView::section {{
                 background: {get_token('surface_mid')};
                 color: {get_token('text')};
-                font-size: {FS_BASE}pt;
+                font-size: {FS_MD}pt;
                 font-weight: {FW_SEMIBOLD};
                 padding: {SP2}px {SP3}px;
                 border: none;
@@ -699,7 +699,7 @@ class _ConsolidatedTable(QWidget):
         # Headers
         table.setHorizontalHeader(WordWrapHeaderView(Qt.Horizontal, parent=table))
         table.horizontalHeader().setDefaultAlignment(Qt.AlignCenter)
-        table.horizontalHeader().setFont(_f(FS_BASE, FW_SEMIBOLD))
+        table.horizontalHeader().setFont(_f(FS_MD, FW_SEMIBOLD))
         table.horizontalHeader().setMinimumSectionSize(90)
         table.setHorizontalHeaderItem(0, QTableWidgetItem("Metric"))
         for ci, name in enumerate(names):
@@ -731,7 +731,7 @@ class _ConsolidatedTable(QWidget):
 
             # Metric cell
             metric_item = QTableWidgetItem(label)
-            metric_item.setFont(_f(FS_BASE, FW_BOLD if is_total else (FW_BOLD if is_group_header else FW_NORMAL)))
+            metric_item.setFont(_f(FS_MD, FW_BOLD if is_total else (FW_BOLD if is_group_header else FW_NORMAL)))
             metric_item.setForeground(QColor(get_token("text") if (is_group_header or is_total) else get_token("text")))
             metric_item.setBackground(QColor(row_bg if row_bg != "transparent" else get_token("base")))
 
@@ -780,7 +780,7 @@ class _ConsolidatedTable(QWidget):
 
                 item = QTableWidgetItem(cell_text)
                 item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
-                item.setFont(_f(FS_BASE, FW_BOLD if is_total else FW_NORMAL))
+                item.setFont(_f(FS_MD, FW_BOLD if is_total else FW_NORMAL))
 
                 if is_best and is_cost:
                     item.setForeground(QColor(get_token("success")))
@@ -1060,7 +1060,7 @@ class _DetailedBreakdownSection(QWidget):
             QHeaderView::section {{
                 background: {get_token('surface_mid')};
                 color: {get_token('text')};
-                font-size: {FS_BASE}pt;
+                font-size: {FS_MD}pt;
                 font-weight: {FW_SEMIBOLD};
                 padding: {SP2}px {SP3}px;
                 border: none;
@@ -1071,7 +1071,7 @@ class _DetailedBreakdownSection(QWidget):
 
         table.setWordWrap(True)
         table.setShowGrid(True)
-        table.setFont(_f(FS_BASE, FW_NORMAL))
+        table.setFont(_f(FS_MD, FW_NORMAL))
         table.setSizeAdjustPolicy(QAbstractScrollArea.AdjustToContents)
         table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
         table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.MinimumExpanding)
@@ -1080,7 +1080,7 @@ class _DetailedBreakdownSection(QWidget):
         # Headers
         table.setHorizontalHeader(WordWrapHeaderView(Qt.Horizontal, parent=table))
         table.horizontalHeader().setDefaultAlignment(Qt.AlignCenter)
-        table.horizontalHeader().setFont(_f(FS_BASE, FW_SEMIBOLD))
+        table.horizontalHeader().setFont(_f(FS_MD, FW_SEMIBOLD))
         table.horizontalHeader().setMinimumSectionSize(90)
         table.setHorizontalHeaderItem(0, QTableWidgetItem("Stage"))
         table.setHorizontalHeaderItem(1, QTableWidgetItem("Cost Item"))
@@ -1131,7 +1131,7 @@ class _DetailedBreakdownSection(QWidget):
                 min(255, sc.blue()  * 25 // 100 + 191),
             )
             stage_cell = QTableWidgetItem(stage_label)
-            stage_cell.setFont(_f(FS_BASE, FW_BOLD))
+            stage_cell.setFont(_f(FS_MD, FW_BOLD))
             stage_cell.setBackground(stage_tint)
             stage_cell.setForeground(QColor("#1a1a1a"))
             stage_cell.setTextAlignment(Qt.AlignCenter)
@@ -1142,7 +1142,7 @@ class _DetailedBreakdownSection(QWidget):
 
                 label_item = QTableWidgetItem(lbl)
                 label_item.setToolTip(lbl)
-                label_item.setFont(_f(FS_BASE, FW_NORMAL))
+                label_item.setFont(_f(FS_MD, FW_NORMAL))
                 label_item.setForeground(QColor(get_token("text")))
                 label_item.setBackground(QColor(get_token("base")))
 
@@ -1163,7 +1163,7 @@ class _DetailedBreakdownSection(QWidget):
                     v_item = QTableWidgetItem(display)
                     v_item.setData(Qt.UserRole, val)
                     v_item.setToolTip(f"{currency} {fmt_currency(val, currency, decimals=2, style='comma')}")
-                    v_item.setFont(_f(FS_BASE, FW_NORMAL))
+                    v_item.setFont(_f(FS_MD, FW_NORMAL))
                     v_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
                     table.setItem(r, ci + 2, v_item)
 
@@ -1204,12 +1204,12 @@ class _DetailLegend(QWidget):
         row.setSpacing(SP3)
 
         lbl_scale = QLabel("Heat Map Scale:")
-        lbl_scale.setFont(_f(FS_XS, FW_SEMIBOLD))
+        lbl_scale.setFont(_f(FS_SM, FW_SEMIBOLD))
         lbl_scale.setStyleSheet(f"color: {get_token('text')};")
         row.addWidget(lbl_scale)
 
         lbl_profit = QLabel("◄ (Profit / Savings)")
-        lbl_profit.setFont(_f(FS_XS, FW_SEMIBOLD))
+        lbl_profit.setFont(_f(FS_SM, FW_SEMIBOLD))
         lbl_profit.setStyleSheet(f"color: {_green_hex};")
         row.addWidget(lbl_profit)
 
@@ -1232,12 +1232,12 @@ class _DetailLegend(QWidget):
 
         # lbl_cost = QLabel("Gold ➔ Orange ➔ Red ➔ Purple (Peak) ►")
         lbl_cost = QLabel("(Peak) ►")
-        lbl_cost.setFont(_f(FS_XS, FW_SEMIBOLD))
+        lbl_cost.setFont(_f(FS_SM, FW_SEMIBOLD))
         lbl_cost.setStyleSheet("color: #7b2cbf;")
         row.addWidget(lbl_cost)
 
         zero_lbl = QLabel("(White = 0)")
-        zero_lbl.setFont(_f(FS_XS, FW_NORMAL))
+        zero_lbl.setFont(_f(FS_SM, FW_NORMAL))
         zero_lbl.setStyleSheet(f"color: {_sec_text};")
         row.addWidget(zero_lbl)
 
@@ -1249,7 +1249,7 @@ class _DetailLegend(QWidget):
             "Green denotes profit / savings / credit, white denotes zero cost, "
             "and costs scale through gold (low), orange (moderate), red (high), and deep purple (peak cost)."
         )
-        note.setFont(_f(FS_XS, FW_NORMAL))
+        note.setFont(_f(FS_SM, FW_NORMAL))
         note.setWordWrap(True)
         note.setStyleSheet(f"color: {_sec_text};")
         root.addWidget(note)
@@ -1339,7 +1339,7 @@ class ComparisonResultWindow(QWidget):
             row_h.setSpacing(SP3)
 
             name_lbl = QLabel(name)
-            name_lbl.setFont(_f(FS_BASE, FW_MEDIUM))
+            name_lbl.setFont(_f(FS_MD, FW_MEDIUM))
             name_lbl.setFixedWidth(220)
             row_h.addWidget(name_lbl)
 

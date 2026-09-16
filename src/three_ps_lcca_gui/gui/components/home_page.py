@@ -63,15 +63,13 @@ from three_ps_lcca_gui.gui.theme import (
     RADIUS_SM,
     RADIUS_MD,
     RADIUS_LG,
-    BTN_SM,
     BTN_MD,
     BTN_LG,
-    FS_XS,
     FS_SM,
-    FS_BASE,
+    FS_SM,
     FS_MD,
-    FS_LG,
-    FS_XL,
+    FS_MD,
+    FS_MD,
     FS_DISP,
     FW_LIGHT,
     FW_NORMAL,
@@ -236,7 +234,7 @@ class _NavButton(QWidget):
         if self._label:
             p.setPen(col)
             weight = FW_SEMIBOLD if self._selected else FW_MEDIUM
-            p.setFont(_f(FS_XS, weight))
+            p.setFont(_f(FS_SM, weight))
             p.drawText(QRect(0, 42, w, 14), Qt.AlignCenter, self._label)
 
         p.end()
@@ -475,7 +473,7 @@ class _GridCardDelegate(QStyledItemDelegate):
             painter.setFont(_f(FS_SM, FW_MEDIUM))
             painter.drawText(pill_rect, Qt.AlignCenter, pill_label)
 
-            painter.setFont(_f(FS_LG, FW_MEDIUM))
+            painter.setFont(_f(FS_MD, FW_MEDIUM))
             dim = QColor(text_col)
             dim.setAlpha(100)
             painter.setPen(dim)
@@ -659,7 +657,7 @@ class _GridCardDelegate(QStyledItemDelegate):
                 pass # Handled by fixed slot above
 
         # ── Title ──────────────────────────────────────────────────────────
-        painter.setFont(_f(FS_LG, FW_MEDIUM))
+        painter.setFont(_f(FS_MD, FW_MEDIUM))
         painter.setPen(text_col)
         nfm = painter.fontMetrics()
         painter.drawText(
@@ -702,7 +700,7 @@ class _GridCardDelegate(QStyledItemDelegate):
             warn_col = QColor(get_token("danger"))
             warn_col.setAlpha(210)
             painter.setPen(warn_col)
-            painter.setFont(_f(FS_XS, FW_MEDIUM))
+            painter.setFont(_f(FS_SM, FW_MEDIUM))
             painter.drawText(
                 QPoint(tx, y_warn), "Needs recovery - last save may be incomplete"
             )
@@ -710,7 +708,7 @@ class _GridCardDelegate(QStyledItemDelegate):
             warn_col = QColor(get_token("warning"))
             warn_col.setAlpha(210)
             painter.setPen(warn_col)
-            painter.setFont(_f(FS_XS, FW_MEDIUM))
+            painter.setFont(_f(FS_SM, FW_MEDIUM))
             painter.drawText(
                 QPoint(tx, y_warn), "File may be damaged - restore from a checkpoint"
             )
@@ -867,13 +865,13 @@ class _EmptyState(QWidget):
             layout.addWidget(self._icon_lbl)
 
             head_lbl = QLabel(heading)
-            head_lbl.setFont(_f(FS_LG, FW_SEMIBOLD))
+            head_lbl.setFont(_f(FS_MD, FW_SEMIBOLD))
             head_lbl.setAlignment(Qt.AlignCenter)
             head_lbl.setWordWrap(True)
             layout.addWidget(head_lbl)
 
         self._sub_lbl = QLabel(subtext)
-        self._sub_lbl.setFont(_f(FS_BASE))
+        self._sub_lbl.setFont(_f(FS_MD))
         self._sub_lbl.setAlignment(Qt.AlignCenter)
         self._sub_lbl.setWordWrap(True)
         layout.addWidget(self._sub_lbl)
@@ -883,7 +881,7 @@ class _EmptyState(QWidget):
             self._cta = QPushButton("+ New Project")
             self._cta.setFixedHeight(BTN_MD)
             self._cta.setFixedWidth(180)
-            self._cta.setFont(_f(FS_BASE, FW_MEDIUM))
+            self._cta.setFont(_f(FS_MD, FW_MEDIUM))
             self._cta.setCursor(Qt.PointingHandCursor)
             self._cta.clicked.connect(
                 lambda: manager.open_project(is_new=True))
@@ -1340,7 +1338,7 @@ class HomePage(QWidget):
         self._comp_fab = QPushButton("Compare Selected")
         self._comp_fab.setParent(panel)
         self._comp_fab.setFixedHeight(BTN_LG)
-        self._comp_fab.setFont(_f(FS_BASE, FW_SEMIBOLD))
+        self._comp_fab.setFont(_f(FS_MD, FW_SEMIBOLD))
         self._comp_fab.setCursor(Qt.PointingHandCursor)
         self._comp_fab.clicked.connect(self._on_home_compare_clicked)
         self._comp_fab.hide()

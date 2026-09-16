@@ -19,7 +19,7 @@ from three_ps_lcca_gui.gui.theme import (
     SP6,
     SP8,
     SP10,
-    FS_XS,
+    FS_SM,
 )
 from three_ps_lcca_gui.gui.themes import get_token, theme_manager, is_dark
 from three_ps_lcca_gui.gui.styles import font as _f
@@ -47,7 +47,7 @@ class SponsorsFooter(QFrame):
         dev_v = QVBoxLayout()
         dev_v.setSpacing(SP3)
         self.dev_lbl = QLabel("Developed At")
-        self.dev_lbl.setFont(_f(FS_XS))
+        self.dev_lbl.setFont(_f(FS_SM))
         dev_v.addWidget(self.dev_lbl)
         self.iitb_logo = QLabel()
         dev_v.addWidget(self.iitb_logo, 0, Qt.AlignLeft | Qt.AlignVCenter)
@@ -60,7 +60,7 @@ class SponsorsFooter(QFrame):
         sup_v.setSpacing(SP3)
         sup_v.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         self.sup_lbl = QLabel("Supported by")
-        self.sup_lbl.setFont(_f(FS_XS))
+        self.sup_lbl.setFont(_f(FS_SM))
         self.sup_lbl.setAlignment(Qt.AlignRight)
         sup_v.addWidget(self.sup_lbl)
 

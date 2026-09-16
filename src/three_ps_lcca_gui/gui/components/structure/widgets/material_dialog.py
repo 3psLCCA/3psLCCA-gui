@@ -53,7 +53,7 @@ import os
 import uuid as _uuid_mod
 
 from three_ps_lcca_gui.gui.themes import get_token
-from three_ps_lcca_gui.gui.theme import FS_BASE, FS_MD, FS_SM
+from three_ps_lcca_gui.gui.theme import FS_MD, FS_MD, FS_SM
 
 try:
     from ..registry.custom_material_db import CustomMaterialDB, CUSTOM_PREFIX
