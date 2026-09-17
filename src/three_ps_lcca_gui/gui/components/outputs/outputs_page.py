@@ -192,7 +192,7 @@ def _make_issue_card(page_name: str, issues: list, severity: str, navigate_cb) -
         go_btn.setStyleSheet(
             f"QPushButton {{ border: 1px solid {get_token('warning')}; border-radius: {RADIUS_MD}px;"
             f"  padding: 0 16px; background: transparent; color: {get_token('warning')};"
-            f"  font-weight: {get_token('weight-semibold')}; }}"
+            f"  font-weight: {FW_SEMIBOLD}; }}"
             f"QPushButton:hover {{ background: transparent; color: {get_token('warning')}; border-width: 1.5px; }}"
         )
     go_btn.setCursor(Qt.PointingHandCursor)
@@ -260,11 +260,13 @@ class ResponsiveTotalCard(QFrame):
         val_lbl.setFont(_f(FS_DISP, FW_BOLD))
         val_lbl.setStyleSheet(f"color: {get_token('text')}; border: none; background: transparent;")
         left_v.addWidget(val_lbl)
-        left_v.addSpacing(2)
 
         curr_lbl = QLabel(currency)
         curr_lbl.setFont(_f(FS_SM, FW_NORMAL))
-        curr_lbl.setStyleSheet(f"color: {get_token('text_secondary')}; border: none; letter-spacing: 0.5px; background: transparent;")
+        curr_lbl.setStyleSheet(
+            f"color: {get_token('text_secondary')}; border: none; "
+            f"letter-spacing: 0.5px; background: transparent;"
+        )
         left_v.addWidget(curr_lbl)
         left_v.addStretch()
 
@@ -448,13 +450,13 @@ class LCCSummaryCards(QWidget):
         val_lbl.setFont(_f(FS_SECTION, FW_NORMAL))
         val_lbl.setStyleSheet(f"color: {get_token('text')}; border: none; background: transparent;")
         v.addWidget(val_lbl)
-        v.addSpacing(2)
 
-        # Row 3: Subtle Currency indicator
+        # Currency sub-label — small text below value
         curr_lbl = QLabel(self._currency)
         curr_lbl.setFont(_f(FS_SM, FW_NORMAL))
         curr_lbl.setStyleSheet(
-            f"color: {get_token('text_secondary')}; border: none; letter-spacing: 0.5px; background: transparent;"
+            f"color: {get_token('text_secondary')}; border: none; "
+            f"letter-spacing: 0.5px; background: transparent;"
         )
         v.addWidget(curr_lbl)
 
@@ -541,6 +543,15 @@ class LCCInsightsWidget(QWidget):
         "text": "text_secondary",
     }
 
+    # Text prefix paired with each severity colour — secondary cue for colour-blind users
+    _SEVERITY_PREFIX = {
+        "primary": "",
+        "warning": "⚠ ",
+        "danger": "⚡ ",
+        "success": "✓ ",
+        "text": "",
+    }
+
     def __init__(self, results: dict, currency: str, parent=None):
         super().__init__(parent)
         self._currency = currency
@@ -567,6 +578,7 @@ class LCCInsightsWidget(QWidget):
         card_v.setSpacing(0)
 
         for i, (icon, color_token, html) in enumerate(findings):
+            html = self._SEVERITY_PREFIX.get(color_token, "") + html
             bullet_color = get_token(self._TOKEN_COLORS.get(color_token, "text_secondary"))
 
             if i > 0:
@@ -703,7 +715,7 @@ class LCCInsightsWidget(QWidget):
             mc_ratio = mat_c / veh_c
             carbon_note = (
                 f" The environmental impact of construction materials is "
-                f"<b>{mc_ratio:.0f}× higher</b> than the impact of vehicle detours during construction."
+                f"<b>{mc_ratio:.1f}×</b> higher than the impact of vehicle detours during construction."
             )
         findings.append((
             "●", "success",
@@ -823,7 +835,7 @@ class OutputsPage(ScrollableForm):
 
         self.btn_calculate = QPushButton("Validate inputs")
         self.btn_calculate.setFixedHeight(BTN_LG)
-        self.btn_calculate.setFixedWidth(180)
+        self.btn_calculate.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
         self.btn_calculate.setFont(_f(FS_MD, FW_MEDIUM))
         self.btn_calculate.setStyleSheet(btn_primary())
         self.btn_calculate.clicked.connect(self.validate_requested.emit)
@@ -1062,6 +1074,7 @@ class OutputsPage(ScrollableForm):
 
         status_lbl = QLabel("Running lifecycle cost analysis…")
         status_lbl.setFont(_f(FS_MD, FW_MEDIUM))
+        status_lbl.setStyleSheet(f"color: {get_token('text')}; background: transparent;")
         h.addWidget(status_lbl)
         h.addStretch()
 
@@ -1114,7 +1127,10 @@ class OutputsPage(ScrollableForm):
             self._calc_worker.cancel()
         self.btn_calculate.setEnabled(True)
         self._show_calculation_error(
-            TimeoutError("Analysis timed out after 30 seconds."), ""
+            Exception(
+                "Analysis timed out — the calculation took longer than 30 seconds. "
+                "Check your input data for unusually large values."
+            ), ""
         )
 
     # ── State: validation issues ──────────────────────────────
@@ -1259,7 +1275,7 @@ class OutputsPage(ScrollableForm):
         btn_row.setSpacing(SP3)
         btn_row.setContentsMargins(0, SP2, 0, 0)
 
-        retry_btn = QPushButton("Retry")
+        retry_btn = QPushButton("Re-validate & Run")
         retry_btn.setFixedHeight(BTN_MD)
         retry_btn.setFont(_f(FS_MD, FW_MEDIUM))
         retry_btn.setStyleSheet(btn_primary())
@@ -1272,7 +1288,7 @@ class OutputsPage(ScrollableForm):
         dl_btn.setStyleSheet(
             f"QPushButton {{ border: 1px solid {get_token('danger')}; border-radius: {RADIUS_MD}px;"
             f"  padding: 0 16px; background: transparent; color: {get_token('danger')};"
-            f"  font-weight: {get_token('weight-semibold')}; }}"
+            f"  font-weight: {FW_SEMIBOLD}; }}"
             f"QPushButton:hover {{ border-width: 1.5px; }}"
         )
         dl_btn.clicked.connect(lambda: self._download_error_log(error, tb))
@@ -1359,10 +1375,6 @@ class OutputsPage(ScrollableForm):
             ),
             lambda r: LCCDetailsTable(r, currency=self._currency),
             lambda r: _divider(),
-            # lambda r: _section_heading("Itemized detail"),
-            # lambda r: _section_description(
-            #     "An itemised schedule of each individual cost component. All values are discounted to the year of assessment, thus representing the present sum of money required to meet future expenditures."
-            # ),
             lambda r: LCCBreakdownTable(r, currency=self._currency),
         ]
         QTimer.singleShot(0, lambda: self._build_result_widgets(results, sections))
@@ -1375,8 +1387,8 @@ class OutputsPage(ScrollableForm):
                     self._status_layout.addWidget(widget)
             except Exception as e:
                 err = QLabel(f"Render error: {e}")
-                err.setFont(_f(FS_MD, italic=True))
-                err.setStyleSheet(f"color: {get_token('text_secondary')};")
+                err.setFont(_f(FS_MD, FW_NORMAL))
+                err.setStyleSheet(f"color: {get_token('text_secondary')}; font-style: italic;")
                 self._status_layout.addWidget(err)
 
         scroll = self.layout.itemAt(0).widget()
@@ -1426,19 +1438,6 @@ class OutputsPage(ScrollableForm):
                 res = page.get_data()
                 all_data[res["chunk"]] = res["data"]
 
-        # ── DEBUG: dump all_data to JSON file ──────────────────
-        # import json, os, datetime as _dt
-        # _dump_dir = os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", "debug_dumps")
-        # os.makedirs(_dump_dir, exist_ok=True)
-        # _ts = _dt.datetime.now().strftime("%Y%m%d_%H%M%S")
-        # _dump_path = os.path.join(_dump_dir, f"all_data_{_ts}.json")
-        # try:
-        #     with open(_dump_path, "w", encoding="utf-8") as _fp:
-        #         json.dump(all_data, _fp, indent=2, default=str)
-        #     _log.info("DEBUG: all_data dumped to %s", _dump_path)
-        # except Exception as _e:
-        #     _log.warning("DEBUG: failed to dump all_data: %s", _e)
-        # ── END DEBUG ──────────────────────────────────────────
 
         self._last_all_data = all_data
         self._currency = get_currency()
@@ -1528,14 +1527,6 @@ class OutputsPage(ScrollableForm):
         )
         dlg.exec()
 
-    # def _generate_pdf_report(self):
-    #     dlg = ReportSectionDialog(export_dict=self._build_export_dict(), mode="provenance", parent=self)
-    #     dlg.exec()
-
-    # def _generate_provenance_report(self):
-    #     """Triggers the modular V2 report generation using the tree-based dialog."""
-    #     dlg = ReportSectionDialog(export_dict=self._build_export_dict(), mode="provenance", parent=self)
-    #     dlg.exec()
 
     def _on_proceed(self):
         self.run_calculation()
