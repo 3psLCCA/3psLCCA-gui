@@ -11,7 +11,7 @@ matplotlib.use("QtAgg")
 from three_ps_lcca_gui.gui.themes import get_token, theme_manager
 from three_ps_lcca_gui.gui.theme import (
     FONT_FAMILY,
-    FS_SM, FS_SM, FS_MD, FS_MD, FW_NORMAL, FW_SEMIBOLD, FW_BOLD
+    FS_SM, FS_MD, FW_NORMAL, FW_SEMIBOLD, FW_BOLD, RADIUS_SM
 )
 from three_ps_lcca_gui.gui.components.utils.display_format import fmt_currency
 from three_ps_lcca_gui.gui.components.utils.table_widgets import round_table_viewport, contrast_color
@@ -33,7 +33,7 @@ from PySide6.QtGui import QColor, QFont, QPainter, QPen, QFontMetrics
 from PySide6.QtWidgets import (
     QApplication, QHeaderView, QLabel, QScrollArea, QFrame,
     QSizePolicy, QStyledItemDelegate, QTableWidget, QTableWidgetItem,
-    QVBoxLayout, QWidget, QToolTip, QHBoxLayout
+    QVBoxLayout, QWidget, QToolTip, QHBoxLayout,
 )
 
 try:
@@ -42,6 +42,12 @@ except ImportError:
     from matplotlib.backends.backend_qt import FigureCanvasQTAgg
 
 from .plots_helper.plot_utils import ChartToolbar, WheelForwarder as _ScrollForwarder
+from .table_export import (
+    attach_table_context_menu,
+    create_table_context_menu,
+    export_widget_as_image,
+    copy_widget_to_clipboard,
+)
 
 
 
@@ -207,6 +213,8 @@ class LCCDetailsTable(QWidget):
         self._build_data(results)
         self.table.resizeRowsToContents()
 
+        attach_table_context_menu(self.table, title="Consolidated Stage Summary", default_filename="stage_cost_summary.svg")
+
         lay.addWidget(self.table)
 
         # Compute height from actual row heights after word-wrap
@@ -215,6 +223,19 @@ class LCCDetailsTable(QWidget):
         table_h = header_h + total_row_h + 2
         self.table.setFixedHeight(table_h)
         self.setFixedHeight(table_h)
+
+    def export_as_image(self, file_path: str | None = None, parent=None, format: str = "svg"):
+        """Export the table as an SVG vector or PNG/JPEG image."""
+        return export_widget_as_image(
+            self.table,
+            title="Consolidated Stage Summary",
+            default_filename=file_path or "stage_cost_summary.svg",
+            parent=parent or self,
+            format=format,
+        )
+
+    def copy_to_clipboard(self):
+        return copy_widget_to_clipboard(self.table)
 
     def _build_data(self, results: dict):
         rows = []
@@ -858,6 +879,27 @@ class LCCBreakdownTable(QWidget):
         p.drawRect(0, self._PAD_TOP, W - 1, total_h - self._PAD_TOP)
 
         p.end()
+
+    def export_as_image(self, file_path: str | None = None, parent=None, format: str = "svg"):
+        """Export the detailed table as an SVG vector (Option 4) or PNG/JPEG image."""
+        if not self._row_layouts:
+            self._calculate_layout()
+        return export_widget_as_image(
+            self,
+            title="Detailed Cost Breakdown",
+            default_filename=file_path or "detailed_cost_breakdown.svg",
+            parent=parent or self,
+            format=format,
+        )
+
+    def copy_to_clipboard(self):
+        if not self._row_layouts:
+            self._calculate_layout()
+        return copy_widget_to_clipboard(self)
+
+    def contextMenuEvent(self, event):
+        menu = create_table_context_menu(self, title="Detailed Cost Breakdown", default_filename="detailed_cost_breakdown.svg")
+        menu.exec(event.globalPos())
 
     @classmethod
     def in_scroll(cls, results: dict, currency: str = "INR",

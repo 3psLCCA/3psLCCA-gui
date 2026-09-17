@@ -4,7 +4,7 @@ tests/test_comparison_page.py
 Comprehensive test suite for comparison_page.py (redesigned).
 
 Coverage areas:
-  A. Pure helpers  (_fmt_date, _safe_float, _fmt_detail_val, _fmt_M)
+  A. Pure helpers  (_fmt_date, _safe_float, _fmt_M)
   B. lifecycle_summary  (compute_all_summaries)
   C. _KPI / section data maths  (best-project selection, delta %)
   D. _HeatmapDelegate colour logic  (_lerp_color, _contrast)
@@ -50,7 +50,6 @@ except Exception:
 from three_ps_lcca_gui.gui.components.outputs.comparison_page import (
     _fmt_date,
     _safe_float,
-    _fmt_detail_val,
     _fmt_M,
     _lerp_color,
     _contrast,
@@ -188,31 +187,6 @@ class TestSafeFloat(unittest.TestCase):
     def test_negative(self):       self.assertAlmostEqual(_safe_float(-500), -500.0)
     def test_zero(self):           self.assertAlmostEqual(_safe_float(0), 0.0)
 
-
-class TestFmtDetailVal(unittest.TestCase):
-
-    def test_inr_exact(self):
-        # 100_000 INR → exact formatted currency "100,000"
-        self.assertEqual(_fmt_detail_val(100_000, "INR"), "100,000")
-
-    def test_inr_negative_credit(self):
-        # -50_000 → "-50,000"
-        self.assertEqual(_fmt_detail_val(-50_000, "INR"), "-50,000")
-
-    def test_inr_zero(self):
-        self.assertEqual(_fmt_detail_val(0, "INR"), "0")
-
-    def test_usd_million(self):
-        result = _fmt_detail_val(2_000_000, "USD")
-        self.assertEqual(result, "2,000,000")
-
-    def test_inr_small_rounds_to_zero(self):
-        # Very small value below 0.001 → "0"
-        self.assertEqual(_fmt_detail_val(0.0005, "INR"), "0")
-
-    def test_large_crore_inr(self):
-        result = _fmt_detail_val(1_00_00_000, "INR")
-        self.assertEqual(result, "10,000,000")
 
 
 class TestFmtM(unittest.TestCase):
@@ -880,11 +854,6 @@ class TestEdgeCases(unittest.TestCase):
         s = compute_all_summaries(r)
         # eco total may be negative, but must not raise
         self.assertIsInstance(s["pillar_totals"]["eco"], float)
-
-    def test_fmt_detail_val_handles_non_numeric(self):
-        # should not crash
-        result = _fmt_detail_val("bad", "INR")
-        self.assertEqual(result, "0")
 
     def test_safe_float_dict(self):
         self.assertAlmostEqual(_safe_float({"a": 1}), 0.0)

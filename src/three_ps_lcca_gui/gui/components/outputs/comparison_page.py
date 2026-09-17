@@ -72,6 +72,7 @@ from .helper_functions.lcc_colors import COLORS as LCC_PALETTE
 from .lcc_data import _get, _MASTER_ROWS, BREAKDOWN_STAGES
 from .lcc_plot import _VerticalTextDelegate, LCCBreakdownTable, LCCDetailsTable
 from .plots_helper.plot_utils import ChartToolbar, WheelForwarder
+from .table_export import attach_table_context_menu, create_export_button
 
 # ── Register Ubuntu fonts for matplotlib ──────────────────────────────────────
 _UBUNTU_FONT_DIR = os.path.abspath(
@@ -251,16 +252,26 @@ def _make_divider() -> QFrame:
 # Section header (title + optional subtitle)
 # ──────────────────────────────────────────────────────────────────────────────
 
-def _section_header(title: str, subtitle: str = "") -> QWidget:
+def _section_header(title: str, subtitle: str = "", action_widget: QWidget | None = None) -> QWidget:
     w = QWidget()
     v = QVBoxLayout(w)
     v.setContentsMargins(0, 0, 0, 0)
     v.setSpacing(SP2)
 
+    top_row = QHBoxLayout()
+    top_row.setContentsMargins(0, 0, 0, 0)
+    top_row.setSpacing(SP3)
+
     t = QLabel(title)
     t.setFont(_f(FS_SECTION, FW_BOLD))
     t.setStyleSheet(f"color: {get_token('text')};")
-    v.addWidget(t)
+    top_row.addWidget(t)
+    top_row.addStretch()
+
+    if action_widget:
+        top_row.addWidget(action_widget)
+
+    v.addLayout(top_row)
 
     if subtitle:
         s = QLabel(subtitle)
@@ -862,13 +873,6 @@ class _ConsolidatedTable(QWidget):
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(SP3)
 
-        root.addWidget(_section_header(
-            "Consolidated Comparison",
-            "A single view of every pillar and stage across projects. "
-            "The lowest value in each row is highlighted, so the best-performing "
-            "option per metric is immediate."
-        ))
-
         # ── Build row definitions ─────────────────────────────────────────────
         def _ptotal(pid):
             sw = summaries[pid]["stagewise"]
@@ -895,6 +899,16 @@ class _ConsolidatedTable(QWidget):
         n_rows = len(all_rows)
 
         table = QTableWidget(n_rows, n_cols + 1)
+        attach_table_context_menu(table, title="Consolidated Comparison Table", default_filename="consolidated_comparison.svg")
+
+        export_btn = create_export_button(table, title="Consolidated Comparison Table", default_filename="consolidated_comparison.svg")
+        root.addWidget(_section_header(
+            "Consolidated Comparison",
+            "A single view of every pillar and stage across projects. "
+            "The lowest value in each row is highlighted, so the best-performing "
+            "option per metric is immediate.",
+            action_widget=export_btn,
+        ))
         table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         table.setSelectionMode(QAbstractItemView.NoSelection)
         table.setFocusPolicy(Qt.NoFocus)
@@ -1202,12 +1216,6 @@ class _DetailedBreakdownSection(QWidget):
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(SP3)
 
-        root.addWidget(_section_header(
-            "Detailed Cost Item Breakdown",
-            "Itemized breakdown across lifecycle stages. Values are rendered with a diverging "
-            "heat map — green indicates credits/savings, while gold to purple indicates increasing costs."
-        ))
-
         # ── Pillar legend (reused from LCCBreakdownTable) ─────────────────────
         leg_row = QHBoxLayout()
         leg_row.setSpacing(SP4)
@@ -1230,7 +1238,6 @@ class _DetailedBreakdownSection(QWidget):
             ib_l.addWidget(lbl)
             leg_row.addWidget(item_box)
         leg_row.addStretch()
-        root.addLayout(leg_row)
 
         # ── Group items by stage ──────────────────────────────────────────────
         stage_groups = []  # list of (stage_label, stage_color, items)
@@ -1267,6 +1274,11 @@ class _DetailedBreakdownSection(QWidget):
                 stage_groups.append((stage_label, stage_color, stage_items))
 
         if not stage_groups:
+            root.addWidget(_section_header(
+                "Detailed Cost Item Breakdown",
+                "Itemized breakdown across lifecycle stages. Values are rendered with a diverging "
+                "heat map — green indicates credits/savings, while gold to purple indicates increasing costs."
+            ))
             root.addWidget(QLabel("No detailed breakdown available."))
             return
 
@@ -1274,6 +1286,24 @@ class _DetailedBreakdownSection(QWidget):
         n_cols     = len(pids)
 
         table = QTableWidget(total_rows, n_cols + 2)
+        attach_table_context_menu(
+            table,
+            title="Detailed Cost Breakdown Comparison",
+            default_filename="detailed_breakdown_comparison.svg"
+        )
+        export_btn = create_export_button(
+            table,
+            title="Detailed Cost Breakdown Comparison",
+            default_filename="detailed_breakdown_comparison.svg"
+        )
+
+        root.addWidget(_section_header(
+            "Detailed Cost Item Breakdown",
+            "Itemized breakdown across lifecycle stages. Values are rendered with a diverging "
+            "heat map — green indicates credits/savings, while gold to purple indicates increasing costs.",
+            action_widget=export_btn,
+        ))
+        root.addLayout(leg_row)
         table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         table.setSelectionMode(QAbstractItemView.NoSelection)
         table.setFocusPolicy(Qt.NoFocus)
@@ -1391,7 +1421,7 @@ class _DetailedBreakdownSection(QWidget):
 
                 for ci, pid in enumerate(pids):
                     val = pid_vals.get(pid, 0.0)
-                    display = _fmt_detail_val(val, currency)
+                    display = fmt_currency(val, currency, style="comma")
                     v_item = QTableWidgetItem(display)
                     v_item.setData(Qt.UserRole, val)
                     v_item.setToolTip(f"{currency} {fmt_currency(val, currency, decimals=2, style='comma')}")
@@ -1405,20 +1435,6 @@ class _DetailedBreakdownSection(QWidget):
         legend = _DetailLegend()
         root.addWidget(legend)
         root.addWidget(table)
-
-
-def _fmt_detail_val(val, currency: str) -> str:
-    """Format a detail value with exact precision and comma digit grouping.
-    Guards against non-numeric input — returns '0' safely.
-    Prepends ▼ for savings/credits so color-blind users have a secondary
-    shape-based cue independent of the green heatmap color.
-    """
-    val = _safe_float(val)
-    if abs(val) < 0.001:
-        return "0"
-    d = 0 if float(val).is_integer() else 2
-    formatted = fmt_currency(val, currency, decimals=d, style="comma")
-    return f"▼ {formatted}" if val < 0 else formatted
 
 
 class _DetailLegend(QWidget):

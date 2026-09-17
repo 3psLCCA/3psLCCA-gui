@@ -72,6 +72,7 @@ from .helper_functions.lifecycle_summary import compute_all_summaries
 from .data_preparer import DataPreparer
 from .report_section_dialog import ReportSectionDialog
 from .calc_logic import _LCCAWorker
+from .table_export import attach_table_context_menu, create_export_button
 
 CHUNK = "outputs_data"
 CHUNK_COMPARISON = "comparison_cache"
@@ -106,6 +107,71 @@ def _section_heading(title: str) -> QLabel:
     lbl.setFont(_f(FS_SECTION, FW_SEMIBOLD))
     lbl.setStyleSheet(f"color: {get_token('text')};")
     return lbl
+
+
+def _section_header_with_button(title: str, action_widget: QWidget) -> QWidget:
+    """Header row with section title on left and an action widget on right."""
+    w = QWidget()
+    w.setStyleSheet("background: transparent; border: none;")
+    h = QHBoxLayout(w)
+    h.setContentsMargins(0, SP6, 0, SP2)
+    h.setSpacing(SP3)
+
+    lbl = QLabel(title)
+    lbl.setFont(_f(FS_SECTION, FW_SEMIBOLD))
+    lbl.setStyleSheet(f"color: {get_token('text')}; background: transparent; border: none;")
+    h.addWidget(lbl)
+    h.addStretch()
+    h.addWidget(action_widget)
+    return w
+
+
+class LCCDetailsSection(QWidget):
+    """Wraps LCCDetailsTable with a header and export action button."""
+
+    def __init__(self, results: dict, currency: str, parent=None):
+        super().__init__(parent)
+        self.setStyleSheet("background: transparent; border: none;")
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(0)
+
+        self.table = LCCDetailsTable(results, currency=currency)
+        attach_table_context_menu(self.table, title="Consolidated Stage Summary", default_filename="stage_cost_summary.svg")
+        btn = create_export_button(self.table, title="Consolidated Stage Summary", default_filename="stage_cost_summary.svg")
+        hdr = _section_header_with_button("Consolidated Stage Summary", btn)
+        lay.addWidget(hdr)
+
+        desc = _section_description(
+            "A consolidated presentation of costs across the three pillars (economic, social, and environmental) "
+            "for each life cycle stage. This table facilitates the identification of phases that bear the most substantial burden."
+        )
+        lay.addWidget(desc)
+        lay.addWidget(self.table)
+
+
+class LCCBreakdownSection(QWidget):
+    """Wraps LCCBreakdownTable with an itemized header and export action button."""
+
+    def __init__(self, results: dict, currency: str, parent=None):
+        super().__init__(parent)
+        self.setStyleSheet("background: transparent; border: none;")
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(0)
+
+        self.table = LCCBreakdownTable(results, currency=currency)
+        attach_table_context_menu(self.table, title="Detailed Cost Breakdown", default_filename="detailed_cost_breakdown.svg")
+        btn = create_export_button(self.table, title="Detailed Cost Breakdown", default_filename="detailed_cost_breakdown.svg")
+        hdr = _section_header_with_button("Itemized Cost Breakdown", btn)
+        lay.addWidget(hdr)
+
+        desc = _section_description(
+            "An itemised schedule of each individual cost component across all stages and pillars. "
+            "All values are discounted to the year of assessment."
+        )
+        lay.addWidget(desc)
+        lay.addWidget(self.table)
 
 
 def _section_description(text: str) -> QLabel:
@@ -1369,13 +1435,9 @@ class OutputsPage(ScrollableForm):
             lambda r: _divider(),
             lambda r: AggregateChartWidget(r, currency=self._currency),
             lambda r: _divider(),
-            lambda r: _section_heading("Consolidated stage summary"),
-            lambda r: _section_description(
-                "A consolidated presentation of costs across the three pillars (economic, social, and environmental) for each life cycle stage. This table facilitates the identification of phases that bear the most substantial burden."
-            ),
-            lambda r: LCCDetailsTable(r, currency=self._currency),
+            lambda r: LCCDetailsSection(r, currency=self._currency),
             lambda r: _divider(),
-            lambda r: LCCBreakdownTable(r, currency=self._currency),
+            lambda r: LCCBreakdownSection(r, currency=self._currency),
         ]
         QTimer.singleShot(0, lambda: self._build_result_widgets(results, sections))
 
