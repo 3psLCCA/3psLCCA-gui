@@ -140,8 +140,10 @@ def create_table_context_menu(
     title: str = "Table Export",
     default_filename: str = "table_export.svg",
     custom_actions: list | None = None,
+    target_widget: QWidget | None = None,
 ) -> QMenu:
     """Builds a standardized theme-styled context menu for exporting widgets."""
+    target = target_widget or widget
     menu = QMenu(widget)
     menu.setStyleSheet(
         f"""
@@ -171,13 +173,13 @@ def create_table_context_menu(
 
     act_svg = menu.addAction(icon, "Export Table as Vector (SVG)...")
     act_svg.triggered.connect(
-        lambda: export_widget_as_image(widget, title=title, default_filename=default_filename, format="svg")
+        lambda: export_widget_as_image(target, title=title, default_filename=default_filename, format="svg")
     )
 
     act_png = menu.addAction(icon, "Export Table as PNG Image...")
     act_png.triggered.connect(
         lambda: export_widget_as_image(
-            widget,
+            target,
             title=title,
             default_filename=default_filename.rsplit(".", 1)[0] + ".png",
             format="png",
@@ -187,7 +189,7 @@ def create_table_context_menu(
     menu.addSeparator()
 
     act_copy = menu.addAction("Copy Table Image to Clipboard")
-    act_copy.triggered.connect(lambda: copy_widget_to_clipboard(widget))
+    act_copy.triggered.connect(lambda: copy_widget_to_clipboard(target))
 
     if custom_actions:
         menu.addSeparator()
@@ -202,11 +204,13 @@ def attach_table_context_menu(
     title: str = "Table Export",
     default_filename: str = "table_export.svg",
     custom_actions: list | None = None,
+    target_widget: QWidget | None = None,
 ):
     """Enables CustomContextMenu policy on the widget (and its viewport if scrollable/table) and shows the export menu."""
     def _show_menu(global_pt):
         menu = create_table_context_menu(
-            widget, title=title, default_filename=default_filename, custom_actions=custom_actions
+            widget, title=title, default_filename=default_filename,
+            custom_actions=custom_actions, target_widget=target_widget
         )
         menu.exec(global_pt)
 
@@ -224,6 +228,7 @@ def create_export_button(
     title: str = "Table Export",
     default_filename: str = "table_export.svg",
     tooltip: str = "Export or copy table (SVG / PNG / Clipboard)",
+    target_widget: QWidget | None = None,
 ) -> QPushButton:
     """Creates a compact icon button with the save table icon.
 
@@ -255,7 +260,7 @@ def create_export_button(
 
     def _open_options_menu():
         menu = create_table_context_menu(
-            widget, title=title, default_filename=default_filename
+            widget, title=title, default_filename=default_filename, target_widget=target_widget
         )
         # Display menu immediately beneath the button
         menu.exec(btn.mapToGlobal(btn.rect().bottomLeft()))

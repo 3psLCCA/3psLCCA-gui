@@ -1286,15 +1286,32 @@ class _DetailedBreakdownSection(QWidget):
         n_cols     = len(pids)
 
         table = QTableWidget(total_rows, n_cols + 2)
+
+        # Container enclosing heat legend and table so SVG/PNG exports include heat map scale
+        export_container = QWidget()
+        export_container.setAttribute(Qt.WA_StyledBackground, True)
+        export_container.setStyleSheet(f"background: {get_token('window')};")
+        c_layout = QVBoxLayout(export_container)
+        c_layout.setContentsMargins(0, 0, 0, 0)
+        c_layout.setSpacing(SP2)
+
         attach_table_context_menu(
             table,
             title="Detailed Cost Breakdown Comparison",
-            default_filename="detailed_breakdown_comparison.svg"
+            default_filename="detailed_breakdown_comparison.svg",
+            target_widget=export_container,
+        )
+        attach_table_context_menu(
+            export_container,
+            title="Detailed Cost Breakdown Comparison",
+            default_filename="detailed_breakdown_comparison.svg",
+            target_widget=export_container,
         )
         export_btn = create_export_button(
             table,
             title="Detailed Cost Breakdown Comparison",
-            default_filename="detailed_breakdown_comparison.svg"
+            default_filename="detailed_breakdown_comparison.svg",
+            target_widget=export_container,
         )
 
         root.addWidget(_section_header(
@@ -1431,10 +1448,11 @@ class _DetailedBreakdownSection(QWidget):
 
             curr_row += count
 
-        # Legend (placed above table for immediate visual reference)
+        # Legend and table placed inside export_container
         legend = _DetailLegend()
-        root.addWidget(legend)
-        root.addWidget(table)
+        c_layout.addWidget(legend)
+        c_layout.addWidget(table)
+        root.addWidget(export_container)
 
 
 class _DetailLegend(QWidget):
