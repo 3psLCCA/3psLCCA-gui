@@ -57,7 +57,7 @@ from three_ps_lcca_gui.gui.styles import font as _f, btn_primary, btn_ghost
 from three_ps_lcca_gui.gui.theme import (
     SP1, SP2, SP3, SP4, SP5, SP6, SP8, SP10,
     RADIUS_SM, RADIUS_LG, RADIUS_MD,
-    FS_SM, FS_SM, FS_MD, FS_DISP,
+    FS_SM, FS_MD, FS_DISP,
     FW_NORMAL, FW_MEDIUM, FW_SEMIBOLD, FW_BOLD,
     BTN_SM, BTN_MD, BTN_LG, FONT_FAMILY, FS_SECTION
 )
@@ -336,19 +336,20 @@ class _HeroCardsSection(QWidget):
             name_lbl.setWordWrap(True)
             card_v.addWidget(name_lbl)
 
-            # Line 2 — big value
-            val_lbl = QLabel(_fmt_million(total))
+            # Line 2 — big value with currency prefix (e.g. "INR 142.67 million")
+            val_lbl = QLabel(f"{currency} {_fmt_million(total)}" if currency else _fmt_million(total))
             val_lbl.setFont(_f(FS_DISP, FW_BOLD))
             val_lbl.setStyleSheet(f"color: {get_token('text')}; background: transparent;")
             card_v.addWidget(val_lbl)
 
-            # Line 3 — currency
-            cur_lbl = QLabel(currency)
-            cur_lbl.setFont(_f(FS_SM, FW_NORMAL))
-            cur_lbl.setStyleSheet(
-                f"color: {get_token('text_secondary')}; background: transparent;"
-            )
-            card_v.addWidget(cur_lbl)
+            # Line 3 — "✓ Lowest cost" badge for the winning project
+            if is_best:
+                badge = QLabel("✓ Lowest cost")
+                badge.setFont(_f(FS_SM, FW_SEMIBOLD))
+                badge.setStyleSheet(
+                    f"color: {get_token('success')}; background: transparent;"
+                )
+                card_v.addWidget(badge)
 
             cards_row.addWidget(card, 1)
 
@@ -563,6 +564,10 @@ class _GroupedBarChart(QWidget):
         self.annot.set_visible(False)
 
         fig.tight_layout(pad=1.5)
+        # Reserve bottom margin proportional to the number of legend rows so the
+        # legend is never clipped regardless of how many projects are compared.
+        legend_rows = max(1, (n_series + 3) // 4)   # ncol is capped at 4
+        fig.subplots_adjust(bottom=0.10 + legend_rows * 0.08)
 
         # Canvas with WheelForwarder
         self.canvas = FigureCanvasQTAgg(fig)
@@ -586,6 +591,7 @@ class _GroupedBarChart(QWidget):
         footer_hint = QLabel("Hover on bars to inspect breakdown")
         footer_hint.setFont(_f(FS_SM))
         footer_hint.setStyleSheet(f"color: {text_sec}; border: none; background: transparent;")
+        footer_hint.setVisible(bool(self._all_bar_items))
         footer_l.addWidget(footer_hint)
         footer_l.addStretch()
 
@@ -1103,6 +1109,7 @@ class _HeatmapDelegate(QStyledItemDelegate):
         col_idx = index.column()
         white_rgb = (255, 255, 255)
         white_color = QColor(255, 255, 255)
+        bg = None  # guaranteed to be bound before the fallback check below
 
         if isinstance(val, (int, float)):
             if val < -0.001:
@@ -1403,12 +1410,15 @@ class _DetailedBreakdownSection(QWidget):
 def _fmt_detail_val(val, currency: str) -> str:
     """Format a detail value with exact precision and comma digit grouping.
     Guards against non-numeric input — returns '0' safely.
+    Prepends ▼ for savings/credits so color-blind users have a secondary
+    shape-based cue independent of the green heatmap color.
     """
     val = _safe_float(val)
     if abs(val) < 0.001:
         return "0"
     d = 0 if float(val).is_integer() else 2
-    return fmt_currency(val, currency, decimals=d, style="comma")
+    formatted = fmt_currency(val, currency, decimals=d, style="comma")
+    return f"▼ {formatted}" if val < 0 else formatted
 
 
 class _DetailLegend(QWidget):
@@ -1507,7 +1517,7 @@ class ComparisonResultWindow(QWidget):
         self._errors:   dict = {}
         self._pending:  set  = set()
         self._workers:  dict = {}
-        self._currency = caches[pids[0]].get("currency", "INR") if pids else "INR"
+        self._currency = caches[pids[0]].get("currency", "") if pids else ""
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
@@ -1566,7 +1576,8 @@ class ComparisonResultWindow(QWidget):
 
             name_lbl = QLabel(name)
             name_lbl.setFont(_f(FS_MD, FW_MEDIUM))
-            name_lbl.setFixedWidth(220)
+            name_lbl.setMinimumWidth(140)
+            name_lbl.setMaximumWidth(300)
             row_h.addWidget(name_lbl)
 
             bar = QProgressBar()
