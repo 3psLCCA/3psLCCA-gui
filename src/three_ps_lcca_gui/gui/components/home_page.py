@@ -371,6 +371,32 @@ class _ResizeFilter(QObject):
         return False
 
 
+
+class _OrderedSet:
+    """Set that remembers insertion order (used for the comparison selection)."""
+
+    def __init__(self):
+        self._d: dict = {}
+
+    def add(self, x):
+        self._d[x] = None
+
+    def discard(self, x):
+        self._d.pop(x, None)
+
+    def clear(self):
+        self._d.clear()
+
+    def __contains__(self, x):
+        return x in self._d
+
+    def __len__(self):
+        return len(self._d)
+
+    def __iter__(self):
+        return iter(self._d)
+
+
 class _GridCardDelegate(QStyledItemDelegate):
     RADIUS = RADIUS_LG
 
@@ -380,7 +406,7 @@ class _GridCardDelegate(QStyledItemDelegate):
         self._loading_pid  = None
         self._loading_dots = 0
         self.comparison_mode     = False
-        self._comp_selected: set = set()   # pids selected for comparison
+        self._comp_selected = _OrderedSet()   # pids selected for comparison, in click order
 
     def _card_h(self, status: str) -> int:
         return CARD_H_WARN if status in ("crashed", "corrupted") else CARD_H_NORM
