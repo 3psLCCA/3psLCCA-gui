@@ -81,6 +81,11 @@ def _ensure_tables():
                 "ALTER TABLE comparison_history "
                 "ADD COLUMN is_starred INTEGER NOT NULL DEFAULT 0"
             )
+        if "currency_settings" not in existing_cols:
+            c.execute(
+                "ALTER TABLE comparison_history "
+                "ADD COLUMN currency_settings TEXT"
+            )
 
 
 # ── Bootstrap ──────────────────────────────────────────────────────────────────
@@ -216,7 +221,8 @@ def get_comparison_history(limit: int = 100) -> list[dict]:
     """Return comparison history rows newest-first, with decoded JSON fields."""
     with _conn() as c:
         rows = c.execute("""
-            SELECT id, compared_at, label, project_ids, project_names, analysis_period
+            SELECT id, compared_at, label, project_ids, project_names, analysis_period,
+                   is_starred, currency_settings
             FROM comparison_history
             ORDER BY compared_at DESC
             LIMIT ?
@@ -226,8 +232,22 @@ def get_comparison_history(limit: int = 100) -> list[dict]:
         d = dict(row)
         d["project_ids"]   = json.loads(d["project_ids"])
         d["project_names"] = json.loads(d["project_names"])
+        raw = d.get("currency_settings")
+        try:
+            d["currency_settings"] = json.loads(raw) if raw else None
+        except ValueError:
+            d["currency_settings"] = None
         result.append(d)
     return result
+
+
+def set_comparison_currency(history_id: int, settings: dict | None):
+    """Store (or clear) the currency-conversion settings of a history row."""
+    with _conn() as c:
+        c.execute(
+            "UPDATE comparison_history SET currency_settings = ? WHERE id = ?",
+            (json.dumps(settings) if settings else None, history_id),
+        )
 
 
 def delete_comparison(history_id: int):

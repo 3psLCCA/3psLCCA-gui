@@ -43,13 +43,14 @@ import matplotlib.colors as mcolors
 from matplotlib import font_manager as _fm
 
 from PySide6.QtCore import Qt, QSize, QThread, QTimer, Signal
-from PySide6.QtGui import QColor, QFontMetrics, QPixmap, QPainter, QIcon
+from PySide6.QtGui import QColor, QFontMetrics, QPixmap, QPainter, QIcon, QDoubleValidator
 from PySide6.QtWidgets import (
     QFrame, QGridLayout, QHBoxLayout, QLabel, QProgressBar,
     QPushButton, QScrollArea, QSizePolicy, QVBoxLayout, QWidget,
     QTableWidget, QTableWidgetItem, QHeaderView, QAbstractItemView,
     QStyledItemDelegate, QApplication, QAbstractScrollArea,
     QStyleOptionHeader, QStyle,
+    QComboBox, QDialog, QDialogButtonBox, QFormLayout, QLineEdit,
 )
 
 from three_ps_lcca_gui.gui.themes import get_token, theme_manager
@@ -127,6 +128,185 @@ _PROJECT_HATCHES = [
     "|||",    # Vertical lines
     "***",    # Stars
 ]
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Currency conversion helpers
+# ──────────────────────────────────────────────────────────────────────────────
+
+def _scale_numbers(obj, k: float):
+    """Return a copy of a nested dict/list of numbers with every number multiplied by k."""
+    if isinstance(obj, dict):
+        return {key: _scale_numbers(v, k) for key, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_scale_numbers(v, k) for v in obj]
+    if isinstance(obj, (int, float)) and not isinstance(obj, bool):
+        return obj * k
+    return obj
+
+
+def _settings_valid(settings, currencies: set) -> bool:
+    """True when settings define a display currency and a positive rate for every other currency."""
+    if not settings or settings.get("display") not in currencies:
+        return False
+    rates = settings.get("rates", {})
+    for cur in currencies - {settings["display"]}:
+        try:
+            if float(rates.get(cur, 0)) <= 0:
+                return False
+        except (TypeError, ValueError):
+            return False
+    return True
+
+
+def _currency_note_label(text: str) -> QLabel:
+    lbl = QLabel(text)
+    lbl.setFont(_f(FS_SM, FW_SEMIBOLD))
+    lbl.setWordWrap(True)
+    lbl.setStyleSheet(f"color: {get_token('text')};")
+    return lbl
+
+
+class _RateEdit(QLineEdit):
+    """Positive-number input for an exchange rate; empty means 'not entered'."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        v = QDoubleValidator(0.0, 1e12, 6, self)
+        v.setNotation(QDoubleValidator.StandardNotation)
+        self.setValidator(v)
+        self.setMinimumHeight(BTN_MD)
+        self.setFont(_f(FS_MD, FW_NORMAL))
+
+    def value(self) -> float:
+        try:
+            return float(self.text().replace(",", ""))
+        except ValueError:
+            return 0.0
+
+    def setValue(self, val: float):
+        self.setText(f"{val:.6f}".rstrip("0").rstrip(".") if val > 0 else "")
+
+
+class _CurrencyDialog(QDialog):
+    """Asks for a display currency and '1 <foreign> = X <display>' rates."""
+
+    def __init__(self, currencies: list, settings=None, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Currency Conversion")
+        self.setMinimumWidth(420)
+        self._currencies = list(currencies)
+        settings = settings or {}
+
+        lay = QVBoxLayout(self)
+        lay.setSpacing(SP3)
+
+        info = QLabel(
+            "The selected projects use different currencies. Choose the currency "
+            "to show results in, and enter the exchange rate for each other currency."
+        )
+        info.setWordWrap(True)
+        lay.addWidget(info)
+
+        form = QFormLayout()
+        self._display = QComboBox()
+        self._display.setFixedHeight(BTN_MD)
+        self._display.setFont(_f(FS_MD, FW_NORMAL))
+        self._display.addItems(self._currencies)
+        if settings.get("display") in self._currencies:
+            self._display.setCurrentText(settings["display"])
+        disp_lbl = QLabel("Show results in")
+        disp_lbl.setFont(_f(FS_MD, FW_SEMIBOLD))
+        disp_lbl.setMinimumWidth(120)
+        form.addRow(disp_lbl, self._display)
+        lay.addLayout(form)
+
+        self._rate_form = QFormLayout()
+        self._rate_form.setLabelAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        form.setLabelAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        lay.addLayout(self._rate_form)
+        self._spins: dict = {}     # currency -> _RateEdit
+        self._rows: dict = {}      # currency -> row widget (edit + unit label)
+        self._units: dict = {}     # currency -> unit QLabel
+        saved_rates = settings.get("rates", {})
+        for cur in self._currencies:
+            edit = _RateEdit()
+            edit.setValue(float(saved_rates.get(cur, 0.0) or 0.0))
+            unit = QLabel("")
+            unit.setFont(_f(FS_MD, FW_SEMIBOLD))
+            row = QWidget()
+            row_l = QHBoxLayout(row)
+            row_l.setContentsMargins(0, 0, 0, 0)
+            row_l.setSpacing(SP3)
+            row_l.addWidget(edit, 1)
+            row_l.addWidget(unit)
+            self._spins[cur], self._rows[cur], self._units[cur] = edit, row, unit
+        self._prev_display = self._display.currentText()
+        self._display.currentTextChanged.connect(self._on_display_changed)
+        self._rebuild_rates()
+
+        self._err = QLabel("")
+        self._err.setStyleSheet(f"color: {get_token('danger')};")
+        lay.addWidget(self._err)
+
+        bb = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        bb.accepted.connect(self._accept)
+        bb.rejected.connect(self.reject)
+        lay.addWidget(bb)
+
+    def _on_display_changed(self, new_disp: str):
+        """Re-express the entered rates against the new display currency.
+
+        Rates are '1 X = r_X old'. With r_new = rate of the new display currency
+        (in old), the old currency becomes 1/r_new and every other X becomes
+        r_X / r_new. If r_new wasn't entered, rates can't be converted and are cleared.
+        """
+        old = self._prev_display
+        self._prev_display = new_disp
+        if old and old != new_disp and old in self._spins and new_disp in self._spins:
+            r_new = self._spins[new_disp].value()
+            converted = {}
+            for cur, spin in self._spins.items():
+                if cur == new_disp:
+                    converted[cur] = 0.0
+                elif cur == old:
+                    converted[cur] = 1.0 / r_new if r_new > 0 else 0.0
+                else:
+                    converted[cur] = spin.value() / r_new if r_new > 0 else 0.0
+            for cur, val in converted.items():
+                self._spins[cur].setValue(val)
+        self._rebuild_rates()
+
+    def _rebuild_rates(self, *_):
+        # takeRow keeps the row widgets alive (removeRow would delete them)
+        while self._rate_form.rowCount():
+            res = self._rate_form.takeRow(0)
+            if res.labelItem and res.labelItem.widget():
+                res.labelItem.widget().deleteLater()
+        disp = self._display.currentText()
+        for cur, row in self._rows.items():
+            if cur == disp:
+                row.hide()
+                continue
+            row.show()
+            lbl = QLabel(f"1 {cur} =")
+            lbl.setFont(_f(FS_MD, FW_SEMIBOLD))
+            lbl.setMinimumWidth(120)
+            self._rate_form.addRow(lbl, row)
+            self._units[cur].setText(disp)
+            self._spins[cur].setPlaceholderText(f"Rate in {disp}")
+
+    def _accept(self):
+        disp = self._display.currentText()
+        rates = {c: s.value() for c, s in self._spins.items() if c != disp}
+        if any(v <= 0 for v in rates.values()):
+            self._err.setText("Enter a rate greater than zero for every currency.")
+            return
+        self._result = {"display": disp, "rates": rates}
+        self.accept()
+
+    def result_settings(self) -> dict:
+        return self._result
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -293,8 +473,9 @@ class _HeroCardsSection(QWidget):
     The lowest-cost project receives a green 'Lowest cost' badge alongside its pill.
     """
 
-    def __init__(self, pids, names, summaries, caches, currency, parent=None):
+    def __init__(self, pids, names, summaries, caches, currency, originals=None, parent=None):
         super().__init__(parent)
+        self._originals = originals or {}
         self._build(pids, names, summaries, caches, currency)
 
     def _build(self, pids, names, summaries, caches, currency):
@@ -352,6 +533,14 @@ class _HeroCardsSection(QWidget):
             val_lbl.setFont(_f(FS_DISP, FW_BOLD))
             val_lbl.setStyleSheet(f"color: {get_token('text')}; background: transparent;")
             card_v.addWidget(val_lbl)
+
+            # Converted projects: show the original amount and rate
+            orig = self._originals.get(pid)
+            if orig:
+                orig_lbl = QLabel(orig)
+                orig_lbl.setFont(_f(FS_SM, FW_NORMAL))
+                orig_lbl.setStyleSheet(f"color: {get_token('text_secondary')}; background: transparent;")
+                card_v.addWidget(orig_lbl)
 
             # Line 3 — "✓ Lowest cost" badge for the winning project
             if is_best:
@@ -864,8 +1053,12 @@ class _ConsolidatedTable(QWidget):
     Non-best values show a '+X%' delta label.
     """
 
-    def __init__(self, pids, names, summaries, caches, currency, parent=None):
+    def __init__(self, pids, names, summaries, caches, currency, note="", origin=None, parent=None):
         super().__init__(parent)
+        self._note, self._origin = note, origin or {}
+        self._pids, self._names, self._currency = pids, names, currency
+        self._baseline = None          # None → compare vs lowest in each row
+        self._value_rows = []
         self._build(pids, names, summaries, caches, currency)
 
     def _build(self, pids, names, summaries, caches, currency):
@@ -899,6 +1092,7 @@ class _ConsolidatedTable(QWidget):
         n_rows = len(all_rows)
 
         table = QTableWidget(n_rows, n_cols + 1)
+        self._table = table
         attach_table_context_menu(table, title="Consolidated Comparison Table", default_filename="consolidated_comparison.svg")
 
         export_btn = create_export_button(table, title="Consolidated Comparison Table", default_filename="consolidated_comparison.svg")
@@ -909,6 +1103,31 @@ class _ConsolidatedTable(QWidget):
             "option per metric is immediate.",
             action_widget=export_btn,
         ))
+        root.addWidget(_currency_note_label(self._note))
+
+        if n_cols > 1:
+            sel_row = QHBoxLayout()
+            sel_row.setContentsMargins(0, 0, 0, 0)
+            sel_row.setSpacing(SP3)
+            sel_lbl = QLabel("Compare against")
+            sel_lbl.setFont(_f(FS_MD, FW_SEMIBOLD))
+            sel_lbl.setStyleSheet(f"color: {get_token('text')};")
+            sel_row.addWidget(sel_lbl)
+            self._combo = QComboBox()
+            self._combo.setFont(_f(FS_MD, FW_NORMAL))
+            self._combo.setFixedHeight(BTN_MD)
+            self._combo.setMinimumWidth(240)
+            self._combo.setMaximumWidth(380)
+            self._combo.setSizeAdjustPolicy(QComboBox.AdjustToContents)
+            self._combo.setCursor(Qt.PointingHandCursor)
+            self._combo.addItem("Lowest in each row", None)
+            for pid, nm in zip(pids, names):
+                self._combo.addItem(nm, pid)
+            self._combo.currentIndexChanged.connect(self._on_baseline_changed)
+            sel_row.addWidget(self._combo)
+            sel_row.addStretch()
+            root.addLayout(sel_row)
+
         table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         table.setSelectionMode(QAbstractItemView.NoSelection)
         table.setFocusPolicy(Qt.NoFocus)
@@ -1010,24 +1229,51 @@ class _ConsolidatedTable(QWidget):
                 if numeric:
                     best_pid = min(numeric, key=numeric.get)
 
+            self._value_rows.append((row_idx, values, is_cost, is_total, row_bg, best_pid))
+
+        root.addWidget(table)
+        self._caption = QLabel("")
+        self._caption.setFont(_f(FS_SM, FW_NORMAL))
+        self._caption.setWordWrap(True)
+        self._caption.setStyleSheet(f"color: {get_token('text_secondary')};")
+        root.addWidget(self._caption)
+        self._apply_baseline()
+
+    def _on_baseline_changed(self, idx: int):
+        self._baseline = self._combo.itemData(idx)
+        self._apply_baseline()
+
+    def _apply_baseline(self):
+        """(Re)write every value cell. % deltas are vs the chosen bridge, or vs the
+        lowest value in each row when no bridge is chosen."""
+        table, pids, currency = self._table, self._pids, self._currency
+        base = self._baseline
+        for ci, pid in enumerate(pids):
+            title = self._names[ci]
+            if pid in self._origin:
+                title += f"\n({self._origin[pid]} → {currency}, converted)"
+            else:
+                title += f"\n({currency})"
+            if pid == base:
+                title += "\n(baseline)"
+            table.setHorizontalHeaderItem(ci + 1, QTableWidgetItem(title))
+
+        for row_idx, values, is_cost, is_total, row_bg, best_pid in self._value_rows:
+            ref_pid = base if base else best_pid
+            ref_val = values.get(ref_pid, 0.0) if ref_pid else 0.0
             for ci, pid in enumerate(pids):
-                val      = values[pid]
-                is_best  = (pid == best_pid)
-                best_val = values.get(best_pid, 0.0) if best_pid else 0.0
-
-                # Use standard comma currency formatter with 2 decimals
+                val = values[pid]
                 cell_text = fmt_currency(val, currency, decimals=2, style="comma")
-
-                if is_cost and best_pid and pid != best_pid and best_val > 0:
-                    delta = ((val - best_val) / best_val) * 100
-                    sign  = "+" if delta >= 0 else ""
-                    cell_text = f"{cell_text}  ({sign}{delta:.0f}%)"
+                if is_cost and ref_pid and pid != ref_pid and ref_val > 0:
+                    delta = (val - ref_val) / ref_val * 100
+                    sign = "+" if delta >= 0 else ""
+                    cell_text = f"{cell_text}  ({sign}{delta:.1f}%)"
 
                 item = QTableWidgetItem(cell_text)
                 item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
                 item.setFont(_f(FS_MD, FW_BOLD if is_total else FW_NORMAL))
 
-                if is_best and is_cost:
+                if pid == best_pid and is_cost:
                     item.setForeground(QColor(get_token("success")))
                     _sc = QColor(get_token("success"))
                     _sc.setAlpha(38)   # ≈ 15 % opacity — visible tint without overpowering
@@ -1036,9 +1282,27 @@ class _ConsolidatedTable(QWidget):
                     item.setForeground(QColor(get_token("text")))
                     item.setBackground(QColor(row_bg if row_bg != "transparent" else get_token("base")))
 
+                if is_cost and len(pids) > 2:
+                    tips = []
+                    for oc, other in enumerate(pids):
+                        if other != pid and values[other] > 0:
+                            d = (val - values[other]) / values[other] * 100
+                            tips.append(f"vs {self._names[oc]}: {'+' if d >= 0 else ''}{d:.1f}%")
+                    if tips:
+                        item.setToolTip("\n".join(tips))
+
                 table.setItem(row_idx, ci + 1, item)
 
-        root.addWidget(table)
+        if base:
+            self._caption.setText(
+                f"Percentages show the difference vs {self._names[pids.index(base)]}. "
+                "Green marks the lowest value in each row."
+            )
+        else:
+            self._caption.setText(
+                "Percentages show the difference vs the lowest value in each row "
+                "(highlighted in green). Choose a bridge above to compare everything against it."
+            )
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -1207,11 +1471,14 @@ class _DetailedBreakdownSection(QWidget):
     - Cols 2+: Comparison projects using diverging heat map instead of bars
     """
 
-    def __init__(self, pids, names, results, currency, parent=None):
+    def __init__(self, pids, names, results, currency, rates=None, note="", origin=None, parent=None):
         super().__init__(parent)
+        self._rates = rates or {}
+        self._note, self._origin = note, origin or {}
         self._build(pids, names, results, currency)
 
     def _build(self, pids, names, results, currency):
+        rates = self._rates
         root = QVBoxLayout(self)
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(SP3)
@@ -1252,8 +1519,8 @@ class _DetailedBreakdownSection(QWidget):
                 for cat, key, lbl, is_credit in recon_rows:
                     pid_vals = {}
                     for pid in pids:
-                        raw = _get(results.get(pid, {}), "reconstruction", cat, key)
-                        pid_vals[pid] = -_safe_float(raw) if is_credit else _safe_float(raw)
+                        raw = _safe_float(_get(results.get(pid, {}), "reconstruction", cat, key)) * rates.get(pid, 1.0)
+                        pid_vals[pid] = -raw if is_credit else raw
                     if all(abs(v) < 0.01 for v in pid_vals.values()):
                         continue
                     stage_items.append((lbl, pid_vals, is_credit, cat))
@@ -1264,8 +1531,8 @@ class _DetailedBreakdownSection(QWidget):
             for cat, key, lbl, is_credit in items_for_stage:
                 pid_vals = {}
                 for pid in pids:
-                    raw = _get(results.get(pid, {}), sk, cat, key)
-                    pid_vals[pid] = -_safe_float(raw) if is_credit else _safe_float(raw)
+                    raw = _safe_float(_get(results.get(pid, {}), sk, cat, key)) * rates.get(pid, 1.0)
+                    pid_vals[pid] = -raw if is_credit else raw
                 if all(abs(v) < 0.01 for v in pid_vals.values()):
                     continue
                 stage_items.append((lbl, pid_vals, is_credit, cat))
@@ -1320,6 +1587,7 @@ class _DetailedBreakdownSection(QWidget):
             "heat map — green indicates credits/savings, while gold to purple indicates increasing costs.",
             action_widget=export_btn,
         ))
+        root.addWidget(_currency_note_label(self._note))
         root.addLayout(leg_row)
         table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         table.setSelectionMode(QAbstractItemView.NoSelection)
@@ -1364,6 +1632,10 @@ class _DetailedBreakdownSection(QWidget):
         table.setHorizontalHeaderItem(0, QTableWidgetItem("Stage"))
         table.setHorizontalHeaderItem(1, QTableWidgetItem("Cost Item"))
         for ci, name in enumerate(names):
+            if pids[ci] in self._origin:
+                name += f"\n({self._origin[pids[ci]]} → {currency}, converted)"
+            else:
+                name += f"\n({currency})"
             table.setHorizontalHeaderItem(ci + 2, QTableWidgetItem(name))
 
         table.horizontalHeader().setVisible(True)
@@ -1479,7 +1751,7 @@ class _DetailLegend(QWidget):
 
         lbl_profit = QLabel("◄ (Profit / Savings)")
         lbl_profit.setFont(_f(FS_SM, FW_SEMIBOLD))
-        lbl_profit.setStyleSheet(f"color: {_green_hex};")
+        lbl_profit.setStyleSheet(f"color: {get_token('text')};")
         row.addWidget(lbl_profit)
 
         _purple_hex = "#{:02x}{:02x}{:02x}".format(*_WARM_COST_STOPS[-1][1])
@@ -1503,12 +1775,12 @@ class _DetailLegend(QWidget):
         # lbl_cost = QLabel("Gold ➔ Orange ➔ Red ➔ Purple (Peak) ►")
         lbl_cost = QLabel("(Peak) ►")
         lbl_cost.setFont(_f(FS_SM, FW_SEMIBOLD))
-        lbl_cost.setStyleSheet(f"color: {_purple_hex};")
+        lbl_cost.setStyleSheet(f"color: {get_token('text')};")
         row.addWidget(lbl_cost)
 
         zero_lbl = QLabel("(White = 0)")
         zero_lbl.setFont(_f(FS_SM, FW_NORMAL))
-        zero_lbl.setStyleSheet(f"color: {_sec_text};")
+        zero_lbl.setStyleSheet(f"color: {get_token('text')};")
         row.addWidget(zero_lbl)
 
         row.addStretch()
@@ -1536,8 +1808,11 @@ class ComparisonResultWindow(QWidget):
     Runs workers, shows full redesigned comparison report.
     """
 
+    # Emitted with the new settings dict whenever the user confirms currency conversion.
+    currency_settings_changed = Signal(dict)
+
     def __init__(self, pids: list, names: list, caches: dict,
-                 override_ap: int, parent=None):
+                 override_ap: int, parent=None, currency_settings=None):
         super().__init__(parent, Qt.Window)
         label = "  ·  ".join(sorted(names))
         self.setWindowTitle(f"Bridge Comparison — Life Cycle Cost")
@@ -1552,6 +1827,10 @@ class ComparisonResultWindow(QWidget):
         self._pending:  set  = set()
         self._workers:  dict = {}
         self._currency = caches[pids[0]].get("currency", "") if pids else ""
+        # Conversion settings: {"display": "INR", "rates": {"USD": 83.2}} — only
+        # supplied when reopened from history; otherwise asked when currencies differ.
+        self._currency_settings = currency_settings
+        self._prompted = False
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(0, 0, 0, 0)
@@ -1701,6 +1980,40 @@ class ComparisonResultWindow(QWidget):
 
         summaries = {p: compute_all_summaries(self._results[p]) for p in pids}
 
+        # ── Currency conversion (only when projects use different currencies) ──
+        proj_cur   = {p: self._caches[p].get("currency", "") for p in pids}
+        currencies = {c for c in proj_cur.values() if c}
+        rates      = {p: 1.0 for p in pids}
+        originals  = {}
+        currency   = self._currency
+        mixed      = len(currencies) > 1
+
+        if mixed:
+            if not _settings_valid(self._currency_settings, currencies):
+                self._currency_settings = None
+                self._show_currency_needed(sorted(currencies))
+                return
+            cs       = self._currency_settings
+            currency = cs["display"]
+            for p in pids:
+                c = proj_cur[p]
+                if c and c != currency:
+                    rates[p] = float(cs["rates"][c])
+                    total = sum(summaries[p]["stagewise"].values())
+                    originals[p] = (f"converted from {c} {_fmt_million(total)} "
+                                    f"@ 1 {c} = {rates[p]:g} {currency}")
+            summaries = {p: _scale_numbers(s, rates[p]) for p, s in summaries.items()}
+        elif currencies:
+            currency = next(iter(currencies))
+
+        origin = {p: proj_cur[p] for p in originals}
+        currency_note = f"All values are in {currency}."
+        if origin:
+            currency_note += " Converted: " + "; ".join(
+                f"{names[pids.index(p)]} from {proj_cur[p]} (1 {proj_cur[p]} = {rates[p]:g} {currency})"
+                for p in origin
+            ) + "."
+
         # ── Page Header ───────────────────────────────────────────────────────
         hdr_row = QHBoxLayout()
         hdr_row.setContentsMargins(0, 0, 0, 0)
@@ -1710,6 +2023,15 @@ class ComparisonResultWindow(QWidget):
         title.setStyleSheet(f"color: {get_token('text')};")
         hdr_row.addWidget(title)
         hdr_row.addStretch()
+
+        if mixed:
+            cur_btn = QPushButton("Currency settings")
+            cur_btn.setFixedHeight(BTN_MD)
+            cur_btn.setStyleSheet(btn_ghost())
+            cur_btn.setFont(_f(FS_MD, FW_SEMIBOLD))
+            cur_btn.setCursor(Qt.PointingHandCursor)
+            cur_btn.clicked.connect(lambda: self._prompt_currency(sorted(currencies)))
+            hdr_row.addWidget(cur_btn)
 
         pdf_btn = QPushButton("Generate PDF Report")
         pdf_btn.setFixedHeight(BTN_MD)
@@ -1724,7 +2046,12 @@ class ComparisonResultWindow(QWidget):
 
         # ── Metadata breadcrumb strip (H1) ────────────────────────────────────
         # "ProjectA  ·  ProjectB  ·  INR"  — names already carry AP info
-        _meta_text = "  ·  ".join(names) + "  ·  " + self._currency
+        _meta_text = "  ·  ".join(names) + "  ·  " + currency
+        if originals:
+            _meta_text += "  ·  Rates: " + ", ".join(
+                f"1 {c} = {self._currency_settings['rates'][c]:g} {currency}"
+                for c in sorted(self._currency_settings["rates"]) if c != currency
+            )
         meta_lbl = QLabel(_meta_text)
         meta_lbl.setFont(_f(FS_SM, FW_NORMAL))
         meta_lbl.setWordWrap(True)
@@ -1735,34 +2062,69 @@ class ComparisonResultWindow(QWidget):
 
         # ── Section 1: Hero KPI cards ──────────────────────────────────────
         self._body_layout.addWidget(
-            _HeroCardsSection(pids, names, summaries, caches_sub, self._currency)
+            _HeroCardsSection(pids, names, summaries, caches_sub, currency, originals)
         )
         self._body_layout.addWidget(_make_divider())
 
         # ── Section 2: Pillar chart ────────────────────────────────────────
         self._body_layout.addWidget(
-            _PillarChartSection(pids, names, summaries, self._currency)
+            _PillarChartSection(pids, names, summaries, currency)
         )
         self._body_layout.addWidget(_make_divider())
 
         # ── Section 3: Stage chart ─────────────────────────────────────────
         self._body_layout.addWidget(
-            _StageChartSection(pids, names, summaries, self._currency)
+            _StageChartSection(pids, names, summaries, currency)
         )
         self._body_layout.addWidget(_make_divider())
 
         # ── Section 4: Consolidated table ─────────────────────────────────
         self._body_layout.addWidget(
-            _ConsolidatedTable(pids, names, summaries, caches_sub, self._currency)
+            _ConsolidatedTable(pids, names, summaries, caches_sub, currency, currency_note, origin)
         )
         self._body_layout.addWidget(_make_divider())
 
         # ── Section 5: Detailed breakdown ─────────────────────────────────
         self._body_layout.addWidget(
-            _DetailedBreakdownSection(pids, names, self._results, self._currency)
+            _DetailedBreakdownSection(pids, names, self._results, currency, rates, currency_note, origin)
         )
 
         self._body_layout.addStretch()
+
+    # ── currency conversion prompt ────────────────────────────────────────────
+
+    def _prompt_currency(self, currencies: list) -> bool:
+        dlg = _CurrencyDialog(currencies, self._currency_settings, self)
+        if dlg.exec() != QDialog.Accepted:
+            return False
+        self._currency_settings = dlg.result_settings()
+        self.currency_settings_changed.emit(self._currency_settings)
+        QTimer.singleShot(0, self._show_results)
+        return True
+
+    def _show_currency_needed(self, currencies: list):
+        """Mixed currencies and no valid conversion yet: explain and offer the dialog."""
+        lbl = QLabel(
+            "These projects use different currencies "
+            f"({', '.join(currencies)}), so their costs cannot be compared directly."
+        )
+        lbl.setFont(_f(FS_MD, FW_MEDIUM))
+        lbl.setWordWrap(True)
+        lbl.setStyleSheet(f"color: {get_token('text')};")
+        self._body_layout.addWidget(lbl)
+
+        btn = QPushButton("Set currency conversion")
+        btn.setFixedHeight(BTN_MD)
+        btn.setStyleSheet(btn_primary())
+        btn.setFont(_f(FS_MD, FW_SEMIBOLD))
+        btn.setCursor(Qt.PointingHandCursor)
+        btn.clicked.connect(lambda: self._prompt_currency(currencies))
+        self._body_layout.addWidget(btn, 0, Qt.AlignLeft)
+        self._body_layout.addStretch()
+
+        if not self._prompted:      # ask automatically once; theme rebuilds don't re-ask
+            self._prompted = True
+            QTimer.singleShot(0, lambda: self._prompt_currency(currencies))
 
 
 # ──────────────────────────────────────────────────────────────────────────────

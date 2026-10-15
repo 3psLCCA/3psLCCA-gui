@@ -1058,7 +1058,11 @@ class HomePage(QWidget):
         win.show()
 
         label = "  ·  ".join(sorted(name_list))
-        comp_sm.add_comparison(label, pid_list, name_list, 0)
+        hist_id = comp_sm.add_comparison(label, pid_list, name_list, 0)
+        # A conversion entered in this window is saved on its history entry only
+        win.currency_settings_changed.connect(
+            lambda s, hid=hist_id: comp_sm.set_comparison_currency(hid, s)
+        )
         self._refresh_history_count()
         if self._home_content_stack.currentIndex() == 1:
             self._history_tab.refresh()

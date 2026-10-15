@@ -671,7 +671,13 @@ def _do_rerun(entry: dict, manager=None, picker_panel=None, parent_widget=None):
     win = ComparisonResultWindow(
         pids=avail_pids, names=avail_names,
         caches=caches, override_ap=ap,
+        currency_settings=entry.get("currency_settings"),
     )
+    if entry.get("id") is not None:
+        hid = entry["id"]
+        win.currency_settings_changed.connect(
+            lambda s, hid=hid: sm.set_comparison_currency(hid, s)
+        )
     win.show()
     if picker_panel is not None:
         picker_panel._open_windows[project_set] = win
