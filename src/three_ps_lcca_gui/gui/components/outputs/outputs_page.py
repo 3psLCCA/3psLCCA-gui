@@ -19,8 +19,9 @@ from PySide6.QtWidgets import (
     QSizePolicy,
     QVBoxLayout,
     QWidget,
+    QGraphicsDropShadowEffect,
 )
-from PySide6.QtGui import QFont
+from PySide6.QtGui import QFont, QColor
 from PySide6.QtCore import Qt, QSize, QThread, QTimer, Signal
 
 from three_ps_lcca_gui.gui.themes import get_token, theme_manager
@@ -28,7 +29,7 @@ try:
     from three_ps_lcca_gui.gui._CONFIG import COMPARISON_MODE
 except ImportError:
     COMPARISON_MODE = True
-from three_ps_lcca_gui.gui.styles import font as _f, btn_primary, btn_ghost
+from three_ps_lcca_gui.gui.styles import font as _f, btn_primary, btn_outline, btn_ghost
 from three_ps_lcca_gui.gui.theme import (
     SP1,
     SP2,
@@ -36,16 +37,13 @@ from three_ps_lcca_gui.gui.theme import (
     SP4,
     SP5,
     SP6,
-    RADIUS_LG,
+    RADIUS_SM,
     RADIUS_MD,
-    FS_XS,
-    FS_SM,
-    FS_BASE,
-    FS_MD,
-    FS_LG,
-    FS_SUBHEAD,
-    FS_XL,
-    FS_DISP,
+    RADIUS_LG,
+    FS_SM,       # 8pt  - Micro / Captions / Badges / Currency
+    FS_MD,       # 10pt - Body copy / Buttons / Hints
+    FS_SECTION,  # 14pt - Section headings / Breakdown values
+    FS_DISP,     # 18pt - Page title / Hero KPI value
     FW_NORMAL,
     FW_MEDIUM,
     FW_SEMIBOLD,
@@ -74,6 +72,7 @@ from .helper_functions.lifecycle_summary import compute_all_summaries
 from .data_preparer import DataPreparer
 from .report_section_dialog import ReportSectionDialog
 from .calc_logic import _LCCAWorker
+from .table_export import attach_table_context_menu, create_export_button
 
 CHUNK = "outputs_data"
 CHUNK_COMPARISON = "comparison_cache"
@@ -104,10 +103,75 @@ def _divider() -> QFrame:
 def _section_heading(title: str) -> QLabel:
     lbl = QLabel(title)
     lbl.setWordWrap(True)
-    lbl.setContentsMargins(0, SP6, 0, SP1)
-    lbl.setFont(_f(FS_SUBHEAD, FW_BOLD))
+    lbl.setContentsMargins(0, SP6, 0, SP2)
+    lbl.setFont(_f(FS_SECTION, FW_SEMIBOLD))
     lbl.setStyleSheet(f"color: {get_token('text')};")
     return lbl
+
+
+def _section_header_with_button(title: str, action_widget: QWidget) -> QWidget:
+    """Header row with section title on left and an action widget on right."""
+    w = QWidget()
+    w.setStyleSheet("background: transparent; border: none;")
+    h = QHBoxLayout(w)
+    h.setContentsMargins(0, SP6, 0, SP2)
+    h.setSpacing(SP3)
+
+    lbl = QLabel(title)
+    lbl.setFont(_f(FS_SECTION, FW_SEMIBOLD))
+    lbl.setStyleSheet(f"color: {get_token('text')}; background: transparent; border: none;")
+    h.addWidget(lbl)
+    h.addStretch()
+    h.addWidget(action_widget)
+    return w
+
+
+class LCCDetailsSection(QWidget):
+    """Wraps LCCDetailsTable with a header and export action button."""
+
+    def __init__(self, results: dict, currency: str, parent=None):
+        super().__init__(parent)
+        self.setStyleSheet(f"{type(self).__name__} {{ background: transparent; border: none; }}")
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(0)
+
+        self.table = LCCDetailsTable(results, currency=currency)
+        attach_table_context_menu(self.table, title="Consolidated Stage Summary", default_filename="stage_cost_summary.svg")
+        btn = create_export_button(self.table, title="Consolidated Stage Summary", default_filename="stage_cost_summary.svg")
+        hdr = _section_header_with_button("Consolidated Stage Summary", btn)
+        lay.addWidget(hdr)
+
+        desc = _section_description(
+            "A consolidated presentation of costs across the three pillars (economic, social, and environmental) "
+            "for each life cycle stage. This table facilitates the identification of phases that bear the most substantial burden."
+        )
+        lay.addWidget(desc)
+        lay.addWidget(self.table)
+
+
+class LCCBreakdownSection(QWidget):
+    """Wraps LCCBreakdownTable with an itemized header and export action button."""
+
+    def __init__(self, results: dict, currency: str, parent=None):
+        super().__init__(parent)
+        self.setStyleSheet(f"{type(self).__name__} {{ background: transparent; border: none; }}")
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(0)
+
+        self.table = LCCBreakdownTable(results, currency=currency)
+        attach_table_context_menu(self.table, title="Detailed Cost Breakdown", default_filename="detailed_cost_breakdown.svg")
+        btn = create_export_button(self.table, title="Detailed Cost Breakdown", default_filename="detailed_cost_breakdown.svg")
+        hdr = _section_header_with_button("Itemized Cost Breakdown", btn)
+        lay.addWidget(hdr)
+
+        desc = _section_description(
+            "An itemised schedule of each individual cost component across all stages and pillars. "
+            "All values are discounted to the year of assessment."
+        )
+        lay.addWidget(desc)
+        lay.addWidget(self.table)
 
 
 def _section_description(text: str) -> QLabel:
@@ -115,7 +179,7 @@ def _section_description(text: str) -> QLabel:
     lbl.setWordWrap(True)
     lbl.setFont(_f(FS_MD))
     lbl.setStyleSheet(
-        f"color: {get_token('text_secondary')}; margin-bottom: {SP4}px;"
+        f"color: {get_token('text_secondary')}; line-height: 1.4; margin-bottom: {SP4}px;"
     )
     return lbl
 
@@ -170,7 +234,7 @@ def _make_issue_card(page_name: str, issues: list, severity: str, navigate_cb) -
         row.addWidget(dot_wrapper, 0, Qt.AlignTop)
 
         txt_lbl = QLabel(msg)
-        txt_lbl.setFont(_f(FS_BASE))
+        txt_lbl.setFont(_f(FS_MD))
         txt_lbl.setStyleSheet(f"color: {get_token('text')}; background: transparent;")
         txt_lbl.setWordWrap(True)
         row.addWidget(txt_lbl, 1)
@@ -194,7 +258,7 @@ def _make_issue_card(page_name: str, issues: list, severity: str, navigate_cb) -
         go_btn.setStyleSheet(
             f"QPushButton {{ border: 1px solid {get_token('warning')}; border-radius: {RADIUS_MD}px;"
             f"  padding: 0 16px; background: transparent; color: {get_token('warning')};"
-            f"  font-weight: {get_token('weight-semibold')}; }}"
+            f"  font-weight: {FW_SEMIBOLD}; }}"
             f"QPushButton:hover {{ background: transparent; color: {get_token('warning')}; border-width: 1.5px; }}"
         )
     go_btn.setCursor(Qt.PointingHandCursor)
@@ -218,17 +282,22 @@ class ResponsiveTotalCard(QFrame):
         self.setObjectName("kpiCard")
         self.setStyleSheet(
             f"#kpiCard {{"
-            f"  background-color: {get_token('surface')};"
+            f"  background-color: {get_token('base')};"
             f"  border: 1px solid {get_token('surface_mid')};"
-            f"  border-top: 3px solid {get_token('primary')};"
-            f"  border-radius: {RADIUS_LG}px;"
+            f"  border-left: 4px solid {get_token('primary')};"
+            f"  border-radius: {RADIUS_MD}px;"
             f"}}"
         )
-        self.setMinimumHeight(110)
+        shadow = QGraphicsDropShadowEffect(self)
+        shadow.setBlurRadius(8)
+        shadow.setColor(QColor(0, 0, 0, 16))
+        shadow.setOffset(0, 2)
+        self.setGraphicsEffect(shadow)
+        self.setMinimumHeight(104)
         
         self.main_layout = QGridLayout(self)
-        self.main_layout.setContentsMargins(SP5, SP4, SP5, SP4)
-        self.main_layout.setSpacing(SP4)
+        self.main_layout.setContentsMargins(SP6, SP4, SP6, SP4)
+        self.main_layout.setSpacing(SP5)
 
         # LEFT SIDE: Total
         self.left_widget = QWidget()
@@ -237,21 +306,33 @@ class ResponsiveTotalCard(QFrame):
         left_v.setContentsMargins(0, 0, 0, 0)
         left_v.setSpacing(0)
         
-        title_lbl = QLabel("Total Life Cycle Cost")
-        title_lbl.setFont(_f(FS_SM, FW_MEDIUM))
-        title_lbl.setStyleSheet(f"color: {get_token('text_secondary')}; letter-spacing: 1px; border: none; background: transparent;")
-        left_v.addWidget(title_lbl)
+        r1 = QHBoxLayout()
+        r1.setContentsMargins(0, 0, 0, 0)
+        r1.setSpacing(SP2)
+        dot = QLabel()
+        dot.setFixedSize(8, 8)
+        dot.setStyleSheet(f"background-color: {get_token('primary')}; border-radius: 4px; border: none;")
+        r1.addWidget(dot)
+        title_lbl = QLabel("<b>Total Life Cycle Cost</b>")
+        title_lbl.setFont(_f(FS_MD, FW_BOLD))
+        title_lbl.setStyleSheet(f"color: {get_token('text_secondary')}; border: none; background: transparent;")
+        r1.addWidget(title_lbl)
+        r1.addStretch()
+        left_v.addLayout(r1)
         left_v.addSpacing(SP2)
         
         val_str = fmt_currency(total_value, currency, decimals=0, style="short")
         val_lbl = QLabel(val_str)
         val_lbl.setFont(_f(FS_DISP, FW_BOLD))
-        val_lbl.setStyleSheet(f"color: {get_token('primary')}; border: none; background: transparent;")
+        val_lbl.setStyleSheet(f"color: {get_token('text')}; border: none; background: transparent;")
         left_v.addWidget(val_lbl)
-        
+
         curr_lbl = QLabel(currency)
-        curr_lbl.setFont(_f(FS_XS, FW_NORMAL))
-        curr_lbl.setStyleSheet(f"color: {get_token('text_disabled')}; border: none; letter-spacing: 0.5px; background: transparent;")
+        curr_lbl.setFont(_f(FS_SM, FW_NORMAL))
+        curr_lbl.setStyleSheet(
+            f"color: {get_token('text_secondary')}; border: none; "
+            f"letter-spacing: 0.5px; background: transparent;"
+        )
         left_v.addWidget(curr_lbl)
         left_v.addStretch()
 
@@ -267,18 +348,19 @@ class ResponsiveTotalCard(QFrame):
         self.right_widget.setStyleSheet("background: transparent; border: none;")
         right_v = QVBoxLayout(self.right_widget)
         right_v.setContentsMargins(0, 0, 0, 0)
-        right_v.setSpacing(SP2)
+        right_v.setSpacing(0)
         
         lorem_title = QLabel("About This Analysis")
         lorem_title.setFont(_f(FS_SM, FW_MEDIUM))
         lorem_title.setStyleSheet(f"color: {get_token('text_secondary')}; letter-spacing: 1px; border: none; background: transparent;")
         right_v.addWidget(lorem_title)
+        right_v.addSpacing(SP1 + 2)
         
         lorem_lbl = QLabel(_LOREM)
         lorem_lbl.setWordWrap(True)
         lorem_lbl.setAlignment(Qt.AlignJustify)
-        lorem_lbl.setFont(_f(FS_BASE))
-        lorem_lbl.setStyleSheet(f"color: {get_token('text')}; border: none; background: transparent;")
+        lorem_lbl.setFont(_f(FS_MD))
+        lorem_lbl.setStyleSheet(f"color: {get_token('text_secondary')}; line-height: 1.4; border: none; background: transparent;")
         right_v.addWidget(lorem_lbl)
         right_v.addStretch()
 
@@ -350,12 +432,12 @@ class LCCSummaryCards(QWidget):
         grand_total = sum(stagewise.values())
 
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(0, SP3, 0, SP5)
-        outer.setSpacing(SP3)
+        outer.setContentsMargins(0, SP3, 0, SP6)
+        outer.setSpacing(SP4)
 
         # ── Row 1: Grand Total + description ─────────────────────────────
         row1 = QHBoxLayout()
-        row1.setSpacing(SP3)
+        row1.setSpacing(SP4)
         row1.addWidget(ResponsiveTotalCard(
             grand_total, self._results, self._currency,
             analysis_period=self._analysis_period,
@@ -365,35 +447,36 @@ class LCCSummaryCards(QWidget):
 
         # ── Row 2: Pillar totals ──────────────────────────────────────────
         row2 = QHBoxLayout()
-        row2.setSpacing(SP3)
+        row2.setSpacing(SP4)
         for title, key, token in [
             ("Economic",      "eco",    "eco"),
             ("Environmental", "env",    "env"),
             ("Social",        "social", "soc"),
         ]:
-            row2.addWidget(self._card(title, pt.get(key, 0), get_token(token)))
+            row2.addWidget(self._card(title, pt.get(key, 0), get_token(token), grand_total=grand_total))
         outer.addLayout(row2)
 
         # ── Row 3: Stage totals ───────────────────────────────────────────
         row3 = QHBoxLayout()
-        row3.setSpacing(SP3)
+        row3.setSpacing(SP4)
         for title, key, token in [
             ("Initial",     "initial",     "init"),
             ("Use",         "use",         "use"),
             ("End-of-Life", "end_of_life", "end"),
         ]:
-            row3.addWidget(self._card(title, stagewise.get(key, 0), get_token(token)))
+            row3.addWidget(self._card(title, stagewise.get(key, 0), get_token(token), grand_total=grand_total))
         outer.addLayout(row3)
 
-    def _card(self, title: str, value: float, accent: str, large: bool = False) -> QFrame:
+    def _card(self, title: str, value: float, accent: str, grand_total: float = 0.0) -> QFrame:
         card = QFrame()
         card.setObjectName("kpiCard")
+        card.setGraphicsEffect(None)
         card.setStyleSheet(
             f"#kpiCard {{"
-            f"  background-color: {get_token('surface')};"
+            f"  background-color: {get_token('base')};"
             f"  border: 1px solid {get_token('surface_mid')};"
-            f"  border-top: 3px solid {accent};"
-            f"  border-radius: {RADIUS_LG}px;"
+            f"  border-left: 3px solid {accent};"
+            f"  border-radius: {RADIUS_SM}px;"
             f"}}"
         )
 
@@ -401,28 +484,49 @@ class LCCSummaryCards(QWidget):
         v.setContentsMargins(SP5, SP4, SP5, SP4)
         v.setSpacing(0)
 
+        # Row 1: Dot + Title (left) | Share % (right)
+        r1 = QHBoxLayout()
+        r1.setContentsMargins(0, 0, 0, 0)
+        r1.setSpacing(SP2)
+
+        dot = QLabel()
+        dot.setFixedSize(8, 8)
+        dot.setStyleSheet(f"background-color: {accent}; border-radius: 4px; border: none;")
+        r1.addWidget(dot)
+
         title_lbl = QLabel(title)
-        title_lbl.setFont(_f(FS_SM, FW_MEDIUM))
-        title_lbl.setStyleSheet(
-            f"color: {get_token('text_secondary')}; letter-spacing: 1px; border: none;"
-        )
-        v.addWidget(title_lbl)
+        title_lbl.setFont(_f(FS_MD, FW_MEDIUM))
+        title_lbl.setStyleSheet(f"color: {get_token('text_secondary')}; border: none; background: transparent;")
+        r1.addWidget(title_lbl)
+        r1.addStretch()
+
+        if grand_total > 0 and value > 0:
+            pct_val = (value / grand_total) * 100
+            pct_lbl = QLabel(f"{pct_val:.1f}%")
+            pct_lbl.setFont(_f(FS_SM, FW_MEDIUM))
+            pct_lbl.setStyleSheet(f"color: {get_token('text_secondary')}; border: none; background: transparent;")
+            r1.addWidget(pct_lbl)
+
+        v.addLayout(r1)
         v.addSpacing(SP2)
 
+        # Row 2: Value formatted at balanced 14pt (regular weight)
         val_str = fmt_currency(value, self._currency, decimals=0, style="short")
         val_lbl = QLabel(val_str)
-        val_lbl.setFont(_f(FS_DISP if large else FS_XL, FW_BOLD))
-        val_lbl.setStyleSheet(f"color: {accent}; border: none;")
+        val_lbl.setFont(_f(FS_SECTION, FW_NORMAL))
+        val_lbl.setStyleSheet(f"color: {get_token('text')}; border: none; background: transparent;")
         v.addWidget(val_lbl)
 
+        # Currency sub-label — small text below value
         curr_lbl = QLabel(self._currency)
-        curr_lbl.setFont(_f(FS_XS, FW_NORMAL))
+        curr_lbl.setFont(_f(FS_SM, FW_NORMAL))
         curr_lbl.setStyleSheet(
-            f"color: {get_token('text_disabled')}; border: none; letter-spacing: 0.5px;"
+            f"color: {get_token('text_secondary')}; border: none; "
+            f"letter-spacing: 0.5px; background: transparent;"
         )
         v.addWidget(curr_lbl)
 
-        card.setMinimumHeight(110 if large else 90)
+        card.setMinimumHeight(84)
         return card
 
 
@@ -473,14 +577,14 @@ class LCCIntroWidget(QWidget):
         fl.setSpacing(SP2)
 
         title = QLabel("About This Report")
-        title.setFont(_f(FS_LG, FW_BOLD))
+        title.setFont(_f(FS_MD, FW_SEMIBOLD))
         title.setStyleSheet(f"color: {get_token('text')}; border: none;")
         fl.addWidget(title)
 
         lbl = QLabel(body)
         lbl.setWordWrap(True)
         lbl.setTextFormat(Qt.RichText)
-        lbl.setFont(_f(FS_BASE))
+        lbl.setFont(_f(FS_MD))
         lbl.setStyleSheet(f"color: {get_token('text_secondary')}; border: none;")
         fl.addWidget(lbl)
 
@@ -503,6 +607,15 @@ class LCCInsightsWidget(QWidget):
         "danger": "danger",
         "success": "success",
         "text": "text_secondary",
+    }
+
+    # Text prefix paired with each severity colour — secondary cue for colour-blind users
+    _SEVERITY_PREFIX = {
+        "primary": "",
+        "warning": "⚠ ",
+        "danger": "⚡ ",
+        "success": "✓ ",
+        "text": "",
     }
 
     def __init__(self, results: dict, currency: str, parent=None):
@@ -531,6 +644,7 @@ class LCCInsightsWidget(QWidget):
         card_v.setSpacing(0)
 
         for i, (icon, color_token, html) in enumerate(findings):
+            html = self._SEVERITY_PREFIX.get(color_token, "") + html
             bullet_color = get_token(self._TOKEN_COLORS.get(color_token, "text_secondary"))
 
             if i > 0:
@@ -567,7 +681,7 @@ class LCCInsightsWidget(QWidget):
             lbl = QLabel(html)
             lbl.setWordWrap(True)
             lbl.setTextFormat(Qt.RichText)
-            lbl.setFont(_f(FS_BASE))
+            lbl.setFont(_f(FS_MD))
             lbl.setStyleSheet(f"color: {get_token('text')}; background: transparent;")
             row_h.addWidget(lbl, 1)
 
@@ -667,7 +781,7 @@ class LCCInsightsWidget(QWidget):
             mc_ratio = mat_c / veh_c
             carbon_note = (
                 f" The environmental impact of construction materials is "
-                f"<b>{mc_ratio:.0f}× higher</b> than the impact of vehicle detours during construction."
+                f"<b>{mc_ratio:.1f}×</b> higher than the impact of vehicle detours during construction."
             )
         findings.append((
             "●", "success",
@@ -722,6 +836,7 @@ class OutputsPage(ScrollableForm):
         self._currency = ""
         self._current_status = "idle"
         self._status_args: dict = {}
+        self.setStyleSheet(f"{type(self).__name__} {{ background-color: {get_token('window')}; }}")
         self._build_ui()
         theme_manager().theme_changed.connect(self._refresh_styles)
 
@@ -730,12 +845,53 @@ class OutputsPage(ScrollableForm):
     def _build_ui(self):
         f = self.form
 
+        # ── Permanent header row: title + action buttons ──────
+        self._hdr_row = QWidget()
+        self._hdr_row.setObjectName("resultsHeader")
+        self._hdr_row.setStyleSheet(
+            f"#resultsHeader {{"
+            f"  background-color: {get_token('window')};"
+            f"  border: none;"
+            f"}}"
+        )
+        _hdr_h = QHBoxLayout(self._hdr_row)
+        _hdr_h.setContentsMargins(0, SP1, 0, SP2)
+        _hdr_h.setSpacing(SP3)
+
         self._header = QLabel("Results")
         self._header.setFont(_f(FS_DISP, FW_BOLD))
-        self._header.setStyleSheet(
-            f"color: {get_token('text')}; margin-bottom: {SP2}px;"
-        )
-        f.addRow(self._header)
+        self._header.setStyleSheet(f"color: {get_token('text')}; border: none;")
+        _hdr_h.addWidget(self._header)
+        _hdr_h.addStretch()
+
+        if COMPARISON_MODE:
+            self._ctx_btn_compare = QPushButton("Add to Comparison ↗")
+            self._ctx_btn_compare.setFixedHeight(BTN_MD)
+            self._ctx_btn_compare.setFont(_f(FS_MD, FW_MEDIUM))
+            self._ctx_btn_compare.setStyleSheet(btn_outline())
+            self._ctx_btn_compare.setToolTip("Close project and add to the comparison workspace")
+            self._ctx_btn_compare.setCursor(Qt.PointingHandCursor)
+            self._ctx_btn_compare.setEnabled(False)
+            self._ctx_btn_compare.setVisible(False)
+            self._ctx_btn_compare.clicked.connect(self._on_compare_clicked)
+            _hdr_h.addWidget(self._ctx_btn_compare)
+
+        self._ctx_btn_pdf = QPushButton("Generate PDF Report")
+        self._ctx_btn_pdf.setFixedHeight(BTN_MD)
+        self._ctx_btn_pdf.setFont(_f(FS_MD, FW_MEDIUM))
+        self._ctx_btn_pdf.setStyleSheet(btn_primary())
+        self._ctx_btn_pdf.setCursor(Qt.PointingHandCursor)
+        self._ctx_btn_pdf.setEnabled(False)
+        self._ctx_btn_pdf.setVisible(False)
+        self._ctx_btn_pdf.clicked.connect(self._generate_pdf_report)
+        _hdr_h.addWidget(self._ctx_btn_pdf)
+
+        f.addRow(self._hdr_row)
+
+        self._context_bar = self._make_context_bar()
+        self._context_bar.setVisible(False)
+        f.addRow(self._context_bar)
+        self._update_context_bar()
 
         self.required_keys = build_form(self, OUTPUTS_FIELDS)
 
@@ -745,7 +901,7 @@ class OutputsPage(ScrollableForm):
 
         self.btn_calculate = QPushButton("Validate inputs")
         self.btn_calculate.setFixedHeight(BTN_LG)
-        self.btn_calculate.setFixedWidth(180)
+        self.btn_calculate.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
         self.btn_calculate.setFont(_f(FS_MD, FW_MEDIUM))
         self.btn_calculate.setStyleSheet(btn_primary())
         self.btn_calculate.clicked.connect(self.validate_requested.emit)
@@ -761,14 +917,110 @@ class OutputsPage(ScrollableForm):
 
         self._show_idle()
 
+
+    # ── Context breadcrumb bar ────────────────────────────────
+
+    def _make_context_bar(self) -> QWidget:
+        """Muted single-line context tag shown below the page title after analysis."""
+        bar = QWidget()
+        bar.setStyleSheet("background: transparent; border: none;")
+        v = QVBoxLayout(bar)
+        v.setContentsMargins(0, SP2, 0, 0)
+        v.setSpacing(0)
+
+        def _hr() -> QFrame:
+            line = QFrame()
+            line.setFrameShape(QFrame.HLine)
+            line.setFixedHeight(1)
+            line.setStyleSheet(
+                f"background-color: {get_token('surface_pressed')}; border: none;"
+            )
+            return line
+
+        v.addWidget(_hr())
+
+        inner = QWidget()
+        inner.setStyleSheet("background: transparent; border: none;")
+        h = QHBoxLayout(inner)
+        h.setContentsMargins(0, SP2, 0, SP2)
+        h.setSpacing(0)
+
+        self._context_label = QLabel()
+        self._context_label.setFont(_f(FS_SM, FW_MEDIUM))
+        self._context_label.setStyleSheet(
+            f"color: {get_token('text_secondary')}; background: transparent; "
+            f"border: none; letter-spacing: 0.5px;"
+        )
+        h.addWidget(self._context_label)
+        h.addStretch()
+        v.addWidget(inner)
+        return bar
+
+    def _update_context_bar(self):
+        """Show context label and action buttons only after analysis completes successfully."""
+        has_results = (
+            bool(getattr(self, "_has_results", False))
+            and getattr(self, "_current_status", "") == "calc_success"
+            and bool(self._currency)
+        )
+
+        # ── Show / hide and enable / disable header action buttons ────
+        self._ctx_btn_pdf.setVisible(has_results)
+        self._ctx_btn_pdf.setEnabled(has_results)
+        if hasattr(self, "_ctx_btn_compare"):
+            self._ctx_btn_compare.setVisible(has_results)
+            self._ctx_btn_compare.setEnabled(has_results)
+
+        if not has_results:
+            self._context_bar.setVisible(False)
+            return
+
+        # ── Populate context label ────────────────────────────
+        project_name = "—"
+        if self.controller:
+            project_name = (
+                getattr(self.controller, "active_display_name", None)
+                or getattr(self.controller, "active_project_id", None)
+                or "—"
+            )
+
+        ap = int(
+            getattr(self, "_last_all_data", {})
+            .get("bridge_data", {})
+            .get("analysis_period", 0)
+        )
+        ap_str = f"{ap}-year analysis" if ap else ""
+
+        parts = [p for p in (project_name, ap_str, self._currency) if p]
+        self._context_label.setText("  ·  ".join(parts))
+        self._context_label.setStyleSheet(
+            f"color: {get_token('text_secondary')}; background: transparent; "
+            f"border: none; letter-spacing: 0.5px;"
+        )
+        self._context_bar.setVisible(True)
+
+
     # ── Theme refresh ─────────────────────────────────────────
 
     def _refresh_styles(self):
+        self.setStyleSheet(f"{type(self).__name__} {{ background-color: {get_token('window')}; }}")
+        if hasattr(self, "_hdr_row"):
+            self._hdr_row.setStyleSheet(
+                f"#resultsHeader {{"
+                f"  background-color: {get_token('window')};"
+                f"  border: none;"
+                f"}}"
+            )
         self._header.setFont(_f(FS_DISP, FW_BOLD))
         self._header.setStyleSheet(
-            f"color: {get_token('text')}; margin-bottom: {SP2}px;"
+            f"color: {get_token('text')}; border: none; margin-bottom: 0px;"
         )
         self.btn_calculate.setStyleSheet(btn_primary())
+        if hasattr(self, "_ctx_btn_pdf"):
+            self._ctx_btn_pdf.setStyleSheet(btn_primary())
+        if hasattr(self, "_ctx_btn_compare"):
+            self._ctx_btn_compare.setStyleSheet(btn_outline())
+        self._update_context_bar()
         s = self._current_status
         if s == "idle":
             self._show_idle()
@@ -803,7 +1055,10 @@ class OutputsPage(ScrollableForm):
             ):
                 item = f.itemAt(row, role)
                 if item and item.widget():
-                    item.widget().setVisible(visible)
+                    w = item.widget()
+                    if w is self._context_bar:   # managed solely by _update_context_bar
+                        continue
+                    w.setVisible(visible)
 
     def _inline_banner(self, text: str, token: str) -> QWidget:
         """Status banner with a coloured left strip."""
@@ -822,7 +1077,7 @@ class OutputsPage(ScrollableForm):
         v = QVBoxLayout(inner)
         v.setContentsMargins(SP3, SP2, SP3, SP2)
         lbl = QLabel(text)
-        lbl.setFont(_f(FS_BASE, FW_MEDIUM))
+        lbl.setFont(_f(FS_MD, FW_MEDIUM))
         lbl.setStyleSheet(f"color: {get_token(token)}; background: transparent;")
         v.addWidget(lbl)
         h.addWidget(inner, 1)
@@ -833,8 +1088,10 @@ class OutputsPage(ScrollableForm):
 
     def _show_idle(self):
         self._current_status = "idle"
+        self._has_results = False
         self._clear_status()
         self._set_inputs_visible(True)
+        self._update_context_bar()
 
         card = QFrame()
         card.setObjectName("idleCard")
@@ -855,7 +1112,7 @@ class OutputsPage(ScrollableForm):
             "Press Validate to check all input pages before running the "
             "life-cycle cost calculation."
         )
-        hint.setFont(_f(FS_BASE))
+        hint.setFont(_f(FS_MD))
         hint.setWordWrap(True)
         hint.setStyleSheet(f"color: {get_token('text_secondary')}; background: transparent;")
         card_v.addWidget(hint)
@@ -866,8 +1123,10 @@ class OutputsPage(ScrollableForm):
 
     def _show_calculating(self):
         self._current_status = "calculating"
+        self._has_results = False
         self._clear_status()
         self.btn_calculate.setEnabled(False)
+        self._update_context_bar()
 
         container = QWidget()
         v = QVBoxLayout(container)
@@ -879,8 +1138,9 @@ class OutputsPage(ScrollableForm):
         h.setContentsMargins(0, 0, 0, 0)
         h.setSpacing(SP2)
 
-        status_lbl = QLabel("Running life-cycle cost analysis…")
+        status_lbl = QLabel("Running lifecycle cost analysis…")
         status_lbl.setFont(_f(FS_MD, FW_MEDIUM))
+        status_lbl.setStyleSheet(f"color: {get_token('text')}; background: transparent;")
         h.addWidget(status_lbl)
         h.addStretch()
 
@@ -933,16 +1193,21 @@ class OutputsPage(ScrollableForm):
             self._calc_worker.cancel()
         self.btn_calculate.setEnabled(True)
         self._show_calculation_error(
-            TimeoutError("Analysis timed out after 30 seconds."), ""
+            Exception(
+                "Analysis timed out — the calculation took longer than 30 seconds. "
+                "Check your input data for unusually large values."
+            ), ""
         )
 
     # ── State: validation issues ──────────────────────────────
 
     def show_results(self, all_errors: dict, all_warnings: dict):
         self._current_status = "issues"
+        self._has_results = False
         self._status_args = {"errors": all_errors, "warnings": all_warnings}
         self._clear_status()
         self._set_inputs_visible(True)
+        self._update_context_bar()
         self._save_state("issues", {"errors": all_errors, "warnings": all_warnings})
 
         if all_errors:
@@ -976,8 +1241,10 @@ class OutputsPage(ScrollableForm):
 
     def show_success(self):
         self._current_status = "success"
+        self._has_results = False
         self._clear_status()
         self._set_inputs_visible(True)
+        self._update_context_bar()
         self._save_state("success", {})
         self._status_layout.addWidget(
             self._inline_banner(
@@ -1004,11 +1271,13 @@ class OutputsPage(ScrollableForm):
 
     def _show_calculation_error(self, error: Exception, tb: str = ""):
         self._current_status = "calc_error"
+        self._has_results = False
         self._status_args = {"error": error, "tb": tb}
         self._save_state("calc_error", {"error": str(error)})
         self.btn_calculate.setEnabled(True)
         self._set_inputs_visible(True)
         self._clear_status()
+        self._update_context_bar()
 
         card = QFrame()
         card.setObjectName("calcErrorCard")
@@ -1033,7 +1302,7 @@ class OutputsPage(ScrollableForm):
 
         full_msg = str(error).strip() or "An unknown error occurred."
         msg_lbl = QLabel(full_msg)
-        msg_lbl.setFont(_f(FS_BASE))
+        msg_lbl.setFont(_f(FS_MD))
         msg_lbl.setWordWrap(True)
         msg_lbl.setStyleSheet(
             f"color: {get_token('text_secondary')}; background: transparent;"
@@ -1052,14 +1321,14 @@ class OutputsPage(ScrollableForm):
             fb_v.setContentsMargins(SP3, SP2, SP3, SP2)
 
             origin_lbl = QLabel("Origin")
-            origin_lbl.setFont(_f(FS_XS, FW_MEDIUM))
+            origin_lbl.setFont(_f(FS_SM, FW_MEDIUM))
             origin_lbl.setStyleSheet(
                 f"color: {get_token('text_disabled')}; letter-spacing: 1px; background: transparent; border: none;"
             )
             fb_v.addWidget(origin_lbl)
 
             frame_lbl = QLabel(relevant_frame)
-            frame_lbl.setFont(QFont("Courier New", FS_XS))
+            frame_lbl.setFont(QFont("Courier New", FS_SM))
             frame_lbl.setWordWrap(True)
             frame_lbl.setTextInteractionFlags(Qt.TextSelectableByMouse)
             frame_lbl.setStyleSheet(
@@ -1072,20 +1341,20 @@ class OutputsPage(ScrollableForm):
         btn_row.setSpacing(SP3)
         btn_row.setContentsMargins(0, SP2, 0, 0)
 
-        retry_btn = QPushButton("Retry")
+        retry_btn = QPushButton("Re-validate & Run")
         retry_btn.setFixedHeight(BTN_MD)
-        retry_btn.setFont(_f(FS_BASE, FW_MEDIUM))
+        retry_btn.setFont(_f(FS_MD, FW_MEDIUM))
         retry_btn.setStyleSheet(btn_primary())
         retry_btn.clicked.connect(self.validate_requested.emit)
         btn_row.addWidget(retry_btn)
 
         dl_btn = QPushButton("Download Error Log")
         dl_btn.setFixedHeight(BTN_MD)
-        dl_btn.setFont(_f(FS_BASE, FW_MEDIUM))
+        dl_btn.setFont(_f(FS_MD, FW_MEDIUM))
         dl_btn.setStyleSheet(
             f"QPushButton {{ border: 1px solid {get_token('danger')}; border-radius: {RADIUS_MD}px;"
             f"  padding: 0 16px; background: transparent; color: {get_token('danger')};"
-            f"  font-weight: {get_token('weight-semibold')}; }}"
+            f"  font-weight: {FW_SEMIBOLD}; }}"
             f"QPushButton:hover {{ border-width: 1.5px; }}"
         )
         dl_btn.clicked.connect(lambda: self._download_error_log(error, tb))
@@ -1143,49 +1412,18 @@ class OutputsPage(ScrollableForm):
 
     def _show_calculation_success(self, results):
         self._current_status = "calc_success"
+        self._has_results = True
         self.btn_calculate.setEnabled(True)
         self._set_inputs_visible(False)
         self._last_results = results
         self._clear_status()
-
-        # Toolbar for results (PDF + Comparison)
-        toolbar_row = QWidget()
-        tl_h = QHBoxLayout(toolbar_row)
-        tl_h.setContentsMargins(0, 0, 0, SP3)
-        tl_h.setSpacing(SP3)
-
-        pdf_btn = QPushButton("Generate PDF Report")
-        pdf_btn.setFixedHeight(BTN_MD)
-        pdf_btn.setFont(_f(FS_BASE, FW_MEDIUM))
-        pdf_btn.setStyleSheet(btn_primary())
-        pdf_btn.clicked.connect(self._generate_pdf_report)
-        tl_h.addWidget(pdf_btn)
-
-        # prov_btn = QPushButton("Generate Report V2")
-        # prov_btn.setFixedHeight(BTN_MD)
-        # prov_btn.setFont(_f(FS_BASE, FW_MEDIUM))
-        # prov_btn.setStyleSheet(btn_primary())
-        # prov_btn.clicked.connect(self._generate_provenance_report)
-        # tl_h.addWidget(prov_btn)
-
-        if COMPARISON_MODE:
-            comp_btn = QPushButton("Add to Comparison ↗")
-            comp_btn.setFixedHeight(BTN_MD)
-            comp_btn.setFont(_f(FS_BASE, FW_MEDIUM))
-            comp_btn.setStyleSheet(btn_ghost())
-            comp_btn.setToolTip("Close project and add to the comparison workspace")
-            comp_btn.clicked.connect(self._on_compare_clicked)
-            tl_h.addWidget(comp_btn)
-
-        tl_h.addStretch()
-        self._status_layout.addWidget(toolbar_row)
+        self._update_context_bar()   # reveal context bar + action buttons
 
         _bd = getattr(self, "_last_all_data", {}).get("bridge_data", {})
         _ap = int(_bd.get("analysis_period", 0))
         _yoc = int(_bd.get("year_of_construction", 0))
 
         sections = [
-            lambda r: _section_heading("Summary"),
             lambda r: LCCSummaryCards(r, currency=self._currency,
                                       analysis_period=_ap, year_of_construction=_yoc),
             lambda r: _divider(),
@@ -1194,36 +1432,26 @@ class OutputsPage(ScrollableForm):
                 "These charts illustrate the distribution of the total life cycle cost. The Sustainability Matrix disaggregates costs across the Economic, Environmental, and Social Pillars. The aggregation chart compares the relative weight of three life cycle phases: Initial Construction, the combined Use/Maintenance/Reconstruction stage, and the final End-of-Life phase."
             ),
             lambda r: LCCPieWidget(r, currency=self._currency),
+            lambda r: _divider(),
             lambda r: AggregateChartWidget(r, currency=self._currency),
             lambda r: _divider(),
-            lambda r: _section_heading("Consolidated stage summary"),
-            lambda r: _section_description(
-                "A consolidated presentation of costs across the three pillars (economic, social, and environmental) for each life cycle stage. This table facilitates the identification of phases that bear the most substantial burden."
-            ),
-            lambda r: LCCDetailsTable(r, currency=self._currency),
+            lambda r: LCCDetailsSection(r, currency=self._currency),
             lambda r: _divider(),
-            # lambda r: _section_heading("Itemized detail"),
-            # lambda r: _section_description(
-            #     "An itemised schedule of each individual cost component. All values are discounted to the year of assessment, thus representing the present sum of money required to meet future expenditures."
-            # ),
-            lambda r: LCCBreakdownTable(r, currency=self._currency),
+            lambda r: LCCBreakdownSection(r, currency=self._currency),
         ]
         QTimer.singleShot(0, lambda: self._build_result_widgets(results, sections))
 
     def _build_result_widgets(self, results, sections):
-        insert_pos = 1  # pdf_row is at 0; insert result sections after it
         for factory in sections:
             try:
                 widget = factory(results)
                 if widget:
-                    self._status_layout.insertWidget(insert_pos, widget)
-                    insert_pos += 1
+                    self._status_layout.addWidget(widget)
             except Exception as e:
                 err = QLabel(f"Render error: {e}")
-                err.setFont(_f(FS_BASE, italic=True))
-                err.setStyleSheet(f"color: {get_token('text_secondary')};")
-                self._status_layout.insertWidget(insert_pos, err)
-                insert_pos += 1
+                err.setFont(_f(FS_MD, FW_NORMAL))
+                err.setStyleSheet(f"color: {get_token('text_secondary')}; font-style: italic;")
+                self._status_layout.addWidget(err)
 
         scroll = self.layout.itemAt(0).widget()
         if scroll and hasattr(scroll, "verticalScrollBar"):
@@ -1272,19 +1500,6 @@ class OutputsPage(ScrollableForm):
                 res = page.get_data()
                 all_data[res["chunk"]] = res["data"]
 
-        # ── DEBUG: dump all_data to JSON file ──────────────────
-        # import json, os, datetime as _dt
-        # _dump_dir = os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", "debug_dumps")
-        # os.makedirs(_dump_dir, exist_ok=True)
-        # _ts = _dt.datetime.now().strftime("%Y%m%d_%H%M%S")
-        # _dump_path = os.path.join(_dump_dir, f"all_data_{_ts}.json")
-        # try:
-        #     with open(_dump_path, "w", encoding="utf-8") as _fp:
-        #         json.dump(all_data, _fp, indent=2, default=str)
-        #     _log.info("DEBUG: all_data dumped to %s", _dump_path)
-        # except Exception as _e:
-        #     _log.warning("DEBUG: failed to dump all_data: %s", _e)
-        # ── END DEBUG ──────────────────────────────────────────
 
         self._last_all_data = all_data
         self._currency = get_currency()
@@ -1324,6 +1539,8 @@ class OutputsPage(ScrollableForm):
 
     def reset_for_edit(self):
         self._has_results = False
+        self._currency = ""
+        self._update_context_bar()   # disable buttons + hide context bar
         self._show_idle()
         self._save_state("idle", {})
         if COMPARISON_MODE:
@@ -1372,14 +1589,6 @@ class OutputsPage(ScrollableForm):
         )
         dlg.exec()
 
-    # def _generate_pdf_report(self):
-    #     dlg = ReportSectionDialog(export_dict=self._build_export_dict(), mode="provenance", parent=self)
-    #     dlg.exec()
-
-    # def _generate_provenance_report(self):
-    #     """Triggers the modular V2 report generation using the tree-based dialog."""
-    #     dlg = ReportSectionDialog(export_dict=self._build_export_dict(), mode="provenance", parent=self)
-    #     dlg.exec()
 
     def _on_proceed(self):
         self.run_calculation()

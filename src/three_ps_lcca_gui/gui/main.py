@@ -3,6 +3,12 @@ import os
 import platform
 import ctypes
 
+# Sub-process worker mode for packaged executables (.exe / .sh)
+if "--glossary-worker" in sys.argv:
+    from three_ps_lcca_gui.gui.components.utils.doc_handler.webview_handler import run
+    run()
+    sys.exit(0)
+
 # ── Global App Configuration ──────────────────────────────────────────────────
 # This MUST happen before any other project imports to ensure paths are set correctly
 from three_ps_lcca_gui.gui.version import APP_NAME, APP_AUTHOR, APP_DATA_NAME
@@ -43,6 +49,7 @@ from three_ps_lcca_gui.gui.project_manager import ProjectManager
 from three_ps_lcca_gui.gui.themes import reapply as _reapply
 from three_ps_lcca_gui.gui.components.utils.unit_resolver import load_custom_units
 from three_ps_lcca_gui.gui.version import VERSION
+from three_ps_lcca_gui.gui.theme import FONT_FAMILY, FS_MD
 
 
 _GUI_DIR = os.path.abspath(os.path.dirname(__file__))
@@ -122,8 +129,10 @@ class _TableHeaderWordWrapFilter(QObject):
         hidden       = [hdr.isSectionHidden(i) for i in range(count)]
         stretch_last = hdr.stretchLastSection()
         min_size     = hdr.minimumSectionSize()
+        should_be_visible = not hdr.isHidden()
         new_hdr = WordWrapHeaderView(Qt.Horizontal, parent=obj)
         obj.setHorizontalHeader(new_hdr)
+        new_hdr.setVisible(should_be_visible)
         new_hdr.setStretchLastSection(stretch_last)
         new_hdr.setMinimumSectionSize(min_size)
         for i in range(count):
@@ -240,7 +249,7 @@ def main():
     # With font-size removed from the global QSS * rule, this becomes the
     # fallback for any widget that does not call setFont() explicitly.
     # Widgets that do call setFont(_f(...)) will use their own size correctly.
-    app.setFont(QFont("Ubuntu", 9))
+    app.setFont(QFont(FONT_FAMILY, FS_MD))
 
     # Load Custom Units (deferred to start of event loop)
     def _load_custom_units():
@@ -262,6 +271,8 @@ def main():
     app.installEventFilter(table_filter)
     app.installEventFilter(focus_filter)
     app.installEventFilter(hdr_wrap_filter)
+    from three_ps_lcca_gui.gui.components.utils.spinbox_fix import install as _install_spinbox_fix
+    _install_spinbox_fix(app)
 
     # Runtime Theme Switching (Qt 6.5+)
     try:

@@ -46,11 +46,13 @@ from PySide6.QtWidgets import (
     QDialog,
     QFormLayout,
     QSizePolicy,
+    QScrollArea,
     QStackedWidget,
 )
 from three_ps_lcca_gui.core.safechunk_engine import SafeChunkEngine
 import three_ps_lcca_gui.core.start_manager as sm
 from three_ps_lcca_gui.gui.theme import (
+    FONT_FAMILY,
     SP2,
     SP3,
     SP4,
@@ -61,15 +63,13 @@ from three_ps_lcca_gui.gui.theme import (
     RADIUS_SM,
     RADIUS_MD,
     RADIUS_LG,
-    BTN_SM,
     BTN_MD,
     BTN_LG,
-    FS_XS,
     FS_SM,
-    FS_BASE,
+    FS_SM,
     FS_MD,
-    FS_LG,
-    FS_XL,
+    FS_MD,
+    FS_MD,
     FS_DISP,
     FW_LIGHT,
     FW_NORMAL,
@@ -85,7 +85,10 @@ from three_ps_lcca_gui.gui.styles import (
     btn_ghost_checkable,
 )
 from three_ps_lcca_gui.gui.components.settings_dialog import SettingsDialog
-from three_ps_lcca_gui.gui.components.outputs.comparison_page import ComparisonPickerPanel
+from three_ps_lcca_gui.gui.components.sponsors_footer import SponsorsFooter
+from three_ps_lcca_gui.gui.components.history_tab import (
+    _HomeTabBar, _ComparisonHistoryTab,
+)
 
 _GUI_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 _ASSETS_DIR = os.path.join(_GUI_DIR, "assets")
@@ -231,7 +234,7 @@ class _NavButton(QWidget):
         if self._label:
             p.setPen(col)
             weight = FW_SEMIBOLD if self._selected else FW_MEDIUM
-            p.setFont(_f(FS_XS, weight))
+            p.setFont(_f(FS_SM, weight))
             p.drawText(QRect(0, 42, w, 14), Qt.AlignCenter, self._label)
 
         p.end()
@@ -368,6 +371,32 @@ class _ResizeFilter(QObject):
         return False
 
 
+
+class _OrderedSet:
+    """Set that remembers insertion order (used for the comparison selection)."""
+
+    def __init__(self):
+        self._d: dict = {}
+
+    def add(self, x):
+        self._d[x] = None
+
+    def discard(self, x):
+        self._d.pop(x, None)
+
+    def clear(self):
+        self._d.clear()
+
+    def __contains__(self, x):
+        return x in self._d
+
+    def __len__(self):
+        return len(self._d)
+
+    def __iter__(self):
+        return iter(self._d)
+
+
 class _GridCardDelegate(QStyledItemDelegate):
     RADIUS = RADIUS_LG
 
@@ -377,7 +406,7 @@ class _GridCardDelegate(QStyledItemDelegate):
         self._loading_pid  = None
         self._loading_dots = 0
         self.comparison_mode     = False
-        self._comp_selected: set = set()   # pids selected for comparison
+        self._comp_selected = _OrderedSet()   # pids selected for comparison, in click order
 
     def _card_h(self, status: str) -> int:
         return CARD_H_WARN if status in ("crashed", "corrupted") else CARD_H_NORM
@@ -470,7 +499,7 @@ class _GridCardDelegate(QStyledItemDelegate):
             painter.setFont(_f(FS_SM, FW_MEDIUM))
             painter.drawText(pill_rect, Qt.AlignCenter, pill_label)
 
-            painter.setFont(_f(FS_LG, FW_MEDIUM))
+            painter.setFont(_f(FS_MD, FW_MEDIUM))
             dim = QColor(text_col)
             dim.setAlpha(100)
             painter.setPen(dim)
@@ -654,7 +683,7 @@ class _GridCardDelegate(QStyledItemDelegate):
                 pass # Handled by fixed slot above
 
         # ── Title ──────────────────────────────────────────────────────────
-        painter.setFont(_f(FS_LG, FW_MEDIUM))
+        painter.setFont(_f(FS_MD, FW_MEDIUM))
         painter.setPen(text_col)
         nfm = painter.fontMetrics()
         painter.drawText(
@@ -697,7 +726,7 @@ class _GridCardDelegate(QStyledItemDelegate):
             warn_col = QColor(get_token("danger"))
             warn_col.setAlpha(210)
             painter.setPen(warn_col)
-            painter.setFont(_f(FS_XS, FW_MEDIUM))
+            painter.setFont(_f(FS_SM, FW_MEDIUM))
             painter.drawText(
                 QPoint(tx, y_warn), "Needs recovery - last save may be incomplete"
             )
@@ -705,7 +734,7 @@ class _GridCardDelegate(QStyledItemDelegate):
             warn_col = QColor(get_token("warning"))
             warn_col.setAlpha(210)
             painter.setPen(warn_col)
-            painter.setFont(_f(FS_XS, FW_MEDIUM))
+            painter.setFont(_f(FS_SM, FW_MEDIUM))
             painter.drawText(
                 QPoint(tx, y_warn), "File may be damaged - restore from a checkpoint"
             )
@@ -727,6 +756,12 @@ class _GridList(QListWidget):
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
+        if self.count() == 1:
+            it = self.item(0)
+            if it and not isinstance(it.data(Qt.UserRole), dict):
+                vw = self.viewport().width()
+                vh = self.viewport().height()
+                it.setSizeHint(QSize(max(200, vw - 40), max(400, vh - 40)))
         # Force re-layout of items to recalculate width from sizeHint
         self.doItemsLayout()
 
@@ -856,13 +891,15 @@ class _EmptyState(QWidget):
             layout.addWidget(self._icon_lbl)
 
             head_lbl = QLabel(heading)
-            head_lbl.setFont(_f(FS_LG, FW_SEMIBOLD))
+            head_lbl.setFont(_f(FS_MD, FW_SEMIBOLD))
             head_lbl.setAlignment(Qt.AlignCenter)
+            head_lbl.setWordWrap(True)
             layout.addWidget(head_lbl)
 
         self._sub_lbl = QLabel(subtext)
-        self._sub_lbl.setFont(_f(FS_BASE))
+        self._sub_lbl.setFont(_f(FS_MD))
         self._sub_lbl.setAlignment(Qt.AlignCenter)
+        self._sub_lbl.setWordWrap(True)
         layout.addWidget(self._sub_lbl)
 
         if show_cta and manager:
@@ -870,7 +907,7 @@ class _EmptyState(QWidget):
             self._cta = QPushButton("+ New Project")
             self._cta.setFixedHeight(BTN_MD)
             self._cta.setFixedWidth(180)
-            self._cta.setFont(_f(FS_BASE, FW_MEDIUM))
+            self._cta.setFont(_f(FS_MD, FW_MEDIUM))
             self._cta.setCursor(Qt.PointingHandCursor)
             self._cta.clicked.connect(
                 lambda: manager.open_project(is_new=True))
@@ -909,6 +946,7 @@ class HomePage(QWidget):
         self.manager = manager
         self._active_project_id = None
         self._all_projects: list[dict] = []  # merged engine + recent + pinned
+        self._open_windows: dict[frozenset, object] = {}  # tracked ComparisonResultWindows
         self._build_ui()
 
     # ── UI construction ───────────────────────────────────────────────────────
@@ -923,8 +961,10 @@ class HomePage(QWidget):
 
         self._stack = QStackedWidget()
         self._stack.addWidget(self._make_right_panel())      # index 0: project grid
-        self._comparison_panel = ComparisonPickerPanel(manager=self.manager)
-        self._stack.addWidget(self._comparison_panel)        # index 1: compare
+        # Wire history tab to this home page for window dedup & GC prevention
+        self._history_tab.set_picker_panel(self)
+        # Seed tab label count on first render
+        self._refresh_history_count()
         root.addWidget(self._stack, stretch=1)
 
     # ── Left sidebar ──────────────────────────────────────────────────────────
@@ -1030,8 +1070,7 @@ class HomePage(QWidget):
         project_set = frozenset(pid_list)
 
         # Raise existing window for the same group if already open
-        panel = self._comparison_panel
-        existing = panel._open_windows.get(project_set)
+        existing = self._open_windows.get(project_set)
         if existing and existing.isVisible():
             existing.raise_()
             existing.activateWindow()
@@ -1039,14 +1078,20 @@ class HomePage(QWidget):
 
         win = ComparisonResultWindow(pids=pid_list, names=name_list,
                                      caches=caches, override_ap=0)
-        # Store in panel._open_windows to keep a Python reference alive
+        # Store in self._open_windows to keep a Python reference alive
         # and prevent the window from being GC'd before its threads start.
-        panel._open_windows[project_set] = win
+        self._open_windows[project_set] = win
         win.show()
 
         label = "  ·  ".join(sorted(name_list))
-        comp_sm.add_comparison(label, pid_list, name_list, 0)
-        panel.soft_refresh()
+        hist_id = comp_sm.add_comparison(label, pid_list, name_list, 0)
+        # A conversion entered in this window is saved on its history entry only
+        win.currency_settings_changed.connect(
+            lambda s, hid=hist_id: comp_sm.set_comparison_currency(hid, s)
+        )
+        self._refresh_history_count()
+        if self._home_content_stack.currentIndex() == 1:
+            self._history_tab.refresh()
 
         # Clear selection and hide FAB
         delegate._comp_selected.clear()
@@ -1054,26 +1099,91 @@ class HomePage(QWidget):
         self.grid_list.viewport().update()
 
     def _switch_to_home(self):
-        self._stack.setCurrentIndex(0)
-        self._nav_home.set_selected(True)
-        if COMPARISON_MODE:
+        if hasattr(self, "_nav_home"):
+            self._nav_home.set_selected(True)
+        if COMPARISON_MODE and hasattr(self, "_nav_compare"):
             self._nav_compare.set_selected(False)
+        saved_sort = sm.get_pref("sort_order") or "recent"
+        if saved_sort == "compare":
+            saved_sort = "recent"
+        for btn in self._sort_btns:
+            btn.setChecked(btn.property("sort_key") == saved_sort)
+        self._on_sort_btn()
+
+    def open_compare_projects(self, preselect_pid: str = None):
+        """Switch to Home project grid in Compare sort mode with preselected project."""
+        if not COMPARISON_MODE:
+            return
+
+        if hasattr(self, "_nav_home"):
+            self._nav_home.set_selected(False)
+        if hasattr(self, "_nav_compare"):
+            self._nav_compare.set_selected(True)
+
+        for btn in self._sort_btns:
+            btn.setChecked(btn.property("sort_key") == "compare")
+
+        delegate = self.grid_list.itemDelegate()
+        delegate.comparison_mode = True
+        delegate._comp_selected.clear()
+        if preselect_pid:
+            delegate._comp_selected.add(preselect_pid)
+        self.grid_list.setSelectionMode(QAbstractItemView.NoSelection)
+
+        # Show tab bar in compare mode, ensure Projects tab (0) is selected
+        self._home_tab_bar.show()
+        self._tab_bar_sep.show()
+        self._home_content_stack.setCurrentIndex(0)
+        self._home_tab_bar.set_current(0)
+        self._refresh_history_count()
+
+        self._render_grid()
+
+        n = len(delegate._comp_selected)
+        if n >= 2:
+            self._comp_fab.setText(f"Compare {n} Projects  →")
+            self._comp_fab.show()
+            self._apply_fab_style()
+            self._reposition_comp_fab()
+        else:
+            self._comp_fab.hide()
+
+        if preselect_pid:
+            for i in range(self.grid_list.count()):
+                it = self.grid_list.item(i)
+                d = it.data(Qt.UserRole)
+                if isinstance(d, dict) and d.get("project_id") == preselect_pid:
+                    self.grid_list.scrollToItem(it)
+                    break
 
     def switch_to_compare(self, preselect_pid: str = None):
         if not COMPARISON_MODE:
             return
-        self._stack.setCurrentIndex(1)
-        self._nav_home.set_selected(False)
-        self._nav_compare.set_selected(True)
-        self._comparison_panel.refresh()
-        if preselect_pid:
-            self._comparison_panel.preselect_project(preselect_pid)
+        self.open_compare_projects(preselect_pid=preselect_pid)
 
     def _switch_to_compare(self):
-        self.switch_to_compare()
+        self.open_compare_projects()
+
+    # ── Home content-tab switching (Projects / Comparison History) ────────────
+
+    def _on_home_tab_changed(self, idx: int):
+        """Switch between Projects page (0) and Comparison History page (1)."""
+        self._home_content_stack.setCurrentIndex(idx)
+        self._home_tab_bar.set_current(idx)
+        if idx == 1:
+            self._history_tab.refresh()
+        self._refresh_history_count()
+
+    def _refresh_history_count(self):
+        """Update the History tab label with the live total comparison count."""
+        count = sm.get_comparison_count()
+        self._home_tab_bar.update_history_count(count)
 
     def _is_project_in_comparison(self, pid: str) -> bool:
-        return self._comparison_panel.is_in_active_comparison(pid)
+        for project_set, win in self._open_windows.items():
+            if pid in project_set and win.isVisible():
+                return True
+        return False
 
     def _safe_open_project(self, pid: str):
         if self._is_project_in_comparison(pid):
@@ -1099,7 +1209,7 @@ class HomePage(QWidget):
         greet_bar = QWidget()
         greet_bar.setFixedHeight(96)
         gb = QHBoxLayout(greet_bar)
-        gb.setContentsMargins(SP10, 0, SP10, 0)
+        gb.setContentsMargins(SP6, 0, SP6, 0)
 
         self.greeting_lbl = QLabel()
         self.greeting_lbl.setTextFormat(Qt.RichText)
@@ -1123,10 +1233,10 @@ class HomePage(QWidget):
         toolbar = QWidget()
         toolbar.setFixedHeight(52)
         tl = QHBoxLayout(toolbar)
-        tl.setContentsMargins(SP10, 0, SP10, 0)
+        tl.setContentsMargins(SP6, 0, SP6, 0)
         tl.setSpacing(SP2)
 
-        self.grid_section_lbl = QLabel("RECENT PROJECTS")
+        self.grid_section_lbl = QLabel("Recent Projects")
         self.grid_section_lbl.setFont(_f(FS_SM, FW_SEMIBOLD))
         self.grid_section_lbl.setStyleSheet(
             f"color: {get_token('text_disabled')}; letter-spacing: 2px;"
@@ -1150,8 +1260,8 @@ class HomePage(QWidget):
         self._search_text = ""
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Search projects...")
-        self.search_input.setFixedHeight(BTN_SM)
-        self.search_input.setMinimumWidth(160)
+        self.search_input.setFixedHeight(32)
+        self.search_input.setMinimumWidth(80)
         self.search_input.setMaximumWidth(280)
         self.search_input.setSizePolicy(
             QSizePolicy.Expanding, QSizePolicy.Fixed)
@@ -1160,6 +1270,14 @@ class HomePage(QWidget):
         tl.addWidget(self.search_input, 0, Qt.AlignVCenter)
 
         tl.addSpacing(SP4)
+
+        # Segmented sort buttons container (Recent / All / Starred / Compare)
+        self.sort_container = QFrame()
+        self.sort_container.setObjectName("sortSegmentedControl")
+        self.sort_container.setFixedHeight(32)
+        sc_layout = QHBoxLayout(self.sort_container)
+        sc_layout.setContentsMargins(0, 0, 0, 0)
+        sc_layout.setSpacing(0)
 
         self._sort_btns = []
         saved_sort = sm.get_pref("sort_order") or "recent"
@@ -1170,21 +1288,39 @@ class HomePage(QWidget):
             *([("Compare", "compare")] if COMPARISON_MODE else []),
         ]:
             btn = QPushButton(label)
-            btn.setFixedHeight(BTN_SM)
-            btn.setFont(_f(FS_SM, FW_MEDIUM))
             btn.setCheckable(True)
+            btn.setCursor(Qt.PointingHandCursor)
             btn.setProperty("sort_key", key)
             btn.clicked.connect(self._on_sort_btn)
             btn.setChecked(key == saved_sort)
-            tl.addWidget(btn, 0, Qt.AlignVCenter)
-            tl.addSpacing(SP2)
+            sc_layout.addWidget(btn)
             self._sort_btns.append(btn)
 
         if not any(b.isChecked() for b in self._sort_btns):
             self._sort_btns[0].setChecked(True)
 
+        tl.addWidget(self.sort_container, 0, Qt.AlignVCenter)
+
         layout.addWidget(toolbar)
-        layout.addWidget(self._hline())
+        # ── Tab bar: Projects | Comparison History (N) (only shown in Compare mode) ──
+        self._home_tab_bar = _HomeTabBar()
+        self._home_tab_bar.tab_changed.connect(self._on_home_tab_changed)
+        layout.addWidget(self._home_tab_bar)
+        self._tab_bar_sep = self._hline()
+        layout.addWidget(self._tab_bar_sep)
+
+        # Initially hide tab bar unless compare mode is active
+        self._home_tab_bar.hide()
+        self._tab_bar_sep.hide()
+
+        # ── Content stack (Projects page / History page) ───────────────────
+        self._home_content_stack = QStackedWidget()
+
+        # ── Projects page (index 0): grid + recent comparisons preview ─────
+        _projects_page = QWidget()
+        _proj_v = QVBoxLayout(_projects_page)
+        _proj_v.setContentsMargins(0, 0, 0, 0)
+        _proj_v.setSpacing(0)
 
         # ── Project grid list ─────────────────────────────────────────────
         self.grid_list = _GridList()
@@ -1209,48 +1345,21 @@ class HomePage(QWidget):
         self.grid_list.open_requested.connect(self._safe_open_project)
         self.grid_list.pin_toggled.connect(self._toggle_pin_by_id)
         self.grid_list.comparison_toggled.connect(self._on_comp_toggle)
-        layout.addWidget(self.grid_list, stretch=1)
+        # Grid fills the projects page (not the root panel layout directly)
+        _proj_v.addWidget(self.grid_list, 1)
 
-        # ── Footer: Sponsors Area ──────────────────────────────────────────
-        self.footer = QWidget()
-        self.footer.setFixedHeight(120)
+        self._home_content_stack.addWidget(_projects_page)   # index 0
+
+        # ── History page (index 1): search + paginated row list ────────────
+        self._history_tab = _ComparisonHistoryTab(manager=self.manager)
+        self._history_tab.history_changed.connect(self._refresh_history_count)
+        self._home_content_stack.addWidget(self._history_tab)  # index 1
+
+        layout.addWidget(self._home_content_stack, stretch=1)
+
+        layout.addWidget(self._hline())
+        self.footer = SponsorsFooter()
         layout.addWidget(self.footer)
-
-        fl = QHBoxLayout(self.footer)
-        fl.setContentsMargins(SP10, SP6, SP10, SP6)
-
-        # Developed At Section
-        dev_v = QVBoxLayout()
-        dev_v.setSpacing(SP3)
-        dev_lbl = QLabel("DEVELOPED AT")
-        dev_lbl.setFont(_f(FS_XS, FW_BOLD))
-        dev_v.addWidget(dev_lbl)
-        self.iitb_logo = QLabel()
-        dev_v.addWidget(self.iitb_logo, 0, Qt.AlignLeft | Qt.AlignVCenter)
-        fl.addLayout(dev_v)
-
-        fl.addStretch()
-
-        # Supported By Section
-        sup_v = QVBoxLayout()
-        sup_v.setSpacing(SP3)
-        sup_v.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        sup_lbl = QLabel("SUPPORTED BY")
-        sup_lbl.setFont(_f(FS_XS, FW_BOLD))
-        sup_lbl.setAlignment(Qt.AlignRight)
-        sup_v.addWidget(sup_lbl)
-
-        sup_h = QHBoxLayout()
-        sup_h.setSpacing(SP8)
-        sup_h.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-        self.cs_logo = QLabel()
-        self.mos_logo = QLabel()
-        self.insdag_logo = QLabel()
-        sup_h.addWidget(self.cs_logo)
-        sup_h.addWidget(self.mos_logo)
-        sup_h.addWidget(self.insdag_logo)
-        sup_v.addLayout(sup_h)
-        fl.addLayout(sup_v)
 
         self._refresh_styles()
         theme_manager().theme_changed.connect(self._refresh_styles)
@@ -1259,7 +1368,7 @@ class HomePage(QWidget):
         self._comp_fab = QPushButton("Compare Selected")
         self._comp_fab.setParent(panel)
         self._comp_fab.setFixedHeight(BTN_LG)
-        self._comp_fab.setFont(_f(FS_BASE, FW_SEMIBOLD))
+        self._comp_fab.setFont(_f(FS_MD, FW_SEMIBOLD))
         self._comp_fab.setCursor(Qt.PointingHandCursor)
         self._comp_fab.clicked.connect(self._on_home_compare_clicked)
         self._comp_fab.hide()
@@ -1268,6 +1377,14 @@ class HomePage(QWidget):
 
         self._panel_resize_filter = _ResizeFilter(self._reposition_comp_fab, panel)
         panel.installEventFilter(self._panel_resize_filter)
+
+        # Ensure tab bar visibility matches saved sort order
+        if self._is_compare_mode():
+            self._home_tab_bar.show()
+            self._tab_bar_sep.show()
+        else:
+            self._home_tab_bar.hide()
+            self._tab_bar_sep.hide()
 
         return panel
 
@@ -1343,38 +1460,11 @@ class HomePage(QWidget):
         self._set_svg_logo(self.logo_lbl, os.path.join(
             _ASSETS_DIR, "logo", "logo-3psLCCA.svg"), 55)
 
-        # 2. Footer: Developed At (IITB)
-        self._set_themed_logo(
-            self.iitb_logo,
-            os.path.join(_ASSETS_DIR, "logo", "special", "IITB_logo_dark.svg"),
-            os.path.join(_ASSETS_DIR, "logo", "special",
-                         "IITB_logo_light.svg"),
-            50, is_dk
-        )
+        # 2. Footer
+        if hasattr(self, "footer"):
+            self.footer.refresh_theme()
 
-        # 3. Footer: Supported By (ConstructSteel, MOS, INSDAG)
-        self._set_themed_logo(
-            self.cs_logo,
-            os.path.join(_ASSETS_DIR, "logo", "special",
-                         "ConstructSteel_dark.svg"),
-            os.path.join(_ASSETS_DIR, "logo", "special",
-                         "ConstructSteel_light.svg"),
-            12, is_dk
-        )
-        self._set_themed_logo(
-            self.mos_logo,
-            os.path.join(_ASSETS_DIR, "logo", "special", "MOS_dark.svg"),
-            os.path.join(_ASSETS_DIR, "logo", "special", "MOS_light.svg"),
-            40, is_dk
-        )
-        self._set_themed_logo(
-            self.insdag_logo,
-            os.path.join(_ASSETS_DIR, "logo", "special", "INSDAG_dark.svg"),
-            os.path.join(_ASSETS_DIR, "logo", "special", "INSDAG_light.svg"),
-            40, is_dk
-        )
-
-        # 4. Refresh Button
+        # 3. Refresh Button
         self.refresh_btn.setStyleSheet(
             f"QPushButton {{ border: 1px solid {get_token('surface_mid')}; border-radius: 14px; "
             f"padding: 0; min-width: 28px; max-width: 28px; min-height: 28px; max-height: 28px; background: transparent; }} "
@@ -1382,25 +1472,60 @@ class HomePage(QWidget):
             f"QPushButton:pressed {{ background: {get_token('surface_pressed')}; }}"
         )
 
-        # 5. Text colors
-        muted = f"color: {get_token('text_disabled')}; letter-spacing: 1px;"
-        for lbl in self.footer.findChildren(QLabel):
-            if lbl.text() in ("DEVELOPED AT", "SUPPORTED BY"):
-                lbl.setStyleSheet(muted)
-
         self.grid_section_lbl.setStyleSheet(
             f"color: {get_token('text_disabled')}; letter-spacing: 2px;")
 
         self.search_input.setStyleSheet(
-            f"QLineEdit {{ border-radius: {RADIUS_MD}px; border: 1px solid palette(mid); padding: 0 8px; }}"
+            f"QLineEdit {{ min-height: 0px; height: 30px; border-radius: {RADIUS_MD}px; border: 1px solid palette(mid); padding: 0 8px; }}"
             f"QLineEdit:focus {{ border: 1px solid {get_token('primary')}; }}"
         )
 
-        for btn in self._sort_btns:
-            btn.setStyleSheet(btn_ghost_checkable(radius=RADIUS_MD))
+        # Segmented sort buttons styling
+        if hasattr(self, "sort_container"):
+            bg_container = get_token("surface")
+            border_container = get_token("surface_mid")
+            active_bg = get_token("base")
+            active_border = get_token("surface_mid")
+            text_active = get_token("text")
+            text_inactive = get_token("text_secondary")
 
-        self.footer.setStyleSheet(
-            f"background: {get_token('surface')}; border: none;")
+            self.sort_container.setStyleSheet(
+                f"#sortSegmentedControl {{"
+                f"  background-color: {bg_container};"
+                f"  border: 1px solid {border_container};"
+                f"  border-radius: {RADIUS_MD}px;"
+                f"  padding: 0px;"
+                f"}}"
+            )
+
+            btn_style = (
+                f"QPushButton {{"
+                f"  min-height: 0px;"
+                f"  height: 30px;"
+                f"  background-color: transparent;"
+                f"  border: none;"
+                f"  margin: 0px;"
+                f"  border-radius: {RADIUS_MD - 1}px;"
+                f"  color: {text_inactive};"
+                f"  padding: 0 10px;"
+                f"  font-family: {FONT_FAMILY};"
+                f"  font-size: {FS_MD}pt;"
+                f"  font-weight: {FW_MEDIUM};"
+                f"}}"
+                f"QPushButton:hover:!checked {{"
+                f"  color: {text_active};"
+                f"}}"
+                f"QPushButton:checked {{"
+                f"  background-color: {active_bg};"
+                f"  border: none;"
+                f"  margin: 0px;"
+                f"  color: {text_active};"
+                f"  font-weight: {FW_SEMIBOLD};"
+                f"}}"
+            )
+            for btn in self._sort_btns:
+                btn.setStyleSheet(btn_style)
+
 
         if hasattr(self, "_comp_fab"):
             self._apply_fab_style()
@@ -1452,20 +1577,42 @@ class HomePage(QWidget):
 
     def _on_sort_btn(self):
         sender = self.sender()
-        for btn in self._sort_btns:
-            btn.setChecked(btn is sender)
+        if sender in self._sort_btns:
+            for btn in self._sort_btns:
+                btn.setChecked(btn is sender)
+        if not any(btn.isChecked() for btn in self._sort_btns):
+            self._sort_btns[0].setChecked(True)
         key = self._current_sort()
         delegate = self.grid_list.itemDelegate()
         if key == "compare":
+            if hasattr(self, "_nav_home"):
+                self._nav_home.set_selected(False)
+            if hasattr(self, "_nav_compare"):
+                self._nav_compare.set_selected(True)
             delegate.comparison_mode = True
             delegate._comp_selected.clear()
             self.grid_list.setSelectionMode(QAbstractItemView.NoSelection)
             self._comp_fab.hide()   # hidden until ≥2 selected
+            # Show tab bar in compare mode
+            self._home_tab_bar.show()
+            self._tab_bar_sep.show()
+            self._home_content_stack.setCurrentIndex(0)
+            self._home_tab_bar.set_current(0)
+            self._refresh_history_count()
         else:
+            if hasattr(self, "_nav_home"):
+                self._nav_home.set_selected(True)
+            if hasattr(self, "_nav_compare"):
+                self._nav_compare.set_selected(False)
             delegate.comparison_mode = False
             delegate._comp_selected.clear()
             self.grid_list.setSelectionMode(QAbstractItemView.SingleSelection)
             self._comp_fab.hide()
+            # Hide tab bar in all other modes (Recent, All, Starred)
+            self._home_tab_bar.hide()
+            self._tab_bar_sep.hide()
+            self._home_content_stack.setCurrentIndex(0)
+            self._home_tab_bar.set_current(0)
             sm.set_pref("sort_order", key)
         self._render_grid()
 
@@ -1534,25 +1681,27 @@ class HomePage(QWidget):
 
         # Explicitly re-apply current sort and filter
         self._render_grid()
-        # Keep comparison panel in sync if it is currently visible
-        if self._stack.currentIndex() == 1:
-            self._comparison_panel.soft_refresh()
+        if hasattr(self, "_home_tab_bar"):
+            self._refresh_history_count()
 
     def _render_grid(self):
         self.grid_list.clear()
         sort_key = self._current_sort()
         projects = list(self._all_projects)
+        delegate = self.grid_list.itemDelegate()
+        comp_selected = getattr(delegate, "_comp_selected", set())
         if sort_key == "compare" and COMPARISON_MODE:
             projects = [p for p in projects
-                        if p.get("user_meta", {}).get("fit_for_comparison")]
+                        if p.get("user_meta", {}).get("fit_for_comparison")
+                        or p.get("project_id") in comp_selected]
             projects.sort(key=lambda p: (p.get("display_name") or "").lower())
-            self.grid_section_lbl.setText("READY TO COMPARE")
+            self.grid_section_lbl.setText("Ready to Compare")
         elif sort_key == "pinned":
             projects = [p for p in projects if p.get("pinned")]
-            self.grid_section_lbl.setText("STARRED PROJECTS")
+            self.grid_section_lbl.setText("Starred Projects")
         elif sort_key == "name":
             projects.sort(key=lambda p: (p.get("display_name") or "").lower())
-            self.grid_section_lbl.setText("ALL PROJECTS - A-Z")
+            self.grid_section_lbl.setText("All Projects - A-Z")
         else:
             def get_latest_time(p):
                 t1 = p.get("last_opened_at") or ""
@@ -1560,13 +1709,14 @@ class HomePage(QWidget):
                 return max(t1, t2)
             projects.sort(key=lambda p: (get_latest_time(p),
                           (p.get("display_name") or "").lower()), reverse=True)
-            self.grid_section_lbl.setText("RECENT PROJECTS")
+            self.grid_section_lbl.setText("Recent Projects")
         q = getattr(self, "_search_text", "").strip().lower()
         if q:
             projects = [p for p in projects if q in (
                 p.get("display_name") or p.get("project_id", "")).lower()]
+            raw_q = getattr(self, "_search_text", "").strip()
             self.grid_section_lbl.setText(
-                f"RESULTS FOR \u201c{q.upper()}\u201d")
+                f"Results for \u201c{raw_q}\u201d")
         # ── Handle Empty States ──────────────────────────────────────────
         if not projects:
             item = QListWidgetItem()

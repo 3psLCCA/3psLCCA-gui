@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
 
 from .sys_tracker import SysTracker
 from .themes import get_token
+from .theme import FS_SM, FS_MD
 
 
 class SysTrackerWindow(QWidget):
@@ -51,7 +52,7 @@ class SysTrackerWindow(QWidget):
         def _stat_label(text="—"):
             lbl = QLabel(text)
             lbl.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-            lbl.setFont(QFont("monospace", 10))
+            lbl.setFont(QFont("monospace", FS_MD))
             lbl.setStyleSheet(f"color: {get_token('text')};")
             return lbl
 
@@ -101,7 +102,7 @@ class SysTrackerWindow(QWidget):
         # ── Log ───────────────────────────────────────────────────────────
         self._log = QTextEdit()
         self._log.setReadOnly(True)
-        self._log.setFont(QFont("Consolas", 9))
+        self._log.setFont(QFont("Consolas", FS_SM))
         self._log.setStyleSheet(
             f"background-color: {get_token('surface')}; "
             f"color: {get_token('text')}; "
@@ -163,7 +164,7 @@ class SysTrackerWindow(QWidget):
         label = stats.get("label", "")
         if label != "monitor":
             self._log.append(
-                f"<span style='color:{get_token('text_secondary')};font-size:9px;'>"
+                f"<span style='color:{get_token('text_secondary')};font-size:{FS_SM}pt;'>"
                 f"[{label}]</span> "
                 f"RAM={ram:.1f} MB ({sign}{delta:.1f})  "
                 f"CPU={cpu:.1f}%  hdl={hdl}  {gc}"

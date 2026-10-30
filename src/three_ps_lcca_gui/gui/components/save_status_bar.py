@@ -16,23 +16,13 @@ class SaveStatusBar(QWidget):
         self.controller = controller
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(12, 0, 12, 0)
-        layout.setSpacing(10)
+        layout.setContentsMargins(8, 0, 8, 0)
+        layout.setSpacing(0)
 
         self.status_label = QLabel("No project open")
         self.status_label.setWordWrap(True)  # Enable text wrapping
         self.status_label.setStyleSheet("background: transparent;")
         layout.addWidget(self.status_label)
-
-        layout.addStretch()
-
-        self.checkpoint_btn = QPushButton("Save Checkpoint")
-        self.checkpoint_btn.clicked.connect(self._open_save_dialog)
-        layout.addWidget(self.checkpoint_btn)
-
-        self.manager_btn = QPushButton("Checkpoints")
-        self.manager_btn.clicked.connect(self._open_manager_dialog)
-        layout.addWidget(self.manager_btn)
 
         self.set_active(False)
         self._connect_signals()
@@ -75,8 +65,10 @@ class SaveStatusBar(QWidget):
         CheckpointManagerDialog(self.controller, parent=self).exec()
 
     def set_active(self, active: bool):
-        self.checkpoint_btn.setEnabled(active)
-        self.manager_btn.setEnabled(active)
+        if hasattr(self, "checkpoint_btn"):
+            self.checkpoint_btn.setEnabled(active)
+        if hasattr(self, "manager_btn"):
+            self.manager_btn.setEnabled(active)
         if not active:
             self.status_label.setText("No project open")
 

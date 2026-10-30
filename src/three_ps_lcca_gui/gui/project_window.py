@@ -1,4 +1,4 @@
-﻿import os
+import os
 
 from PySide6.QtCore import Qt, QRect, QSize, QEvent, QPoint, QTimer, QStandardPaths
 from PySide6.QtWidgets import (
@@ -6,6 +6,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QInputDialog,
     QFileDialog,
+    QGraphicsDropShadowEffect,
     QLabel,
     QMainWindow,
     QMenu,
@@ -24,11 +25,11 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from PySide6.QtGui import QAction, QColor, QIcon, QPainter, QPalette
+from PySide6.QtGui import QAction, QColor, QIcon, QPainter, QPalette, QKeySequence, QShortcut
 
 from three_ps_lcca_gui.gui.components.utils.icons import make_icon, make_icon_btn
 from three_ps_lcca_gui.gui.theme import (
-    FS_SM, FS_BASE, FS_MD,
+    FS_SM, FS_MD, FS_MD,
     FW_NORMAL, FW_MEDIUM, FW_SEMIBOLD,
     SP4,
 )
@@ -39,7 +40,6 @@ from three_ps_lcca_gui.gui.devmode import setup_dev_menu
 from three_ps_lcca_gui.gui.project_controller import ProjectController
 from three_ps_lcca_gui.gui.themes import get_token, theme_manager
 from three_ps_lcca_gui.gui.components.home_page import HomePage
-from three_ps_lcca_gui.gui.components.save_status_bar import SaveStatusBar
 from three_ps_lcca_gui.gui.components.logs import Logs
 from three_ps_lcca_gui.gui.components.outputs.outputs_page import OutputsPage
 from three_ps_lcca_gui.gui.components.global_info.main import GeneralInfo
@@ -58,6 +58,7 @@ from three_ps_lcca_gui.core.safechunk_engine import SafeChunkEngine
 from PySide6.QtWidgets import QDialog, QFormLayout, QVBoxLayout, QLabel, QPushButton
 from three_ps_lcca_gui.gui.components.rollback_dialog import RollbackDialog
 from three_ps_lcca_gui.gui.components.blob_manager import BlobManagerDialog
+from three_ps_lcca_gui.gui.components.checkpoint_dialog import SaveCheckpointDialog, CheckpointManagerDialog
 from three_ps_lcca_gui.gui._CONFIG import DEV_MODE, FLUSH_MODE
 try:
     from three_ps_lcca_gui.gui._CONFIG import COMPARISON_MODE
@@ -104,6 +105,9 @@ SIDEBAR_TREE = {
     "Results": {},
 }
 
+
+# ── Responsive breakpoints ───────────────────────────────────────────────────
+_LARGE_SCREEN_WIDTH = 1000  # On screens wider than this, sidebar toggle lives in File menu
 
 # ── Sidebar tree ──────────────────────────────────────────────────────────────
 
@@ -168,7 +172,7 @@ class _SidebarDelegate(QStyledItemDelegate):
         elif depth == 1:
             painter.setFont(_f(FS_MD, FW_SEMIBOLD if is_sel else FW_MEDIUM))
         else:
-            painter.setFont(_f(FS_BASE, FW_MEDIUM if is_sel else FW_NORMAL))
+            painter.setFont(_f(FS_MD, FW_MEDIUM if is_sel else FW_NORMAL))
 
         # Text colour - PRIMARY on selected, normal otherwise
         text_col = QColor(get_token("primary")
@@ -326,6 +330,83 @@ class _HoverSplitter(QSplitter):
         return _HoverHandle(self.orientation(), self)
 
 
+class _SidebarDrawerOverlay(QWidget):
+    """Floating overlay drawer that hosts the sidebar on top of the page for compact screens."""
+
+    def __init__(self, parent=None, on_close=None):
+        super().__init__(parent)
+        self.on_close = on_close
+        self.setAttribute(Qt.WA_NoSystemBackground, True)
+        self.setVisible(False)
+
+        self._drawer_width = 260
+        self._scrim_color = QColor(0, 0, 0, 85)
+
+        self.drawer_widget = QWidget(self)
+        self.drawer_widget.setObjectName("sidebar_drawer")
+
+        shadow = QGraphicsDropShadowEffect(self.drawer_widget)
+        shadow.setBlurRadius(24)
+        shadow.setColor(QColor(0, 0, 0, 70))
+        shadow.setOffset(4, 0)
+        self.drawer_widget.setGraphicsEffect(shadow)
+
+        self.drawer_layout = QVBoxLayout(self.drawer_widget)
+        self.drawer_layout.setContentsMargins(0, 0, 0, 0)
+        self.drawer_layout.setSpacing(0)
+
+        self._update_theme()
+        if hasattr(theme_manager(), "theme_changed"):
+            theme_manager().theme_changed.connect(self._update_theme)
+
+    def _update_theme(self):
+        border_col = get_token("border", "default")
+        bg_col = get_token("surface") or get_token("base")
+        self.drawer_widget.setStyleSheet(
+            f"#sidebar_drawer {{"
+            f"  background: {bg_col};"
+            f"  border-right: 1px solid {border_col};"
+            f"}}"
+        )
+
+    def attach_sidebar(self, sidebar_widget):
+        if sidebar_widget.parent() != self.drawer_widget:
+            self.drawer_layout.addWidget(sidebar_widget)
+            sidebar_widget.show()
+
+    def sync_geometry(self, target_rect: QRect):
+        self.setGeometry(target_rect)
+        self.drawer_widget.setGeometry(0, 0, min(self._drawer_width, self.width()), self.height())
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        r = self.rect()
+        scrim_rect = QRect(self._drawer_width, 0, max(0, r.width() - self._drawer_width), r.height())
+        if scrim_rect.isValid() and not scrim_rect.isEmpty():
+            painter.fillRect(scrim_rect, self._scrim_color)
+        painter.end()
+
+    def mousePressEvent(self, event):
+        if event.pos().x() > self._drawer_width:
+            if callable(self.on_close):
+                self.on_close()
+            else:
+                self.hide()
+            event.accept()
+        else:
+            super().mousePressEvent(event)
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key_Escape:
+            if callable(self.on_close):
+                self.on_close()
+            else:
+                self.hide()
+            event.accept()
+        else:
+            super().keyPressEvent(event)
+
+
 # ── Main window ───────────────────────────────────────────────────────────────
 
 
@@ -349,6 +430,7 @@ class ProjectWindow(QMainWindow):
         if os.path.exists(_icon_path):
             self.setWindowIcon(QIcon(_icon_path))
         self.resize(1100, 750)
+        self.setMinimumSize(680, 520)
 
         self.main_stack = QStackedWidget()
         self.setCentralWidget(self.main_stack)
@@ -409,33 +491,85 @@ class ProjectWindow(QMainWindow):
         self.menuFile = QMenu("&File", self.menubar)
 
         action_new = QAction("New Project", self)
+        action_new.setShortcut(QKeySequence("Ctrl+Shift+N"))
         action_new.triggered.connect(
             lambda: self.manager.open_project(is_new=True))
         self.menuFile.addAction(action_new)
 
         action_open = QAction("Open Project", self)
+        action_open.setShortcut(QKeySequence("Ctrl+Shift+O"))
         action_open.triggered.connect(self.show_home)
         self.menuFile.addAction(action_open)
 
         self.menuFile.addSeparator()
 
         self.actionSave = QAction("Save", self)
+        self.actionSave.setShortcut(QKeySequence("Ctrl+S"))
         self.actionSave.triggered.connect(self._save_now)
         self.menuFile.addAction(self.actionSave)
 
         self.menuFile.addSeparator()
 
+        action_close = QAction("Close Project", self)
+        action_close.setShortcut(QKeySequence("Ctrl+W"))
+        action_close.triggered.connect(self._close_project)
+        self.menuFile.addAction(action_close)
+
+        # ── Project menu ──────────────────────────────────────────────────
+        self.menuProject = QMenu("&Project", self.menubar)
+
+        action_info = QAction("Info", self)
+        action_info.setShortcut(QKeySequence("Ctrl+I"))
+        action_info.triggered.connect(self._show_project_info)
+        self.menuProject.addAction(action_info)
+
+        action_rename = QAction("Rename", self)
+        action_rename.setShortcut(QKeySequence("F2"))
+        action_rename.triggered.connect(self._rename_project)
+        self.menuProject.addAction(action_rename)
+
+        action_share = QAction("Share", self)
+        action_share.triggered.connect(self._export_project)
+        self.menuProject.addAction(action_share)
+
+        self.menuProject.addSeparator()
+
+        self.actionSaveCheckpoint = QAction("Save Checkpoint", self)
+        self.actionSaveCheckpoint.setShortcut(QKeySequence("Ctrl+Shift+S"))
+        self.actionSaveCheckpoint.triggered.connect(self._open_save_checkpoint_dialog)
+        self.menuProject.addAction(self.actionSaveCheckpoint)
+
+        self.actionCheckpoints = QAction("View Checkpoints", self)
+        self.actionCheckpoints.setShortcut(QKeySequence("Ctrl+Shift+H"))
+        self.actionCheckpoints.triggered.connect(self._open_checkpoint_manager_dialog)
+        self.menuProject.addAction(self.actionCheckpoints)
+
+        self.actionVersionHistory = QAction("Version History", self)
+        self.actionVersionHistory.setShortcut(QKeySequence("Ctrl+H"))
+        self.actionVersionHistory.triggered.connect(self._open_rollback_dialog)
+        self.menuProject.addAction(self.actionVersionHistory)
+
+        self.menuProject.addSeparator()
+
+        self.actionBlobManager = QAction("Blob Manager", self)
+        self.actionBlobManager.triggered.connect(self._open_blob_manager)
+        self.menuProject.addAction(self.actionBlobManager)
+
+        self.menuProject.addSeparator()
+
         # ── Export submenu ────────────────────────────────────────────────
-        self.menuExport = QMenu("Export", self.menuFile)
+        self.menuExport = QMenu("Export", self.menuProject)
         self.menuExport.setStyleSheet(
             f"QMenu::item:disabled {{ color: {get_token('text_disabled')}; }}"
         )
 
         self.actionExportInputsJSON = QAction("Export Inputs as JSON", self)
+        self.actionExportInputsJSON.setShortcut(QKeySequence("Ctrl+E"))
         self.actionExportInputsJSON.triggered.connect(self._export_inputs_json)
         self.menuExport.addAction(self.actionExportInputsJSON)
 
         self.actionExportResultsJSON = QAction("Export Results as JSON", self)
+        self.actionExportResultsJSON.setShortcut(QKeySequence("Ctrl+Shift+E"))
         self.actionExportResultsJSON.setEnabled(False)
         self.actionExportResultsJSON.triggered.connect(
             self._export_results_json)
@@ -447,44 +581,28 @@ class ProjectWindow(QMainWindow):
             self._export_all_data_json)
         self.menuExport.addAction(self.actionExportAllDataJSON)
 
-        self.menuFile.addMenu(self.menuExport)
+        self.menuProject.addMenu(self.menuExport)
 
-        self.menuFile.addSeparator()
+        # ── View menu ─────────────────────────────────────────────────────
+        self.menuView = QMenu("&View", self.menubar)
 
-        action_rename = QAction("Rename", self)
-        action_rename.triggered.connect(self._rename_project)
-        self.menuFile.addAction(action_rename)
+        self.actionToggleSidebar = QAction("Hide Sidebar", self)
+        self.actionToggleSidebar.setIcon(make_icon("menu"))
+        self.actionToggleSidebar.setShortcut(QKeySequence("Ctrl+B"))
+        self.actionToggleSidebar.triggered.connect(self._toggle_sidebar)
+        self.menuView.addAction(self.actionToggleSidebar)
 
-        action_export = QAction("Share", self)
-        action_export.triggered.connect(self._export_project)
-        self.menuFile.addAction(action_export)
+        self.menuView.addSeparator()
 
-        self.menuFile.addSeparator()
-
-        self.actionVersionHistory = QAction("Version History", self)
-        self.actionVersionHistory.triggered.connect(self._open_rollback_dialog)
-        self.menuFile.addAction(self.actionVersionHistory)
-
-        self.actionBlobManager = QAction("Blob Manager", self)
-        self.actionBlobManager.triggered.connect(self._open_blob_manager)
-        self.menuFile.addAction(self.actionBlobManager)
-
-        self.menuFile.addSeparator()
-
-        action_info = QAction("Info", self)
-        action_info.triggered.connect(self._show_project_info)
-        self.menuFile.addAction(action_info)
-
-        self.menuFile.addSeparator()
-
-        action_close = QAction("Close Project", self)
-        action_close.triggered.connect(self._close_project)
-        self.menuFile.addAction(action_close)
+        self.log_action = QAction("&Logs", self)
+        self.log_action.setShortcut(QKeySequence("Ctrl+L"))
+        self.menuView.addAction(self.log_action)
 
         # ── Help menu ─────────────────────────────────────────────────────
         self.menuHelp = QMenu("&Help", self.menubar)
 
         action_glossary = QAction("Glossary", self)
+        action_glossary.setShortcut(QKeySequence("F1"))
         action_glossary.triggered.connect(lambda: open_glossary(parent=self))
         self.menuHelp.addAction(action_glossary)
 
@@ -516,24 +634,40 @@ class ProjectWindow(QMainWindow):
         home_action.setIcon(make_icon("home"))
         home_action.triggered.connect(self.show_home)
 
-        self.log_action = QAction("&Logs", self)
-
         self.menubar.addAction(home_action)
         self.menubar.addMenu(self.menuFile)
-        self.menubar.addAction(self.log_action)
+        self.menubar.addMenu(self.menuProject)
+        self.menubar.addMenu(self.menuView)
         self.menubar.addMenu(self.menuHelp)
         if self.menuDev:
             self.menubar.addMenu(self.menuDev)
 
+        # ── Sidebar Toggle (Hamburger menu) ───────────────────────────
+        self.btn_sidebar_toggle = QPushButton()
+        self.btn_sidebar_toggle.setIcon(make_icon("menu"))
+        self.btn_sidebar_toggle.setIconSize(QSize(18, 18))
+        self.btn_sidebar_toggle.setFixedSize(30, 30)
+        self.btn_sidebar_toggle.setToolTip("Toggle Sidebar (Ctrl+B)")
+        self.btn_sidebar_toggle.setCursor(Qt.PointingHandCursor)
+        _r_menu = "border-radius:4px; min-width:30px; min-height:30px; padding:0px; border:none;"
+        self.btn_sidebar_toggle.setStyleSheet(
+            f"QPushButton         {{ {_r_menu} background:transparent; }}"
+            f"QPushButton:hover   {{ {_r_menu} background:palette(midlight); }}"
+            f"QPushButton:pressed {{ {_r_menu} background:palette(mid); }}"
+        )
+        self.btn_sidebar_toggle.clicked.connect(self._toggle_sidebar)
+        top_bar_layout.addWidget(
+            self.btn_sidebar_toggle, alignment=Qt.AlignmentFlag.AlignVCenter)
+
         top_bar_layout.addWidget(
             self.menubar, alignment=Qt.AlignmentFlag.AlignCenter)
         top_bar_layout.addStretch()
-        self.save_status_bar = SaveStatusBar(controller=self.controller)
-        top_bar_layout.addWidget(self.save_status_bar)
 
-        self.btn_calculate = QPushButton("Calculate")
-        self.btn_calculate.clicked.connect(self._run_calculate)
-        top_bar_layout.addWidget(self.btn_calculate)
+        self.shortcut_calc_f5 = QShortcut(QKeySequence("F5"), self)
+        self.shortcut_calc_f5.activated.connect(self._run_calculate)
+
+        self.shortcut_calc_enter = QShortcut(QKeySequence("Ctrl+Return"), self)
+        self.shortcut_calc_enter.activated.connect(self._run_calculate)
 
         self._frozen = False
         self._lock_tooltip = "Click to lock this project and prevent accidental edits."
@@ -631,6 +765,17 @@ class ProjectWindow(QMainWindow):
         master_layout.addWidget(self.splitter, stretch=1)
         self.main_stack.addWidget(self.project_widget)  # index 1
 
+        self._sidebar_min_w = min_width
+
+        # ── Overlay Drawer for compact screens ───────────────────────────
+        self._drawer_width = max(260, min_width + 16)
+        self.drawer_overlay = _SidebarDrawerOverlay(
+            parent=self.project_widget, on_close=self._close_drawer
+        )
+        self.drawer_overlay._drawer_width = self._drawer_width
+
+        self._update_sidebar_mode()
+
     def _get_or_create_widget(self, name: str):
         """Return the page widget for *name*, creating it on first access."""
         if name in self.widget_map:
@@ -686,6 +831,7 @@ class ProjectWindow(QMainWindow):
                     w.reset_view()
 
             self.content_stack.setCurrentWidget(widget)
+            self._close_drawer()
             return
 
         # Leaf item under a tabbed page - show parent page and select tab
@@ -699,6 +845,7 @@ class ProjectWindow(QMainWindow):
 
                 self.content_stack.setCurrentWidget(w)
                 w.select_tab(header)
+                self._close_drawer()
 
     # ── View switching ────────────────────────────────────────────────────────
 
@@ -711,7 +858,7 @@ class ProjectWindow(QMainWindow):
         self.main_stack.setCurrentWidget(self.home_widget)
         self.manager.refresh_all_home_screens()
         if tab == "compare":
-            QTimer.singleShot(0, lambda: self.home_widget.switch_to_compare(
+            QTimer.singleShot(0, lambda: self.home_widget.open_compare_projects(
                 preselect_pid=project_select))
 
     def show_project_view(self):
@@ -724,6 +871,7 @@ class ProjectWindow(QMainWindow):
         display = self.controller.active_display_name or self.project_id
         self.setWindowTitle(f"3psLCCA - {display}")
         self.main_stack.setCurrentWidget(self.project_widget)
+        self._update_sidebar_mode()
 
         # ── Auto-Results Logic ──────────────────────────────────────────
         # If project was previously analyzed and locked (fit for comparison),
@@ -823,6 +971,107 @@ class ProjectWindow(QMainWindow):
             make_icon("lock", color=get_token("base")) if self._frozen
             else make_icon("lock-open", color=get_token("text"))
         )
+        if hasattr(self, "btn_sidebar_toggle"):
+            _r_menu = "border-radius:4px; min-width:30px; min-height:30px; padding:0px; border:none;"
+            self.btn_sidebar_toggle.setStyleSheet(
+                f"QPushButton         {{ {_r_menu} background:transparent; }}"
+                f"QPushButton:hover   {{ {_r_menu} background:palette(midlight); }}"
+                f"QPushButton:pressed {{ {_r_menu} background:palette(mid); }}"
+            )
+            self.btn_sidebar_toggle.setIcon(make_icon("menu"))
+
+    def _open_drawer(self):
+        if not hasattr(self, "drawer_overlay") or not hasattr(self, "splitter"):
+            return
+        if self.sidebar.parent() != self.drawer_overlay.drawer_widget:
+            self.sidebar.setMinimumWidth(80)
+            self.drawer_overlay.attach_sidebar(self.sidebar)
+        self.drawer_overlay.sync_geometry(self.splitter.geometry())
+        self.drawer_overlay.show()
+        self.drawer_overlay.raise_()
+        if hasattr(self, "btn_sidebar_toggle"):
+            self.btn_sidebar_toggle.setToolTip("Hide Sidebar (Ctrl+B)")
+        if hasattr(self, "actionToggleSidebar"):
+            self.actionToggleSidebar.setText("Hide Sidebar")
+
+    def _close_drawer(self):
+        if hasattr(self, "drawer_overlay") and self.drawer_overlay.isVisible():
+            self.drawer_overlay.hide()
+            if hasattr(self, "btn_sidebar_toggle"):
+                self.btn_sidebar_toggle.setToolTip("Show Sidebar (Ctrl+B)")
+            if hasattr(self, "actionToggleSidebar"):
+                self.actionToggleSidebar.setText("Show Sidebar")
+
+    def _update_sidebar_mode(self):
+        """Sync sidebar between Desktop (splitter) and Compact (overlay drawer)."""
+        if not hasattr(self, "sidebar") or not hasattr(self, "splitter") or not hasattr(self, "drawer_overlay"):
+            return
+        if hasattr(self, "project_widget") and self.main_stack.currentWidget() != self.project_widget:
+            return
+
+        is_large = self.width() >= _LARGE_SCREEN_WIDTH
+
+        if is_large:
+            # Desktop mode: sidebar lives in splitter
+            self.drawer_overlay.hide()
+            if self.sidebar.parent() != self.splitter:
+                min_w = getattr(self, "_sidebar_min_w", 220)
+                self.sidebar.setMinimumWidth(min_w)
+                self.sidebar.setParent(None)
+                self.splitter.insertWidget(0, self.sidebar)
+                self.sidebar.show()
+                total_w = self.splitter.width()
+                self.splitter.setSizes([min_w, max(100, total_w - min_w)])
+            self.btn_sidebar_toggle.setVisible(False)
+            if hasattr(self, "actionToggleSidebar"):
+                self.actionToggleSidebar.setText("Hide Sidebar" if not self.sidebar.isHidden() else "Show Sidebar")
+        else:
+            # Compact mode: sidebar lives in drawer overlay; content stack takes 100% of splitter
+            if self.sidebar.parent() != self.drawer_overlay.drawer_widget:
+                self.sidebar.setMinimumWidth(80)
+                self.drawer_overlay.attach_sidebar(self.sidebar)
+                self.drawer_overlay.hide()
+            self.btn_sidebar_toggle.setVisible(True)
+            if self.drawer_overlay.isVisible():
+                self.drawer_overlay.sync_geometry(self.splitter.geometry())
+                self.drawer_overlay.raise_()
+            if hasattr(self, "actionToggleSidebar"):
+                self.actionToggleSidebar.setText("Hide Sidebar" if self.drawer_overlay.isVisible() else "Show Sidebar")
+
+    def _toggle_sidebar(self):
+        """Toggle sidebar visibility: splitter collapse on wide screens, drawer on compact screens."""
+        if not hasattr(self, "sidebar") or not hasattr(self, "splitter"):
+            return
+        if hasattr(self, "project_widget") and self.main_stack.currentWidget() != self.project_widget:
+            return
+
+        is_large = self.width() >= _LARGE_SCREEN_WIDTH
+
+        if is_large:
+            # Desktop mode: toggle sidebar inside splitter
+            is_vis = not self.sidebar.isHidden()
+            if is_vis:
+                cur_w = self.sidebar.width()
+                if cur_w > 50:
+                    self._saved_sidebar_size = cur_w
+                self.sidebar.setVisible(False)
+                if hasattr(self, "actionToggleSidebar"):
+                    self.actionToggleSidebar.setText("Show Sidebar")
+            else:
+                self.sidebar.setVisible(True)
+                if hasattr(self, "actionToggleSidebar"):
+                    self.actionToggleSidebar.setText("Hide Sidebar")
+                min_w = getattr(self, "_saved_sidebar_size", None) or getattr(self, "_sidebar_min_w", 220)
+                total_w = self.splitter.width()
+                self.splitter.setSizes([min_w, max(100, total_w - min_w)])
+        else:
+            # Compact mode: toggle floating drawer overlay
+            if not hasattr(self, "drawer_overlay"):
+                return
+            if self.drawer_overlay.isVisible():
+                self._close_drawer()
+            else:
+                self._open_drawer()
 
     def _on_lock_toggled(self, checked: bool):
         if not checked and self.outputs_page._has_results:
@@ -1143,6 +1392,18 @@ class ProjectWindow(QMainWindow):
 
         dlg.exec()
 
+    def _open_save_checkpoint_dialog(self):
+        if not self.controller.engine or not self.controller.engine.is_active():
+            return
+        dlg = SaveCheckpointDialog(self.controller, parent=self)
+        dlg.exec()
+
+    def _open_checkpoint_manager_dialog(self):
+        if not self.controller.engine or not self.controller.engine.is_active():
+            return
+        dlg = CheckpointManagerDialog(self.controller, parent=self)
+        dlg.exec()
+
     def _open_rollback_dialog(self):
         if not self.controller.engine or not self.controller.engine.is_active():
             return
@@ -1155,7 +1416,11 @@ class ProjectWindow(QMainWindow):
         dlg = BlobManagerDialog(self.controller, parent=self)
         dlg.exec()
 
-    # ── Close ─────────────────────────────────────────────────────────────────
+    # ── Events ────────────────────────────────────────────────────────────────
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._update_sidebar_mode()
 
     def closeEvent(self, event):
         if FLUSH_MODE:

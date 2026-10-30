@@ -7,7 +7,7 @@ every widget that calls these helpers picks it up automatically.
 Font helper
 -----------
     from gui.styles import font
-    widget.setFont(font(FS_LG, FW_SEMIBOLD))
+    widget.setFont(font(FS_MD, FW_SEMIBOLD))
 
 Button QSS builders
 -------------------

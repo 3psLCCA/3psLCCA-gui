@@ -25,7 +25,7 @@ from ..utils.common_requested_data import get_currency
 
 from ..base_widget import ScrollableForm
 from ..utils.form_builder.form_definitions import FieldDef, Section, ValidationStatus
-from ..utils.form_builder.form_builder import build_form
+from ..utils.form_builder.form_builder import build_form, make_section_header
 from ..utils.validation_helpers import clear_field_styles, freeze_form, freeze_widgets, validate_form, confirm_clear_all
 from ..utils.remarks_editor import RemarksEditor
 from ..utils.wpi_manager import WPIManager, WPIProfile
@@ -349,7 +349,8 @@ OUTSIDE_INDIA_FIELDS = [
 ]
 
 PROJECT_MODE_FIELDS = [
-    FieldDef("mode", "Calculation Mode", "", "combo", options=["INDIA", "GLOBAL"], combo_placeholder=""),
+    Section("Calculation Mode"),
+    FieldDef("mode", "Select Standard / Region", "", "combo", options=["INDIA", "GLOBAL"], combo_placeholder=""),
 ]
 
 
@@ -681,7 +682,8 @@ class TrafficData(ScrollableForm):
         india_layout.setFormAlignment(Qt.AlignTop | Qt.AlignLeft)
         india_layout.setVerticalSpacing(8)
 
-        india_layout.addRow(QLabel("<b>Vehicle Traffic Data</b>"))
+        for widget in make_section_header("Vehicle Traffic Data"):
+            india_layout.addRow(widget)
         self._vehicle_table = _VehicleTrafficTable(on_change=self._on_field_changed)
         india_layout.addRow(self._vehicle_table)
 
@@ -699,7 +701,8 @@ class TrafficData(ScrollableForm):
         self.severity_major.valueChanged.connect(self._on_severity_changed)
         self.severity_fatal.valueChanged.connect(self._on_severity_changed)
 
-        india_layout.addRow(QLabel("<b>Peak Hour Distribution</b>"))
+        for widget in make_section_header("Peak Hour Distribution"):
+            india_layout.addRow(widget)
         self._peak_table = _PeakHoursTable(on_change=self._on_field_changed)
         india_layout.addRow(self._peak_table)
 
@@ -712,7 +715,8 @@ class TrafficData(ScrollableForm):
             self._peak_table.rebuild(self.num_peak_hours.value())
 
         # ── WPI section (India only) ──────────────────────────────────────────
-        india_layout.addRow(QLabel("<b>Wholesale Price Index (WPI) Adjustment Factors</b>"))
+        for widget in make_section_header("Wholesale Price Index (WPI) Adjustment Factors"):
+            india_layout.addRow(widget)
 
         # Unlisted warning (shown if any DB entries failed integrity on load)
         self._wpi_warning = QLabel()

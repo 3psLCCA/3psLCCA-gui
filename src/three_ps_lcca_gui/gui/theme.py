@@ -56,17 +56,12 @@ BTN_LG = 40   # primary CTA
 # ── Typography ─────────────────────────────────────────────────────────────
 FONT_FAMILY = "Ubuntu"
 
-# Point sizes
-FS_XS   =  7   # badge pill, tertiary hint
-FS_SM   =  8   # caption, overline label, sort buttons
-FS_BASE =  9   # body text, standard buttons
-FS_MD   = 10   # sidebar row name, banner label
-FS_LG      = 11   # grid card title
-FS_SUBHEAD = 16   # content-area section heading, group divider
-FS_XL      = 15   # logo / brand mark
-FS_DISP  = 18   # greeting display heading
-FS_DISP_LG = 22 # prominent card values
-FS_DISP_XL = 32 # extra large dashboard highlights
+# Point sizes (Strict 4-Tier System across the entire software)
+# 1 pt ≈ 1.33 px at 96 DPI
+FS_DISP    = 18   # Tier 1 (~24px) - Page Titles, Display Headings, Hero Metrics
+FS_SECTION = 14   # Tier 2 (~18px) - Section Headings, Primary Card Values
+FS_MD      = 10   # Tier 3 (~13px) - Body Text, Buttons, Input Fields, Paragraphs
+FS_SM      =  8   # Tier 4 (~11px) - Micro, Captions, Badges, Overlines, Currency, Hints
 
 # Font weights (match QFont.Weight int values)
 # Toned down for subtler hierarchy:
@@ -84,6 +79,14 @@ QSS_WEIGHTS = {
     "weight-medium":   str(FW_MEDIUM),
     "weight-semibold": str(FW_SEMIBOLD),
     "weight-bold":     str(FW_BOLD),
+}
+
+# Centralized font size tokens for QSS substitution
+QSS_FONTS = {
+    "font-size-disp":    f"{FS_DISP}pt",
+    "font-size-section": f"{FS_SECTION}pt",
+    "font-size-md":      f"{FS_MD}pt",
+    "font-size-sm":      f"{FS_SM}pt",
 }
 
 

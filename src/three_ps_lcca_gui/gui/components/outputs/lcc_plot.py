@@ -11,8 +11,7 @@ matplotlib.use("QtAgg")
 from three_ps_lcca_gui.gui.themes import get_token, theme_manager
 from three_ps_lcca_gui.gui.theme import (
     FONT_FAMILY,
-    FS_XS, FS_SM, FS_BASE, FS_MD, FS_LG, FS_XL,
-    FW_NORMAL, FW_MEDIUM, FW_SEMIBOLD, FW_BOLD, SP4, SP2
+    FS_SM, FS_MD, FW_NORMAL, FW_SEMIBOLD, FW_BOLD, RADIUS_SM
 )
 from three_ps_lcca_gui.gui.components.utils.display_format import fmt_currency
 from three_ps_lcca_gui.gui.components.utils.table_widgets import round_table_viewport, contrast_color
@@ -34,7 +33,7 @@ from PySide6.QtGui import QColor, QFont, QPainter, QPen, QFontMetrics
 from PySide6.QtWidgets import (
     QApplication, QHeaderView, QLabel, QScrollArea, QFrame,
     QSizePolicy, QStyledItemDelegate, QTableWidget, QTableWidgetItem,
-    QVBoxLayout, QWidget, QToolTip, QHBoxLayout
+    QVBoxLayout, QWidget, QToolTip, QHBoxLayout,
 )
 
 try:
@@ -43,6 +42,12 @@ except ImportError:
     from matplotlib.backends.backend_qt import FigureCanvasQTAgg
 
 from .plots_helper.plot_utils import ChartToolbar, WheelForwarder as _ScrollForwarder
+from .table_export import (
+    attach_table_context_menu,
+    create_table_context_menu,
+    export_widget_as_image,
+    copy_widget_to_clipboard,
+)
 
 
 
@@ -208,6 +213,8 @@ class LCCDetailsTable(QWidget):
         self._build_data(results)
         self.table.resizeRowsToContents()
 
+        attach_table_context_menu(self.table, title="Consolidated Stage Summary", default_filename="stage_cost_summary.svg")
+
         lay.addWidget(self.table)
 
         # Compute height from actual row heights after word-wrap
@@ -216,6 +223,19 @@ class LCCDetailsTable(QWidget):
         table_h = header_h + total_row_h + 2
         self.table.setFixedHeight(table_h)
         self.setFixedHeight(table_h)
+
+    def export_as_image(self, file_path: str | None = None, parent=None, format: str = "svg"):
+        """Export the table as an SVG vector or PNG/JPEG image."""
+        return export_widget_as_image(
+            self.table,
+            title="Consolidated Stage Summary",
+            default_filename=file_path or "stage_cost_summary.svg",
+            parent=parent or self,
+            format=format,
+        )
+
+    def copy_to_clipboard(self):
+        return copy_widget_to_clipboard(self.table)
 
     def _build_data(self, results: dict):
         rows = []
@@ -247,8 +267,8 @@ class LCCDetailsTable(QWidget):
 
         self.table.setRowCount(len(rows) + 1)
 
-        f_base = QFont(FONT_FAMILY, FS_BASE, FW_SEMIBOLD)
-        f_bold = QFont(FONT_FAMILY, FS_BASE, FW_BOLD)
+        f_base = QFont(FONT_FAMILY, FS_MD, FW_SEMIBOLD)
+        f_bold = QFont(FONT_FAMILY, FS_MD, FW_BOLD)
 
         _stage_bg = {
             "initial_stage": LCC_PALETTE["init_color"],
@@ -293,30 +313,35 @@ class _VerticalTextDelegate(QStyledItemDelegate):
 
     def paint(self, painter, option, index):
         painter.save()
+        painter.setClipRect(option.rect)
         bg = index.data(Qt.BackgroundRole)
         if bg:
             c = bg.color() if hasattr(bg, "color") else QColor(bg)
             painter.fillRect(option.rect, c)
 
-        painter.translate(
-            option.rect.x() + option.rect.width() / 2,
-            option.rect.y() + option.rect.height() / 2,
-        )
-        painter.rotate(-90)
-
-        text_rect = QRect(
-            -option.rect.height() // 2,
-            -option.rect.width() // 2,
-            option.rect.height(),
-            option.rect.width(),
-        )
         text = (index.data(Qt.DisplayRole) or "").replace("\n", " ")
         font = index.data(Qt.FontRole)
         if font:
             painter.setFont(font)
         fg = index.data(Qt.ForegroundRole)
-        painter.setPen(fg.color() if fg and hasattr(fg, "color") else option.palette.text().color())
-        painter.drawText(text_rect, Qt.AlignCenter, text)
+        painter.setPen(fg.color() if (fg and hasattr(fg, "color")) else option.palette.text().color())
+
+        if option.rect.height() < 55:
+            painter.drawText(option.rect.adjusted(2, 2, -2, -2), Qt.AlignCenter | Qt.TextWordWrap, text)
+        else:
+            painter.translate(
+                option.rect.x() + option.rect.width() / 2,
+                option.rect.y() + option.rect.height() / 2,
+            )
+            painter.rotate(-90)
+
+            text_rect = QRect(
+                -option.rect.height() // 2,
+                -option.rect.width() // 2,
+                option.rect.height(),
+                option.rect.width(),
+            )
+            painter.drawText(text_rect, Qt.AlignCenter, text)
         painter.restore()
 
     def sizeHint(self, option, index):
@@ -525,7 +550,7 @@ class LCCBreakdownTable(QWidget):
         item_w = x_val - self._STAGE_W - self._PAD_X * 2
         item_w = max(item_w, 1)
 
-        fm = QFontMetrics(QFont(FONT_FAMILY, FS_BASE, FW_NORMAL))
+        fm = QFontMetrics(QFont(FONT_FAMILY, FS_MD, FW_NORMAL))
         curr_y = self._PAD_TOP + self._MIN_ROW_H  # header height
         self._row_layouts = []
 
@@ -570,7 +595,7 @@ class LCCBreakdownTable(QWidget):
 
                 # Cost Item column → show full label when clipped
                 if self._STAGE_W <= pos.x() < x_val:
-                    fm = QFontMetrics(QFont(FONT_FAMILY, FS_BASE, FW_NORMAL))
+                    fm = QFontMetrics(QFont(FONT_FAMILY, FS_MD, FW_NORMAL))
                     item_w = x_val - self._STAGE_W - self._PAD_X * 2
                     elided = fm.elidedText(label, Qt.ElideRight, item_w)
                     tip = label if elided != label or "\n" in label else ""
@@ -696,7 +721,7 @@ class LCCBreakdownTable(QWidget):
         lx = self._STAGE_W + self._PAD_X
         p.save()
         p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        p.setFont(QFont(FONT_FAMILY, FS_BASE, FW_NORMAL))
+        p.setFont(QFont(FONT_FAMILY, FS_MD, FW_NORMAL))
         for pillar, color in pillar_colors.items():
             p.fillRect(lx, legend_y, 16, 16, QColor(color))
             p.setPen(color_text)
@@ -709,7 +734,7 @@ class LCCBreakdownTable(QWidget):
         # ── header ────────────────────────────────────────────────────────────
         hdr_y = self._PAD_TOP
         p.fillRect(0, hdr_y, W, self._MIN_ROW_H, color_header_bg)
-        p.setFont(QFont(FONT_FAMILY, FS_BASE, FW_SEMIBOLD))
+        p.setFont(QFont(FONT_FAMILY, FS_MD, FW_SEMIBOLD))
         p.setPen(color_text)
         p.drawText(QRect(self._PAD_X, hdr_y, self._STAGE_W - self._PAD_X * 2, self._MIN_ROW_H),
                    Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, "Stage")
@@ -725,7 +750,7 @@ class LCCBreakdownTable(QWidget):
                    Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, "")
 
         # ── data rows ─────────────────────────────────────────────────────────
-        row_font = QFont(FONT_FAMILY, FS_BASE, FW_NORMAL)
+        row_font = QFont(FONT_FAMILY, FS_MD, FW_NORMAL)
 
         for idx, (cat, label, value, stage_color_hex) in enumerate(self._rows):
             ry, rh = self._row_layouts[idx]
@@ -739,7 +764,7 @@ class LCCBreakdownTable(QWidget):
                     min(255, sc.blue()  * 40 // 100 + 153),
                 )
                 p.fillRect(self._STAGE_W, ry, W - self._STAGE_W, rh, band)
-                p.setFont(QFont(FONT_FAMILY, FS_BASE, FW_SEMIBOLD))
+                p.setFont(QFont(FONT_FAMILY, FS_MD, FW_SEMIBOLD))
                 p.setPen(QColor("#1a1a1a"))
                 p.drawText(
                     QRect(self._STAGE_W + self._PAD_X, ry,
@@ -779,7 +804,7 @@ class LCCBreakdownTable(QWidget):
             if value != 0:
                 filled = max(filled, 1)
 
-            p.setFont(QFont(FONT_FAMILY, FS_BASE, FW_SEMIBOLD))
+            p.setFont(QFont(FONT_FAMILY, FS_MD, FW_SEMIBOLD))
             if value < 0:
                 # Bar grows left from x_bar - same width scale as positive bars
                 p.fillRect(
@@ -854,6 +879,27 @@ class LCCBreakdownTable(QWidget):
         p.drawRect(0, self._PAD_TOP, W - 1, total_h - self._PAD_TOP)
 
         p.end()
+
+    def export_as_image(self, file_path: str | None = None, parent=None, format: str = "svg"):
+        """Export the detailed table as an SVG vector (Option 4) or PNG/JPEG image."""
+        if not self._row_layouts:
+            self._calculate_layout()
+        return export_widget_as_image(
+            self,
+            title="Detailed Cost Breakdown",
+            default_filename=file_path or "detailed_cost_breakdown.svg",
+            parent=parent or self,
+            format=format,
+        )
+
+    def copy_to_clipboard(self):
+        if not self._row_layouts:
+            self._calculate_layout()
+        return copy_widget_to_clipboard(self)
+
+    def contextMenuEvent(self, event):
+        menu = create_table_context_menu(self, title="Detailed Cost Breakdown", default_filename="detailed_cost_breakdown.svg")
+        menu.exec(event.globalPos())
 
     @classmethod
     def in_scroll(cls, results: dict, currency: str = "INR",

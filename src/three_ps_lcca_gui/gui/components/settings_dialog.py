@@ -38,6 +38,7 @@ from three_ps_lcca_gui.gui.themes import (
     reapply,
 )
 import three_ps_lcca_gui.gui.themes as _themes
+from three_ps_lcca_gui.gui.theme import FS_SM
 from three_ps_lcca_gui.gui.styles import btn_outline, font
 from three_ps_lcca_gui.gui.theme import FS_SM, FW_MEDIUM
 from three_ps_lcca_gui.gui.components.agency_profile_dialog import AgencyProfileForm
@@ -279,7 +280,7 @@ class _CircularAvatar(QWidget):
             p.drawEllipse(r)
             p.setPen(QColor("white"))
             f = p.font()
-            f.setPixelSize(10)
+            f.setPointSize(FS_SM)
             f.setBold(True)
             p.setFont(f)
             p.drawText(r, Qt.AlignCenter, "CHANGE")

@@ -18,7 +18,6 @@ Project structure:
 import json
 import hashlib
 import os
-import copy
 import threading
 import time
 import shutil
@@ -39,10 +38,10 @@ BAK_EXT = ".lcca.bak"
 EBAK_EXT = ".lcca.ebak"
 BLOB_EXT = ".blob"
 MAGIC = b"\x4c\x43\x43\x41"  # LCCA in hex
-ENGINE_VER = "3.0.0"
+ENGINE_VER = "3.1.0"
 MANUAL_CHECKPOINT_RETENTION = 10
 AUTO_CHECKPOINT_RETENTION = 5
-MIN_ROTATE_AGE = 0.0  # 0 = always rotate on save (set to 30.0 for production)
+MIN_ROTATE_AGE = 0.0  # seconds an ebak must age before being replaced; 0 = rotate on every save (set to 30.0 for production)
 
 
 # ── Encoding ──────────────────────────────────────────────────────────────────
@@ -62,6 +61,17 @@ def _encode(data: dict, readable: bool = False) -> bytes:
         level=6,
     )
     return MAGIC + compressed
+
+
+def _encode_payload(payload: str, readable: bool = False) -> bytes:
+    """
+    Like _encode but takes already-serialized compact JSON, avoiding a second
+    json.dumps pass on the hot save path. Output is byte-identical to
+    _encode(json.loads(payload), readable).
+    """
+    if readable:
+        return json.dumps(json.loads(payload), indent=4).encode("utf-8")
+    return MAGIC + zlib.compress(payload.encode("utf-8"), level=6)
 
 
 def _decode(raw: bytes) -> dict:
@@ -91,15 +101,31 @@ def _decode(raw: bytes) -> dict:
 # ── Decorator ─────────────────────────────────────────────────────────────────
 
 
-def requires_active(func):
-    @functools.wraps(func)
-    def wrapper(self, *args, **kwargs):
-        if not self._engine_active:
-            self._log(f"Blocked: '{func.__name__}' called on inactive engine.")
-            return None
-        return func(self, *args, **kwargs)
+def requires_active(func=None, *, default_factory=None):
+    """
+    Blocks the call when the engine is inactive.
 
-    return wrapper
+    default_factory (optional) builds the value returned for a blocked call,
+    so methods keep their documented return type even when inactive
+    (e.g. fetch_chunk -> {}, delete_chunk -> False, list_blobs -> []).
+    Without it, a blocked call returns None (original behaviour).
+
+    Usable bare (@requires_active) or called (@requires_active(default_factory=dict)).
+    """
+
+    def decorate(f):
+        @functools.wraps(f)
+        def wrapper(self, *args, **kwargs):
+            if not self._engine_active:
+                self._log(f"Blocked: '{f.__name__}' called on inactive engine.")
+                return default_factory() if default_factory is not None else None
+            return f(self, *args, **kwargs)
+
+        return wrapper
+
+    if func is not None:
+        return decorate(func)
+    return decorate
 
 
 # ── Engine ────────────────────────────────────────────────────────────────────
@@ -109,12 +135,24 @@ class SafeChunkEngine:
     """
     SafeChunk Engine v3.0
 
-    - Auto-saves every 1-2s via debounce + force-save timers
-    - Rolling 3-copy backup per chunk (.lcca / .lcca.bak / .lcca.ebak)
+    - Auto-saves every 1-2s via debounce + force-save deadlines, driven by a
+      single long-lived scheduler thread (no thread creation per update)
+    - stage_update serializes data to JSON once; staged reads return the same
+      canonical form a post-commit read returns
+    - Per-chunk recovery copies:
+        .lcca       current save
+        .lcca.bak   mirror of current (corruption recovery, not history)
+        .lcca.ebak  previous save (rollback target)
     - WAL for crash protection
     - SHA256 integrity check on open
     - Auto-checkpoint on clean close (last 5 kept)
     - readable=True: plain JSON output; readable=False: binary LCCA (default)
+
+    THREADING NOTE: on_status / on_sync / on_fault / on_dirty callbacks can
+    fire from background timer threads (debounce / force-save), not just the
+    caller's thread. UI consumers (Tkinter, Qt, ...) must marshal these
+    callbacks onto the UI thread (e.g. root.after / Signal) before touching
+    widgets.
     """
 
     VERSION = ENGINE_VER
@@ -155,10 +193,21 @@ class SafeChunkEngine:
             os.makedirs(path, exist_ok=True)
             return path
 
-        # Standard AppData path — uses APP_DATA_NAME so user files live in a
-        # separate folder from the app installation folder.
-        base = platformdirs.user_data_dir(data_name)
-        full_path = os.path.join(base, author, "user_projects")
+        # Legacy layout (pre-3.0.1): user_data_dir(candidate)/author/user_projects.
+        # Checks both data_name (e.g. APP_DATA_NAME) and name (APP_NAME) so that
+        # existing projects from previous installs don't silently disappear.
+        for candidate in dict.fromkeys([data_name, name]):
+            if candidate:
+                legacy_path = os.path.join(platformdirs.user_data_dir(candidate), author, "user_projects")
+                if os.path.isdir(legacy_path):
+                    return legacy_path
+
+        # Standard platform convention: user_data_dir(appname, appauthor)
+        # (on Windows: AppData/Local/<author>/<name>)
+        target_name = data_name or name
+        full_path = os.path.join(
+            platformdirs.user_data_dir(target_name, author), "user_projects"
+        )
         os.makedirs(full_path, exist_ok=True)
         return full_path
 
@@ -211,17 +260,25 @@ class SafeChunkEngine:
         self.wal_path = self.project_path / "wal.log"
 
         # ── Threading ─────────────────────────────────────────────────────────
+        # One write lock guards _staged_data and per-chunk disk writes.
+        # A single long-lived scheduler thread replaces the old per-call
+        # threading.Timer pair: stage_update just moves deadlines and notifies,
+        # so no threads are created on the hot path.
         self._write_lock = threading.Lock()
-        self._debounce_timer = None
-        self._force_save_timer = None
+        self._sched_cond = threading.Condition(self._write_lock)
+        self._sched_thread = None
+        self._sched_stop = False
+        self._debounce_deadline = None  # monotonic time; None = not armed
+        self._force_deadline = None
 
         # ── State ─────────────────────────────────────────────────────────────
-        self._staged_data = {}  # chunk_name → dict (uncompressed)
+        self._staged_data = {}  # chunk_name → compact JSON string (serialized once)
         self._session_dirty = False
         self._engine_active = False
         self.log_history = []
 
         # ── Callbacks ─────────────────────────────────────────────────────────
+        # May fire from background timer threads - see class docstring.
         self.on_status: Optional[Callable[[str], None]] = None
         self.on_sync: Optional[Callable[[], None]] = None
         self.on_fault: Optional[Callable[[str], None]] = None
@@ -237,7 +294,11 @@ class SafeChunkEngine:
 
     def _write_admin(self, path: Path, data: dict) -> None:
         """Write an administrative file as plain JSON. Never encrypted.
-        Uses atomic tmp -> fsync -> rename to prevent corruption on crash."""
+        Uses atomic tmp -> fsync -> rename to prevent corruption on crash.
+        Strips the internal '_corrupted' sentinel (set by _read_admin) so it
+        can never leak into a persisted file. '_corrupted' is a reserved key."""
+        if "_corrupted" in data:
+            data = {k: v for k, v in data.items() if k != "_corrupted"}
         tmp = path.with_suffix(".tmp")
         try:
             with open(tmp, "w", encoding="utf-8") as f:
@@ -330,12 +391,15 @@ class SafeChunkEngine:
     # --------------------------------------------------------------------------
 
     def _write_lock_file(self):
+        """Claims the lock atomically (exclusive create).
+        Raises FileExistsError if another process won the race."""
         try:
             proc = psutil.Process(os.getpid())
             create_time = proc.create_time()
         except Exception:
             create_time = 0.0
-        self.lock_path.write_text(f"PID: {os.getpid()}\nCREATED: {create_time}")
+        with open(self.lock_path, "x", encoding="utf-8") as f:
+            f.write(f"PID: {os.getpid()}\nCREATED: {create_time}")
 
     @staticmethod
     def _is_lock_live(lock_path: Path) -> bool:
@@ -409,8 +473,22 @@ class SafeChunkEngine:
                 final_name = self.project_id
             self.display_name = final_name
 
-            # ── Claim lock ────────────────────────────────────────────────────
-            self._write_lock_file()
+            # ── Claim lock (atomic create - loses gracefully if raced) ───────
+            try:
+                self._write_lock_file()
+            except FileExistsError:
+                # Another process created the lock between our stale-check and
+                # the claim. If it's live, back off; if it's stale (e.g. the
+                # racer crashed instantly), clear it and retry once.
+                if self._is_lock_live(self.lock_path):
+                    self._engine_active = False
+                    self._log("ATTACH_DENIED: Project is open in another window.")
+                    return
+                try:
+                    self.lock_path.unlink()
+                except Exception:
+                    pass
+                self._write_lock_file()
 
             # ── Cache close_count for first-run detection ─────────────────────
             self.close_count = existing_version.get("close_count", 0)
@@ -507,6 +585,7 @@ class SafeChunkEngine:
                 )
 
             self._engine_active = True
+            self._start_scheduler()
             self._log(
                 f"Engine v{self.VERSION} attached to "
                 f"'{self.display_name}' ({self.project_id})."
@@ -523,7 +602,7 @@ class SafeChunkEngine:
         """
         Safe close sequence:
           1. Force sync all staged data
-          2. Cancel timers
+          2. Stop the autosave scheduler
           3. Update manifest hashes
           4. Auto-checkpoint if session was dirty
           5. Clear WAL
@@ -537,14 +616,8 @@ class SafeChunkEngine:
         self._log("Detaching. Final sync...")
         self.force_sync()
 
-        # ── Cancel timers ─────────────────────────────────────────────────────
-        with self._write_lock:
-            if self._debounce_timer:
-                self._debounce_timer.cancel()
-                self._debounce_timer = None
-            if self._force_save_timer:
-                self._force_save_timer.cancel()
-                self._force_save_timer = None
+        # ── Stop the autosave scheduler ───────────────────────────────────────
+        self._stop_scheduler()
 
         # ── Update manifest hashes (only if data changed) ────────────────────
         if self._session_dirty:
@@ -631,10 +704,9 @@ class SafeChunkEngine:
         return manifest
 
     def _save_manifest(self, manifest: dict):
-        tmp = self.manifest_path.with_suffix(".tmp")
         try:
-            self._write_admin(tmp, manifest)
-            tmp.replace(self.manifest_path)
+            # _write_admin is already atomic (tmp -> fsync -> rename)
+            self._write_admin(self.manifest_path, manifest)
         except Exception as e:
             self._log(f"Manifest save failed: {e}")
 
@@ -678,10 +750,17 @@ class SafeChunkEngine:
         """
         Verifies each .lcca file against stored SHA256 in manifest.
         Returns list of chunk names that failed - empty list means all good.
+
+        A hash mismatch on a file that still DECODES cleanly means the
+        manifest is stale (e.g. a crash after a successful save but before
+        detach() refreshed the hashes), not that the file is damaged. Those
+        files are kept and their manifest hash is refreshed - restoring from
+        backup would silently roll back a valid newer save.
         """
         manifest = self._load_manifest()
         chunks = manifest.get("chunks", {})
         damaged = []
+        refreshed = []
 
         for chunk_name, info in chunks.items():
             if not isinstance(info, dict):
@@ -694,10 +773,26 @@ class SafeChunkEngine:
                 damaged.append(chunk_name)
                 continue
             try:
-                if hashlib.sha256(lcca.read_bytes()).hexdigest() != stored_hash:
-                    damaged.append(chunk_name)
+                raw = lcca.read_bytes()
+                actual_hash = hashlib.sha256(raw).hexdigest()
+                if actual_hash != stored_hash:
+                    try:
+                        _decode(raw)  # valid content, just a stale manifest
+                        info["hash"] = actual_hash
+                        info["saved_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
+                        refreshed.append(chunk_name)
+                    except Exception:
+                        damaged.append(chunk_name)
             except Exception:
                 damaged.append(chunk_name)
+
+        if refreshed:
+            manifest["chunks"] = chunks
+            self._save_manifest(manifest)
+            self._log(
+                f"Integrity: {len(refreshed)} chunk(s) had stale manifest hashes "
+                f"but valid content {refreshed} - hashes refreshed, files kept."
+            )
 
         return damaged
 
@@ -732,17 +827,23 @@ class SafeChunkEngine:
     # WAL (WRITE-AHEAD LOG)
     # --------------------------------------------------------------------------
 
-    def _wal_append(self, chunk_name: str, data: dict):
+    def _wal_append(self, chunk_name: str, payload: str):
         """Synchronously appends a WAL entry before any disk write.
+
+        payload is the chunk's already-serialized compact JSON. It is spliced
+        into the record directly - no re-serialization - while keeping the
+        v3.0 wire format byte-compatible, so an old engine can replay a WAL
+        left behind by a crashed new-engine session.
 
         optimize=True  - flush only (no fsync). Faster; tiny crash window
                          between flush and the OS writing through to disk.
         optimize=False - full fsync, original safe behaviour.
         """
         try:
-            entry = json.dumps(
-                {"chunk": chunk_name, "ts": time.time(), "data": data},
-                separators=(",", ":"),
+            entry = (
+                f'{{"chunk":{json.dumps(chunk_name)},'
+                f'"ts":{json.dumps(time.time())},'
+                f'"data":{payload}}}'
             )
             crc = zlib.crc32(entry.encode()) & 0xFFFFFFFF
             record = json.dumps({"e": entry, "crc": crc}, separators=(",", ":")) + "\n"
@@ -780,7 +881,11 @@ class SafeChunkEngine:
                 except Exception:
                     remaining.append(line)
             if remaining:
-                self.wal_path.write_text("\n".join(remaining) + "\n", encoding="utf-8")
+                # Atomic rewrite - a crash mid-rewrite must not lose the
+                # entries for chunks that are still uncommitted.
+                tmp = self.wal_path.with_suffix(".tmp")
+                tmp.write_text("\n".join(remaining) + "\n", encoding="utf-8")
+                tmp.replace(self.wal_path)
             else:
                 self.wal_path.unlink()
         except Exception as e:
@@ -812,7 +917,10 @@ class SafeChunkEngine:
                     chunk_name = entry.get("chunk", "").strip()
                     data = entry.get("data")
                     if chunk_name and data is not None:
-                        self._staged_data[chunk_name] = data
+                        # Staged store holds compact JSON strings
+                        self._staged_data[chunk_name] = json.dumps(
+                            data, separators=(",", ":")
+                        )
                         replayed += 1
                 except Exception as e:
                     self._log(f"WAL: Skipping unreadable entry: {e}")
@@ -837,8 +945,20 @@ class SafeChunkEngine:
     @requires_active
     def stage_update(self, data: dict, chunk_name: str):
         """
-        Buffers data in memory and triggers debounce + force-save timers.
+        Buffers data in memory and arms the debounce + force-save deadlines.
         Appends to WAL immediately for crash protection.
+
+        Data is serialized to JSON exactly once, here - the same serialized
+        form is used for the staged copy, the WAL record and the disk write.
+        Consequences:
+          - Non-JSON-serializable data is rejected immediately (logs a FAULT
+            and returns) instead of failing at every later commit.
+          - Fetching staged data returns the same JSON-canonical form a fetch
+            after commit returns (tuples become lists, int keys become str).
+
+        Re-staging content identical to what is already staged skips the WAL
+        append and deadline updates - the pending save already covers it.
+        The dirty callbacks still fire, so observable behaviour is unchanged.
         """
         if not self._safe_name(chunk_name):
             self._log(
@@ -846,33 +966,33 @@ class SafeChunkEngine:
             )
             return
 
-        with self._write_lock:
-            self._staged_data[chunk_name] = copy.deepcopy(data)
-            self._wal_append(chunk_name, data)
-
-            # Debounce - resets on every call
-            if self._debounce_timer:
-                self._debounce_timer.cancel()
-            self._debounce_timer = threading.Timer(
-                self.debounce_delay, self._commit_to_disk
+        try:
+            payload = json.dumps(data, separators=(",", ":"))
+        except (TypeError, ValueError) as e:
+            self._handle_error(
+                f"stage_update: data for '{chunk_name}' is not JSON-serializable: {e}"
             )
-            self._debounce_timer.daemon = True
-            self._debounce_timer.start()
+            return
 
-            # Force-save - fires once per burst, guaranteed
-            if self._force_save_timer is None:
-                self._force_save_timer = threading.Timer(
-                    self.force_save_delay, self._force_save_from_timer
-                )
-                self._force_save_timer.daemon = True
-                self._force_save_timer.start()
+        with self._sched_cond:
+            if self._staged_data.get(chunk_name) != payload:
+                self._staged_data[chunk_name] = payload
+                self._wal_append(chunk_name, payload)
+
+                # Debounce resets on every change; force-save arms once per
+                # burst so continuous staging can't starve commits.
+                now = time.monotonic()
+                self._debounce_deadline = now + self.debounce_delay
+                if self._force_deadline is None:
+                    self._force_deadline = now + self.force_save_delay
+                self._sched_cond.notify_all()
 
         if self.on_dirty:
             self.on_dirty(True)
         if self.on_status:
             self.on_status("Unsaved changes...")
 
-    @requires_active
+    @requires_active(default_factory=dict)
     def fetch_chunk(self, chunk_name: str) -> dict:
         """
         Returns chunk data.
@@ -884,8 +1004,11 @@ class SafeChunkEngine:
             )
             return {}
         with self._write_lock:
-            if chunk_name in self._staged_data:
-                return copy.deepcopy(self._staged_data[chunk_name])
+            payload = self._staged_data.get(chunk_name)
+        if payload is not None:
+            # Parse outside the lock; returns a fresh dict per call (same
+            # caller-isolation guarantee deepcopy used to provide).
+            return json.loads(payload)
         return self._read_chunk_with_fallback(chunk_name)
 
     # Alias for backward compatibility
@@ -928,19 +1051,68 @@ class SafeChunkEngine:
     def force_sync(self):
         """Immediately flushes all staged data to disk."""
         with self._write_lock:
-            if self._debounce_timer:
-                self._debounce_timer.cancel()
-                self._debounce_timer = None
-            if self._force_save_timer:
-                self._force_save_timer.cancel()
-                self._force_save_timer = None
+            self._debounce_deadline = None
+            self._force_deadline = None
         self._commit_to_disk()
 
-    def _force_save_from_timer(self):
-        with self._write_lock:
-            self._force_save_timer = None
-        self._commit_to_disk()
-        self._log(f"Force-save fired after {self.force_save_delay}s.")
+    # --------------------------------------------------------------------------
+    # AUTOSAVE SCHEDULER
+    # --------------------------------------------------------------------------
+
+    def _start_scheduler(self):
+        if self._sched_thread is not None and self._sched_thread.is_alive():
+            return
+        self._sched_stop = False
+        self._sched_thread = threading.Thread(
+            target=self._scheduler_loop, daemon=True, name="SafeChunkScheduler"
+        )
+        self._sched_thread.start()
+
+    def _stop_scheduler(self):
+        with self._sched_cond:
+            self._sched_stop = True
+            self._debounce_deadline = None
+            self._force_deadline = None
+            self._sched_cond.notify_all()
+        if self._sched_thread is not None and self._sched_thread.is_alive():
+            self._sched_thread.join(timeout=5.0)
+        self._sched_thread = None
+
+    def _scheduler_loop(self):
+        """
+        Single long-lived autosave thread. Sleeps until the earliest armed
+        deadline (or indefinitely when none is armed), fires a commit, and
+        repeats. Replaces the old per-stage_update threading.Timer pair, so
+        the hot path never creates threads.
+        """
+        while True:
+            fire_force = False
+            with self._sched_cond:
+                while not self._sched_stop:
+                    deadlines = [
+                        d
+                        for d in (self._debounce_deadline, self._force_deadline)
+                        if d is not None
+                    ]
+                    if not deadlines:
+                        self._sched_cond.wait()
+                        continue
+                    remaining = min(deadlines) - time.monotonic()
+                    if remaining > 0:
+                        self._sched_cond.wait(remaining)
+                        continue
+                    break  # a deadline has passed - commit
+                if self._sched_stop:
+                    return
+                fire_force = (
+                    self._force_deadline is not None
+                    and time.monotonic() >= self._force_deadline
+                )
+                self._debounce_deadline = None
+                self._force_deadline = None
+            self._commit_to_disk()
+            if fire_force:
+                self._log(f"Force-save fired after {self.force_save_delay}s.")
 
     # --------------------------------------------------------------------------
     # ATOMIC WRITE + ROTATION
@@ -949,80 +1121,124 @@ class SafeChunkEngine:
     def _commit_to_disk(self):
         """Writes all staged chunks to disk atomically with rotation.
 
-        optimize=True  - collects all successfully written chunk names and
-                         removes them from the WAL in a single rewrite pass.
-        optimize=False - removes each chunk from WAL individually after write
-                         (original behaviour, one rewrite per chunk).
+        Locking is per chunk, not per batch: the write lock is held only for
+        one chunk's write (and fsync) at a time, so stage_update / fetch_chunk
+        on other threads wait at most one chunk write instead of the whole
+        commit. Before each write the chunk is re-checked against the staged
+        snapshot - if it was re-staged with newer data or deleted mid-commit,
+        the stale write is skipped.
+
+        Callbacks (on_dirty / on_sync) fire OUTSIDE the lock, so a handler may
+        safely call back into the engine (e.g. fetch_chunk) without deadlock.
+
+        optimize=True  - committed chunks are removed from the WAL in a single
+                         rewrite pass (or the WAL is dropped whole if nothing
+                         is left staged).
+        optimize=False - one WAL rewrite per chunk (original behaviour).
         """
         with self._write_lock:
             if not self._staged_data or not self._engine_active:
                 return
+            snapshot = list(self._staged_data.items())
 
-            failed = []
-            committed = []
-            for chunk_name, data in list(self._staged_data.items()):
+        failed = []
+        committed = []
+        for chunk_name, payload in snapshot:
+            with self._write_lock:
+                if self._staged_data.get(chunk_name) != payload:
+                    continue  # re-staged with newer data or deleted mid-commit
                 try:
-                    self._write_chunk(chunk_name, data)
+                    self._write_chunk(chunk_name, payload)
                     del self._staged_data[chunk_name]
-                    if self.optimize:
-                        committed.append(chunk_name)  # batch for single WAL rewrite
-                    else:
-                        self._wal_remove(chunk_name)  # original: one rewrite per chunk
+                    committed.append(chunk_name)
                 except Exception as e:
                     failed.append(chunk_name)
                     self._log(f"Commit failed for {chunk_name}: {e}")
 
-            # Batched WAL remove - single file rewrite for all committed chunks
-            if self.optimize and committed:
-                self._wal_remove_batch(committed)
+        with self._write_lock:
+            if committed:
+                # Never remove WAL entries for chunks that were re-staged
+                # during the commit - their newest entry is still uncommitted.
+                # (Superseded older entries are harmless: replay applies lines
+                # in order, so the latest one wins.)
+                removable = [n for n in committed if n not in self._staged_data]
+                if self.optimize:
+                    if not self._staged_data and not failed:
+                        self._wal_clear()  # everything committed - drop whole WAL
+                    elif removable:
+                        self._wal_remove_batch(removable)
+                else:
+                    for name in removable:
+                        self._wal_remove(name)
+            if committed or failed:
+                self._session_dirty = True
+            still_dirty = bool(self._staged_data)
 
-            self._debounce_timer = None
-            self._session_dirty = True
+        if failed:
+            self._handle_error(f"Commit failed for: {failed}")
+        elif committed:
+            if self.on_dirty:
+                self.on_dirty(still_dirty)
+            if self.on_sync:
+                self.on_sync()
+            self._log("Commit successful.")
 
-            if failed:
-                self._handle_error(f"Commit failed for: {failed}")
-            else:
-                if self.on_dirty:
-                    self.on_dirty(False)
-                if self.on_sync:
-                    self.on_sync()
-                self._log("Commit successful.")
-
-    def _write_chunk(self, chunk_name: str, data: dict):
+    def _write_chunk(self, chunk_name: str, payload: str):
         """
-        Atomic write with rolling rotation:
+        Atomic write with rolling rotation. payload is the chunk's compact
+        JSON string (serialized once in stage_update):
           lcca  → ebak   (previous current pushed back)
           new   → tmp → lcca  (atomic fsync + rename)
           lcca  → bak    (mirror of current, always identical to lcca)
 
         Result after each save:
           lcca  = current
-          bak   = mirror of current
+          bak   = mirror of current (corruption recovery, NOT a history copy)
           ebak  = previous current (one save behind)
+
+        MIN_ROTATE_AGE throttles the lcca → ebak rotation: an existing ebak
+        younger than MIN_ROTATE_AGE seconds is kept, so rapid consecutive
+        saves don't collapse the rollback history into near-identical copies.
+        0 disables the throttle (rotate on every save).
         """
         lcca = self.chunks_path / f"{chunk_name}{LCCA_EXT}"
         bak = self.chunks_bak_path / f"{chunk_name}{BAK_EXT}"
         ebak = self.chunks_bak_path / f"{chunk_name}{EBAK_EXT}"
 
-        encoded = _encode(data, self.readable)
+        encoded = _encode_payload(payload, self.readable)
+
+        # Read the existing file ONCE - reused for both the unchanged-content
+        # early-out and the rotation validity check below.
+        existing = None
+        if lcca.exists():
+            try:
+                existing = lcca.read_bytes()
+            except Exception:
+                existing = None
 
         # Skip if content unchanged
-        if lcca.exists():
-            try:
-                if lcca.read_bytes() == encoded:
-                    return
-            except Exception:
-                pass
+        if existing is not None and existing == encoded:
+            return
 
         # Current lcca → ebak before overwriting (only if valid - never rotate a corrupt file)
-        if lcca.exists():
-            try:
-                _decode(lcca.read_bytes())
-                shutil.copy2(lcca, ebak)
-            except Exception:
-                self._log(
-                    f"WARNING: existing {chunk_name}.lcca is corrupt - skipping rotation to ebak."
-                )
+        if existing is not None:
+            rotate = True
+            if MIN_ROTATE_AGE > 0 and ebak.exists():
+                try:
+                    # copy2 preserves mtime, so ebak's mtime is the time the
+                    # rotated save was originally written - i.e. its real age.
+                    if time.time() - ebak.stat().st_mtime < MIN_ROTATE_AGE:
+                        rotate = False
+                except Exception:
+                    pass
+            if rotate:
+                try:
+                    _decode(existing)
+                    shutil.copy2(lcca, ebak)
+                except Exception:
+                    self._log(
+                        f"WARNING: existing {chunk_name}.lcca is corrupt - skipping rotation to ebak."
+                    )
 
         # Atomic write: tmp → fsync → rename
         tmp = lcca.with_suffix(".tmp")
@@ -1032,8 +1248,8 @@ class SafeChunkEngine:
             os.fsync(f.fileno())
         tmp.replace(lcca)
 
-        # Mirror current lcca → bak (safety copy, always same as lcca)
-        shutil.copy2(lcca, bak)
+        # Mirror to bak from the bytes already in memory (no re-read of lcca)
+        bak.write_bytes(encoded)
 
     # --------------------------------------------------------------------------
     # CHECKPOINTS
@@ -1143,9 +1359,21 @@ class SafeChunkEngine:
         }
 
         try:
+            # Binary-mode .lcca files are already zlib-compressed, but their
+            # compressed streams can still carry long-range redundancy (zlib's
+            # window is only 32 KB), so storing them uncompressed can balloon
+            # checkpoints (measured up to 9x on repetitive data). Deflate
+            # level 1 keeps that size win at a fraction of level 9's CPU cost.
+            # Readable-mode chunks are plain JSON and use the default level.
+            chunk_level = None if self.readable else 1
             with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
                 for f in self.chunks_path.glob(f"*{LCCA_EXT}"):
-                    zf.write(f, arcname=f"chunks/{f.name}")
+                    zf.write(
+                        f,
+                        arcname=f"chunks/{f.name}",
+                        compress_type=zipfile.ZIP_DEFLATED,
+                        compresslevel=chunk_level,
+                    )
                 if self.manifest_path.exists():
                     zf.write(self.manifest_path, arcname="manifest.json")
                 if self.version_path.exists():
@@ -1229,7 +1457,7 @@ class SafeChunkEngine:
         except Exception:
             return False
 
-    @requires_active
+    @requires_active(default_factory=lambda: False)
     def restore_checkpoint(self, zip_name: str) -> bool:
         """
         Restores project from checkpoint ZIP.
@@ -1255,12 +1483,8 @@ class SafeChunkEngine:
         staging = self.project_path / "_restore_staging"
         try:
             with self._write_lock:
-                if self._debounce_timer:
-                    self._debounce_timer.cancel()
-                    self._debounce_timer = None
-                if self._force_save_timer:
-                    self._force_save_timer.cancel()
-                    self._force_save_timer = None
+                self._debounce_deadline = None
+                self._force_deadline = None
                 self._staged_data.clear()
 
             if staging.exists():
@@ -1432,7 +1656,7 @@ class SafeChunkEngine:
         """Returns names of all stored chunks."""
         return [f.name[: -len(LCCA_EXT)] for f in self.chunks_path.glob(f"*{LCCA_EXT}")]
 
-    @requires_active
+    @requires_active(default_factory=lambda: False)
     def delete_chunk(self, chunk_name: str) -> bool:
         """
         Permanently deletes a chunk and all its backup copies from disk.
@@ -1450,8 +1674,10 @@ class SafeChunkEngine:
 
         try:
             # Hold the write lock while clearing staged data and unlinking .lcca
-            # so a concurrent _commit_to_disk can't write the chunk back between steps.
-            # Do NOT cancel _debounce_timer here - it is shared across all chunks.
+            # so a concurrent _commit_to_disk can't write the chunk back between
+            # steps (its per-chunk re-check sees the staged entry is gone).
+            # Do NOT clear the autosave deadlines here - they are shared across
+            # all chunks.
             with self._write_lock:
                 was_staged = chunk_name in self._staged_data
                 self._staged_data.pop(chunk_name, None)
@@ -1491,6 +1717,12 @@ class SafeChunkEngine:
         """
         Returns available rollback copies for a chunk with timestamps.
         Used by UI to show user their options.
+
+        Labels reflect what each file actually contains:
+          .lcca - current save
+          .bak  - mirror of the current save (corruption recovery copy;
+                  rolling back to it is a no-op)
+          .ebak - the previous save (the real rollback target)
         """
         options = []
 
@@ -1500,8 +1732,8 @@ class SafeChunkEngine:
 
         for path, label in [
             (lcca, "Current"),
-            (bak, "Previous save"),
-            (ebak, "Earlier save"),
+            (bak, "Backup of current"),
+            (ebak, "Previous save"),
         ]:
             if path.exists():
                 try:
@@ -1767,7 +1999,7 @@ class SafeChunkEngine:
             )
             return None
 
-    @requires_active
+    @requires_active(default_factory=lambda: False)
     def delete_blob(self, blob_name: str) -> bool:
         """
         Deletes a blob from disk and removes its entry from blob_manifest.json.
@@ -1798,7 +2030,7 @@ class SafeChunkEngine:
             self._handle_error(f"delete_blob failed for '{blob_name}': {e}")
             return False
 
-    @requires_active
+    @requires_active(default_factory=list)
     def list_blobs(self) -> list[dict]:
         """
         Returns metadata for all stored blobs.
@@ -1995,14 +2227,14 @@ class SafeChunkEngine:
             vf = item / "version.json"
             if vf.exists():
                 data = SafeChunkEngine._read_admin(vf)
-                if data:
+                if data.pop("_corrupted", False):
+                    info["status"] = "corrupted"
+                else:
                     name = data.get("display_name", "").strip()
                     if name and name != item.name:
                         info["display_name"] = name
                     if not data.get("clean_close", True) and info["status"] == "ok":
                         info["status"] = "crashed"
-                else:
-                    info["status"] = "corrupted"
 
             # project_meta.json - app/user metadata (always plain JSON)
             pm = item / "project_meta.json"
@@ -2059,7 +2291,9 @@ class SafeChunkEngine:
 
         vf = item / "version.json"
         data = SafeChunkEngine._read_admin(vf)
-        if data:
+        if data.pop("_corrupted", False):
+            info["status"] = "corrupted"
+        elif data:
             info["display_name"] = data.get("display_name", project_id)
             info["app_version"] = data.get("app_version")
             info["engine_version"] = data.get("engine_version")
@@ -2067,8 +2301,6 @@ class SafeChunkEngine:
             info["readable"] = data.get("readable", False)
             if not info["clean_close"]:
                 info["status"] = "crashed"
-        elif vf.exists():
-            info["status"] = "corrupted"
 
         pm = item / "project_meta.json"
         if pm.exists():
