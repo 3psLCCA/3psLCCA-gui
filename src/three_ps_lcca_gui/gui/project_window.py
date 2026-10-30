@@ -663,11 +663,6 @@ class ProjectWindow(QMainWindow):
             self.menubar, alignment=Qt.AlignmentFlag.AlignCenter)
         top_bar_layout.addStretch()
 
-        self.btn_calculate = QPushButton("Calculate")
-        self.btn_calculate.setToolTip("Calculate (F5 / Ctrl+Enter)")
-        self.btn_calculate.clicked.connect(self._run_calculate)
-        top_bar_layout.addWidget(self.btn_calculate)
-
         self.shortcut_calc_f5 = QShortcut(QKeySequence("F5"), self)
         self.shortcut_calc_f5.activated.connect(self._run_calculate)
 

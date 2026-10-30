@@ -433,14 +433,39 @@ TABLE_SPINBOX_BASE_QSS = (
 )
 
 
-class TableDoubleSpinBox(QDoubleSpinBox):
+class _FitEditorMixin:
+    """Force the inner editor to fill the spin box (minus a small side margin).
+    On some Qt/PySide builds the style-sheet edit-field rect collapses to ~0 px
+    when the up/down buttons are zero-width, leaving the text invisible."""
+
+    _EDITOR_MARGIN = 4
+
+    def _fit_editor(self):
+        m = self._EDITOR_MARGIN
+        self.lineEdit().setGeometry(self.rect().adjusted(m, 0, -m, 0))
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._fit_editor()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self._fit_editor()
+
+    def changeEvent(self, event):
+        super().changeEvent(event)
+        if event.type() in (QEvent.StyleChange, QEvent.FontChange):
+            self._fit_editor()
+
+
+class TableDoubleSpinBox(_FitEditorMixin, QDoubleSpinBox):
     """QDoubleSpinBox subclass for table cells.
     Named differently so main.qss compact rules apply instead of the
     standard form-control padding/min-height rules.
     """
 
 
-class TableSpinBox(QSpinBox):
+class TableSpinBox(_FitEditorMixin, QSpinBox):
     """QSpinBox subclass for table cells. Same rationale as TableDoubleSpinBox."""
 
 

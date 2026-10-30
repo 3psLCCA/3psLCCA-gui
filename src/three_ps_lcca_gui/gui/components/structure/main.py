@@ -107,7 +107,7 @@ class _TrashBadgeButton(QWidget):
         if self._is_back_mode:
             self.setFixedSize(124, 44)
             self.btn.setFixedSize(124, 36)
-            self.btn.move(0, 8)
+            self.btn.move(0, 4)
             self.btn.setText("Back to Work")
             self.btn.setIcon(make_icon("restore", color=get_token("success")))
             self.btn.setIconSize(QSize(16, 16))
@@ -115,10 +115,10 @@ class _TrashBadgeButton(QWidget):
         else:
             self.setFixedSize(50, 44)
             self.btn.setFixedSize(36, 36)
-            self.btn.move(0, 8)
+            self.btn.move(0, 4)
             self.btn.setText("")
             self.btn.setIcon(make_icon("trash-outline", color=get_token("text_secondary")))
-            self.btn.setIconSize(QSize(18, 18))
+            self.btn.setIconSize(QSize(15, 15))
             self.btn.setToolTip("View Trash Bin")
 
     def apply_theme(self):
@@ -208,6 +208,9 @@ class StructureTabView(QWidget):
         top_area = QWidget()
         top_layout = QHBoxLayout(top_area)
         top_layout.setContentsMargins(0, 0, 0, 0)
+        # Trash button widget is 44px tall (button centred, 4px above/below for the count badge);
+        # keep the row at least that tall so the button isn't clipped.
+        top_area.setMinimumHeight(44)
 
         region_info = QVBoxLayout()
         region_info.setContentsMargins(0, 0, 0, 0)
@@ -249,8 +252,8 @@ class StructureTabView(QWidget):
         # Trash Button with Count Badge
         self.trash_btn = _TrashBadgeButton()
 
-        top_layout.addWidget(self.action_pill, 0, Qt.AlignBottom)
-        top_layout.addWidget(self.trash_btn, 0, Qt.AlignBottom)
+        top_layout.addWidget(self.action_pill, 0, Qt.AlignVCenter)
+        top_layout.addWidget(self.trash_btn, 0, Qt.AlignVCenter)
 
         self._apply_theme_colors()
         theme_manager().theme_changed.connect(self._apply_theme_colors)

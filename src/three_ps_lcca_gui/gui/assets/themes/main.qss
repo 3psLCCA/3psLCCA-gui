@@ -210,6 +210,28 @@ TableDoubleSpinBox::down-button {
     background: transparent;
 }
 
+/* Force the inner editor of table-cell spin boxes to be compact and visible
+   (otherwise it picks up the generic QLineEdit padding/min-height rules). */
+TableSpinBox QLineEdit,
+TableDoubleSpinBox QLineEdit {
+    background-color: transparent;
+    border: none;
+    border-radius: 0;
+    padding: 0;
+    margin: 0;
+    min-height: 0;
+    color: $text;
+    font-size: $font-size-md;
+    selection-background-color: $primary;
+    selection-color: $text-on-primary;
+}
+
+TableSpinBox[frozen="true"] QLineEdit,
+TableDoubleSpinBox[frozen="true"] QLineEdit,
+TableSpinBox[isZero="true"] QLineEdit,
+TableDoubleSpinBox[isZero="true"] QLineEdit {
+    color: $text_disabled;
+}
 
 /* ── Table-cell line edit (transparent, borderless - cell border on focus) ── */
 TableLineEdit {

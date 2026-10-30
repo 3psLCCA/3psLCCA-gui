@@ -271,6 +271,8 @@ def main():
     app.installEventFilter(table_filter)
     app.installEventFilter(focus_filter)
     app.installEventFilter(hdr_wrap_filter)
+    from three_ps_lcca_gui.gui.components.utils.spinbox_fix import install as _install_spinbox_fix
+    _install_spinbox_fix(app)
 
     # Runtime Theme Switching (Qt 6.5+)
     try:
