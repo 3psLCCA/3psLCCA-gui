@@ -143,8 +143,30 @@ jobs:
           exit 1
         fi
 
+    - name: Ensure DEV_MODE is False in _CONFIG.py
+
+      run: |
+        set -e
+        CONFIG="src/three_ps_lcca_gui/gui/_CONFIG.py"
+
+        if [ ! -f "$CONFIG" ]; then
+          echo "[ERROR] ERROR: $CONFIG not found!"
+          exit 1
+        fi
+
+        sed -i -E "s/^DEV_MODE([[:space:]]*)=.*/DEV_MODE\1= False/" "$CONFIG"
+
+        if grep -Eq "^DEV_MODE[[:space:]]*=[[:space:]]*False[[:space:]]*$" "$CONFIG"; then
+          echo "[SUCCESS] DEV_MODE is False"
+          grep "^DEV_MODE" "$CONFIG"
+        else
+          echo "[ERROR] ERROR: DEV_MODE could not be set to False"
+          cat "$CONFIG"
+          exit 1
+        fi
+
     - name: Build conda package
-      
+
       run: |
         set -e
 
