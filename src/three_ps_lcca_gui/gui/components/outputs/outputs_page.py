@@ -131,7 +131,7 @@ class LCCDetailsSection(QWidget):
 
     def __init__(self, results: dict, currency: str, parent=None):
         super().__init__(parent)
-        self.setStyleSheet("background: transparent; border: none;")
+        self.setStyleSheet(f"{type(self).__name__} {{ background: transparent; border: none; }}")
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(0)
@@ -155,7 +155,7 @@ class LCCBreakdownSection(QWidget):
 
     def __init__(self, results: dict, currency: str, parent=None):
         super().__init__(parent)
-        self.setStyleSheet("background: transparent; border: none;")
+        self.setStyleSheet(f"{type(self).__name__} {{ background: transparent; border: none; }}")
         lay = QVBoxLayout(self)
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(0)
@@ -836,7 +836,7 @@ class OutputsPage(ScrollableForm):
         self._currency = ""
         self._current_status = "idle"
         self._status_args: dict = {}
-        self.setStyleSheet(f"background-color: {get_token('window')};")
+        self.setStyleSheet(f"{type(self).__name__} {{ background-color: {get_token('window')}; }}")
         self._build_ui()
         theme_manager().theme_changed.connect(self._refresh_styles)
 
@@ -1003,7 +1003,7 @@ class OutputsPage(ScrollableForm):
     # ── Theme refresh ─────────────────────────────────────────
 
     def _refresh_styles(self):
-        self.setStyleSheet(f"background-color: {get_token('window')};")
+        self.setStyleSheet(f"{type(self).__name__} {{ background-color: {get_token('window')}; }}")
         if hasattr(self, "_hdr_row"):
             self._hdr_row.setStyleSheet(
                 f"#resultsHeader {{"
