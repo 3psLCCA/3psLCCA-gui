@@ -172,8 +172,9 @@ jobs:
 
         echo "Starting conda-build..."
         echo "Recipe location: $(pwd)/conda-recipe"
-
-        conda-build conda-recipe --output-folder dist
+        CONDA_BLD_PATH="${RUNNER_TEMP}/conda-bld"
+        mkdir -p "$CONDA_BLD_PATH"
+        conda-build conda-recipe --croot "$CONDA_BLD_PATH" --output-folder dist
 
         echo "[SUCCESS] Build successful"
         echo "Built packages:"
