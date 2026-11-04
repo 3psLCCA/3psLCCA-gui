@@ -2033,12 +2033,12 @@ class ComparisonResultWindow(QWidget):
             cur_btn.clicked.connect(lambda: self._prompt_currency(sorted(currencies)))
             hdr_row.addWidget(cur_btn)
 
-        pdf_btn = QPushButton("Generate PDF Report")
-        pdf_btn.setFixedHeight(BTN_MD)
-        pdf_btn.setStyleSheet(btn_primary())
-        pdf_btn.setFont(_f(FS_MD, FW_SEMIBOLD))
-        pdf_btn.setCursor(Qt.PointingHandCursor)
-        hdr_row.addWidget(pdf_btn)
+        # pdf_btn = QPushButton("Generate PDF Report")
+        # pdf_btn.setFixedHeight(BTN_MD)
+        # pdf_btn.setStyleSheet(btn_primary())
+        # pdf_btn.setFont(_f(FS_MD, FW_SEMIBOLD))
+        # pdf_btn.setCursor(Qt.PointingHandCursor)
+        # hdr_row.addWidget(pdf_btn)
 
         hdr_w = QWidget()
         hdr_w.setLayout(hdr_row)
