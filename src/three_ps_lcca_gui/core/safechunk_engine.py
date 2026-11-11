@@ -159,6 +159,7 @@ class SafeChunkEngine:
     APP_NAME: str = None
     APP_AUTHOR: str = None
     APP_DATA_NAME: str = None  # separate AppData folder name for user files
+    PROJECTS_DIR: str = None   # user-chosen projects folder (overrides AppData)
 
     @staticmethod
     def get_default_base_dir(
@@ -166,16 +167,22 @@ class SafeChunkEngine:
         app_name: str = None,
         app_author: str = None,
         app_data_name: str = None,
+        ignore_custom: bool = False,
     ) -> str:
         """
         Returns the default base directory for projects.
         use_local=True:  Returns "user_projects" (relative to current directory).
-        use_local=False: Returns platform-specific AppData path (via platformdirs).
+        use_local=False: Returns PROJECTS_DIR if set, else the platform-specific
+                         AppData path (via platformdirs).
+        ignore_custom=True: Skip PROJECTS_DIR and always return the AppData path.
         """
         if use_local:
             path = os.path.abspath(os.path.join("lcca", "user_projects"))
             os.makedirs(path, exist_ok=True)
             return path
+
+        if SafeChunkEngine.PROJECTS_DIR and not ignore_custom:
+            return SafeChunkEngine.PROJECTS_DIR
 
         # Resolve defaults
         name = app_name or SafeChunkEngine.APP_NAME
