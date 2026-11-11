@@ -141,6 +141,7 @@ class _TrashBadgeButton(QWidget):
                     font-weight: 600;
                     font-size: 12px;
                     padding: 0 10px;
+                    min-height: 0px;
                 }}
                 QPushButton:hover {{
                     background-color: {hover_col};
@@ -158,6 +159,7 @@ class _TrashBadgeButton(QWidget):
                     border-radius: 8px;
                     padding: 0px;
                     margin: 0px;
+                    min-height: 0px;
                 }}
                 QPushButton:hover {{
                     background-color: {hover_col};
