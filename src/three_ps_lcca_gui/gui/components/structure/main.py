@@ -301,6 +301,8 @@ class StructureTabView(QWidget):
         self.tab_view.addTab(self.substructure_tab, "Sub-Structure")
         self.tab_view.addTab(self.superstructure_tab, "Super-Structure")
         self.tab_view.addTab(self.misc_tab, "Miscellaneous")
+        for i, tab in enumerate((self.foundation_tab, self.substructure_tab, self.superstructure_tab, self.misc_tab)):
+            tab.set_section_name(self.tab_view.tabText(i))
 
         # 2. Trash View
         self.trash_view = TrashTabWidget(controller=controller)
@@ -385,6 +387,10 @@ class StructureTabView(QWidget):
             "grand_total":     foundation["total"] + substructure["total"] + super_str["total"] + misc["total"],
             "total_items":     foundation["items"] + substructure["items"] + super_str["items"] + misc["items"],
         })
+
+        # Every tab's summary line shows the project total just saved above.
+        for tab in (self.foundation_tab, self.substructure_tab, self.superstructure_tab, self.misc_tab):
+            tab.refresh_summary()
 
     def on_refresh(self):
         """Refreshes all active tabs and updates the global trash count."""

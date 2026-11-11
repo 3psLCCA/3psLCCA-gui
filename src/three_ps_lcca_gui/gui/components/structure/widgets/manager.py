@@ -264,7 +264,10 @@ class StructureManagerWidget(QWidget):
             for item in items:
                 if not item.get("state", {}).get("in_trash", False):
                     v = item.get("values", {})
-                    total += (v.get("quantity") or 0) * (v.get("rate") or 0)
+                    try:
+                        total += float(v.get("quantity") or 0) * float(v.get("rate") or 0)
+                    except (TypeError, ValueError):
+                        pass  # non-numeric quantity/rate: item adds nothing to the total
                     count += 1
                     comp_has_items = True
             if comp_has_items:
@@ -272,13 +275,23 @@ class StructureManagerWidget(QWidget):
         self._computed_total      = total
         self._computed_count      = count
         self._computed_components = components
-        currency = getattr(self, "_currency", "")
-        suffix = f" ({currency})" if currency else ""
-        item_str = f"{count} item{'s' if count != 1 else ''}"
-        comp_str = f"{components} component{'s' if components != 1 else ''}"
-        self.total_lbl.setText(f"<b>Total{suffix}:</b> {fmt_comma(total)}  |  {item_str} in {comp_str}")
         self.count_lbl.hide()
+        self.refresh_summary()
         self.total_changed.emit()
+
+    def set_section_name(self, name: str):
+        self._section_name = name
+        self.refresh_summary()
+
+    def refresh_summary(self):
+        """Tab subtotal + the project total already kept in the str_summary chunk."""
+        name = getattr(self, "_section_name", "") or "Section"
+        text = f"<b>{name}:</b> {fmt_comma(getattr(self, '_computed_total', 0.0))}"
+        engine = getattr(self.controller, "engine", None)
+        grand = (engine.fetch_chunk("str_summary") or {}).get("grand_total") if engine else None
+        if grand is not None:
+            text += f"  |  <b>Project total:</b> {fmt_comma(grand)}"
+        self.total_lbl.setText(text)
 
     def create_section(self, name, has_items=False, search_cat=None):
         self._section_search_cats[name] = search_cat
