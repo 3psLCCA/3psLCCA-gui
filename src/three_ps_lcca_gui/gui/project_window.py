@@ -551,11 +551,11 @@ class ProjectWindow(QMainWindow):
 
         self.menuProject.addSeparator()
 
-        self.actionBlobManager = QAction("Blob Manager", self)
-        self.actionBlobManager.triggered.connect(self._open_blob_manager)
-        self.menuProject.addAction(self.actionBlobManager)
+        # self.actionBlobManager = QAction("Blob Manager", self)
+        # self.actionBlobManager.triggered.connect(self._open_blob_manager)
+        # self.menuProject.addAction(self.actionBlobManager)
 
-        self.menuProject.addSeparator()
+        # self.menuProject.addSeparator()
 
         # ── Export submenu ────────────────────────────────────────────────
         self.menuExport = QMenu("Export", self.menuProject)
