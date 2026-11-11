@@ -402,6 +402,15 @@ QCheckBox:disabled {
     color: $text_disabled;
 }
 
+/* ── Component title inside its group frame ── */
+QLabel#componentTitle {
+    color: $text;
+    font-size: $font-size-md;
+    font-weight: $weight-bold;
+    background: transparent;
+    border: none;
+}
+
 /* ── Form controls - radio button ───────────────────────────────────────── */
 QRadioButton {
     spacing: 12px;
@@ -734,3 +743,18 @@ QDialog{
     background-color: $window;
     color: $text;
 }
+/* ── Floating action button (pill) ──────────────────────────────────────── */
+QPushButton#fabButton {
+    background-color: $primary;
+    color: $text-on-primary;
+    border: 2px solid $primary;
+    border-radius: 25px;   /* half the height of a standard button (36 + padding + border = 50) */
+    min-height: 0;
+    padding: 0 0 0 19px;   /* keeps the "+" centred in the collapsed circle */
+    text-align: left;
+    font-weight: $weight-semibold;
+}
+/* $primary-hover/-active are translucent tints - a floating button must stay opaque */
+QPushButton#fabButton:hover   { background-color: $primary; border-color: $text-on-primary; }
+QPushButton#fabButton:pressed { background-color: $primary; border-color: $text-on-primary; }
+QPushButton#fabButton:disabled { background-color: $border-subtle; color: $text_disabled; }

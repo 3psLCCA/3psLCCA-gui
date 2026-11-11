@@ -11,7 +11,8 @@ from PySide6.QtWidgets import (
     QLabel,
     QFrame,
 )
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt, QTimer, QEvent, QVariantAnimation, QEasingCurve
+from three_ps_lcca_gui.gui.theme import SP3, SP5, SP8
 import time
 import uuid
 import datetime
@@ -25,6 +26,9 @@ from ...utils.display_format import fmt, fmt_comma
 from three_ps_lcca_gui.gui.styles import btn_danger
 from ...utils.common_requested_data import get_chunk
 
+
+_FAB_FULL_TEXT = "+ Add Component"
+_FAB_SIZE = 50  # px; keep in sync with border-radius (half) in main.qss
 
 # ---------------------------------------------------------------------------
 # StructureManagerWidget
@@ -42,6 +46,7 @@ class StructureManagerWidget(QWidget):
         self._page_registry: dict = {}
 
         self._frozen = False
+        self._has_layout_tail = False  # trailing stretch + spacer present in container_layout
         self._add_material_btns = []
         self._del_comp_btns = []
         self._del_comp_btn_map: dict = {}
@@ -62,7 +67,7 @@ class StructureManagerWidget(QWidget):
         summary_layout.addWidget(sep)
         summary_layout.addWidget(self.count_lbl)
         summary_layout.addStretch()
-        self.main_layout.addWidget(summary_bar)
+        self._summary_bar = summary_bar  # lives inside the scroll area (see refresh_ui)
 
         self.scroll = QScrollArea()
         self.scroll.setWidgetResizable(True)
@@ -73,12 +78,63 @@ class StructureManagerWidget(QWidget):
         self.scroll.setWidget(self.container)
         self.main_layout.addWidget(self.scroll)
 
-        btn_layout = QHBoxLayout()
-        self.add_comp_btn = QPushButton("+ Add Component")
+        # Floating pill button (child of this widget, not in the layout)
+        self.add_comp_btn = QPushButton("+", self)
+        self.add_comp_btn.setToolTip("Add Component")
+        self.add_comp_btn.installEventFilter(self)
+        self.add_comp_btn.setObjectName("fabButton")
+        self._fab_h = _FAB_SIZE
+        self.add_comp_btn.setFixedHeight(self._fab_h)
+        self.add_comp_btn.setCursor(Qt.PointingHandCursor)
         self.add_comp_btn.clicked.connect(self.add_new_component)
-        btn_layout.addWidget(self.add_comp_btn)
-        btn_layout.addStretch()
-        self.main_layout.addLayout(btn_layout)
+        self._fab_anim = QVariantAnimation(self)
+        self._fab_anim.setDuration(180)
+        self._fab_anim.setEasingCurve(QEasingCurve.OutCubic)
+        self._fab_anim.valueChanged.connect(lambda w: self._place_fab(int(w)))
+        self._fab_anim.finished.connect(self._on_fab_anim_done)
+        self._place_fab(self._fab_h)
+
+    def eventFilter(self, obj, event):
+        # Collapsed "+" circle that expands to "+ Add Component" on hover
+        if obj is self.add_comp_btn and event.type() in (QEvent.Enter, QEvent.Leave):
+            self._animate_fab(event.type() == QEvent.Enter)
+        return super().eventFilter(obj, event)
+
+    def _fab_expanded_width(self) -> int:
+        btn = self.add_comp_btn
+        btn.setText(_FAB_FULL_TEXT)
+        return btn.sizeHint().width() + SP3
+
+    def _place_fab(self, width: int):
+        btn = self.add_comp_btn
+        btn.setFixedWidth(width)
+        btn.move(max(self.width() - width - SP8, 0), max(self.height() - self._fab_h - SP5, 0))
+        btn.raise_()
+
+    def _animate_fab(self, expand: bool):
+        btn = self.add_comp_btn
+        self._fab_anim.stop()
+        self._fab_anim.setStartValue(btn.width())
+        if expand:
+            self._fab_anim.setEndValue(self._fab_expanded_width())
+        else:
+            self._fab_anim.setEndValue(self._fab_h)
+        self._fab_anim.start()
+
+    def _on_fab_anim_done(self):
+        if self.add_comp_btn.width() <= self._fab_h:
+            self.add_comp_btn.setText("+")
+
+    def _reposition_fab(self):
+        self._place_fab(self.add_comp_btn.width() or self._fab_h)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._reposition_fab()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self._reposition_fab()
 
     def _get_registry(self) -> dict:
         return self.controller.engine.fetch_chunk("str_component_registry") or {}
@@ -152,8 +208,13 @@ class StructureManagerWidget(QWidget):
         while self.container_layout.count():
             item = self.container_layout.takeAt(0)
             widget = item.widget()
-            if widget:
+            if widget and widget is not self._summary_bar:
                 widget.setParent(None)
+
+        self._has_layout_tail = False
+        # Summary bar scrolls with the content instead of taking fixed space
+        self.container_layout.addWidget(self._summary_bar)
+        self._summary_bar.show()
 
         self.sections = {}
         self._add_material_btns = []
@@ -177,6 +238,9 @@ class StructureManagerWidget(QWidget):
                         table.add_row(item, original_index)
 
         self.container_layout.addStretch()
+        # Room below the last component so the floating button never covers it
+        self.container_layout.addSpacing(self._fab_h + SP5)
+        self._has_layout_tail = True
         self.container.adjustSize()
         self._update_summary()
 
@@ -211,8 +275,14 @@ class StructureManagerWidget(QWidget):
     def create_section(self, name, has_items=False, search_cat=None):
         self._section_search_cats[name] = search_cat
 
-        group = QGroupBox(name.replace("&", "&&"))
+        group = QGroupBox()
         g_layout = QVBoxLayout(group)
+
+        # Component name as a title row inside the frame (not the groupbox legend)
+        title_lbl = QLabel(name)
+        title_lbl.setObjectName("componentTitle")
+        title_lbl.setTextFormat(Qt.PlainText)
+        g_layout.addWidget(title_lbl)
 
         table = StructureTableWidget(self, name)
         self.sections[name] = table
@@ -243,7 +313,10 @@ class StructureManagerWidget(QWidget):
 
         g_layout.addWidget(table)
         g_layout.addLayout(btn_bar)
-        self.container_layout.addWidget(group)
+        # Sections added after refresh_ui (Add Component) must go above the
+        # trailing stretch + spacer, otherwise they leave a blank gap above them.
+        tail = 2 if self._has_layout_tail else 0
+        self.container_layout.insertWidget(self.container_layout.count() - tail, group)
 
     def add_material(self, comp_name, mat_dict, is_trash=False):
         now = datetime.datetime.now().isoformat()
