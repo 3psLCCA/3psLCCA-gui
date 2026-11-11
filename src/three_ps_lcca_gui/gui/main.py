@@ -283,6 +283,20 @@ def main():
     # Handle First Launch Dialog
     import three_ps_lcca_gui.core.start_manager as sm
 
+    # User-chosen projects folder (empty = default AppData location)
+    projects_dir = sm.get_pref("projects_dir")
+    if projects_dir and os.path.isdir(projects_dir):
+        SafeChunkEngine.PROJECTS_DIR = projects_dir
+    elif projects_dir:
+        from PySide6.QtWidgets import QMessageBox
+        splash.hide()
+        QMessageBox.warning(
+            None, "Projects Folder Not Found",
+            f"The projects folder could not be found:\n{projects_dir}\n\n"
+            "If it is on a removable or network drive, connect it and restart.\n"
+            "The default folder will be used for this session.",
+        )
+
     if sm.is_first_launch():
         from three_ps_lcca_gui.gui.components.first_launch_dialog import FirstLaunchDialog
 

@@ -14,8 +14,9 @@ from three_ps_lcca_gui.core.safechunk_engine import SafeChunkEngine
 
 # ── Paths ──────────────────────────────────────────────────────────────────────
 def _get_db_path() -> str:
-    """Returns the DB path, resolved at runtime to ensure SafeChunkEngine is configured."""
-    base_dir = Path(SafeChunkEngine.get_default_base_dir()).parent
+    """Returns the DB path, resolved at runtime to ensure SafeChunkEngine is configured.
+    Always under AppData, even when the user picked a custom projects folder."""
+    base_dir = Path(SafeChunkEngine.get_default_base_dir(ignore_custom=True)).parent
     db_path = os.path.join(base_dir, "data", "user.db")
     os.makedirs(os.path.dirname(db_path), exist_ok=True)
     return db_path

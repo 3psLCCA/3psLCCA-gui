@@ -1019,6 +1019,7 @@ class HomePage(QWidget):
         dlg = SettingsDialog(self)
         if dlg.exec() == QDialog.Accepted:
             self._update_greeting()
+            self.manager.refresh_all_home_screens()  # rescan if projects folder changed
 
     def _on_comp_toggle(self, pid: str, selected: bool):
         n = len(self.grid_list.itemDelegate()._comp_selected)
@@ -1980,6 +1981,8 @@ class HomePage(QWidget):
                     engine.restore_checkpoint(os.path.basename(path))
                     engine.detach()
                     self.manager.refresh_all_home_screens()
+                else:
+                    QMessageBox.warning(self, "Load Failed", status)
         except Exception as e:
             QMessageBox.warning(self, "Load Failed", str(e))
 
