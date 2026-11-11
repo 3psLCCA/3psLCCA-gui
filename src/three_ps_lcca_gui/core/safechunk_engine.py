@@ -1351,6 +1351,13 @@ class SafeChunkEngine:
         """
         self.force_sync()
 
+        # Manifest hashes are normally refreshed only on detach(). If this
+        # session has written data, refresh them now so the checkpoint's
+        # manifest matches the chunks/blobs it packs (e.g. sharing an open project).
+        if self._session_dirty:
+            self._update_manifest_hashes()
+            self._update_blob_manifest_hashes()
+
         clean_label = re.sub(r"[^\w\-_]", "_", label)[:30]
         timestamp = (
             time.strftime("%Y%m%d_%H%M%S") + f"_{int(time.time() * 1000) % 1000:03d}"
