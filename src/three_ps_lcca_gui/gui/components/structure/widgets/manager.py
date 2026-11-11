@@ -92,6 +92,7 @@ class StructureManagerWidget(QWidget):
         self._fab_anim.setEasingCurve(QEasingCurve.OutCubic)
         self._fab_anim.valueChanged.connect(lambda w: self._place_fab(int(w)))
         self._fab_anim.finished.connect(self._on_fab_anim_done)
+        self._set_fab_collapsed(True)
         self._place_fab(self._fab_h)
 
     def eventFilter(self, obj, event):
@@ -100,10 +101,17 @@ class StructureManagerWidget(QWidget):
             self._animate_fab(event.type() == QEvent.Enter)
         return super().eventFilter(obj, event)
 
-    def _fab_expanded_width(self) -> int:
+    def _set_fab_collapsed(self, collapsed: bool):
+        """Collapsed: a large "+" (see main.qss). Expanded: normal-size label."""
         btn = self.add_comp_btn
-        btn.setText(_FAB_FULL_TEXT)
-        return btn.sizeHint().width() + SP3
+        btn.setText("+" if collapsed else _FAB_FULL_TEXT)
+        btn.setProperty("collapsed", collapsed)
+        btn.style().unpolish(btn)
+        btn.style().polish(btn)
+
+    def _fab_expanded_width(self) -> int:
+        self._set_fab_collapsed(False)
+        return self.add_comp_btn.sizeHint().width() + SP3
 
     def _place_fab(self, width: int):
         btn = self.add_comp_btn
@@ -123,7 +131,7 @@ class StructureManagerWidget(QWidget):
 
     def _on_fab_anim_done(self):
         if self.add_comp_btn.width() <= self._fab_h:
-            self.add_comp_btn.setText("+")
+            self._set_fab_collapsed(True)
 
     def _reposition_fab(self):
         self._place_fab(self.add_comp_btn.width() or self._fab_h)

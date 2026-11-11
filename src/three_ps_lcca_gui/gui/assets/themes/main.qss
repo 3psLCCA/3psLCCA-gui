@@ -745,16 +745,17 @@ QDialog{
 }
 /* ── Floating action button (pill) ──────────────────────────────────────── */
 QPushButton#fabButton {
-    background-color: $primary;
+    background-color: $warning;
     color: $text-on-primary;
-    border: 2px solid $primary;
+    border: 2px solid $warning;
     border-radius: 25px;   /* half the height of a standard button (36 + padding + border = 50) */
     min-height: 0;
     padding: 0 0 0 19px;   /* keeps the "+" centred in the collapsed circle */
     text-align: left;
     font-weight: $weight-semibold;
 }
+QPushButton#fabButton[collapsed="true"] { font-size: 20px; padding: 0 0 2px 0; text-align: center; }
 /* $primary-hover/-active are translucent tints - a floating button must stay opaque */
-QPushButton#fabButton:hover   { background-color: $primary; border-color: $text-on-primary; }
-QPushButton#fabButton:pressed { background-color: $primary; border-color: $text-on-primary; }
+QPushButton#fabButton:hover   { background-color: $warning; border-color: $text-on-primary; }
+QPushButton#fabButton:pressed { background-color: $warning; border-color: $text-on-primary; }
 QPushButton#fabButton:disabled { background-color: $border-subtle; color: $text_disabled; }
