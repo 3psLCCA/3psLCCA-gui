@@ -534,6 +534,37 @@ def _write_arrow_svgs(tokens: dict[str, str]) -> None:
         print(f"[themes] Could not write arrow SVGs: {e}")
 
 
+def apply_title_bar_color(widget) -> None:
+    """Colour a top-level window's native title bar with the active 'base' / 'text' tokens.
+
+    Windows 11 only (DWM caption colour); on any other OS or older Windows it is a no-op,
+    and the default title bar is kept. Safe to call repeatedly.
+    """
+    if sys.platform != "win32" or widget is None or not widget.isWindow():
+        return
+    try:
+        import ctypes
+
+        dwm = ctypes.windll.dwmapi
+        hwnd = int(widget.winId())
+
+        def _set(attr: int, value: int) -> None:
+            v = ctypes.c_int(value)
+            dwm.DwmSetWindowAttribute(hwnd, attr, ctypes.byref(v), ctypes.sizeof(v))
+
+        def _colorref(token: str) -> int | None:
+            c = QColor(get_token(token))
+            return (c.red() | c.green() << 8 | c.blue() << 16) if c.isValid() else None
+
+        _set(20, 1 if _current_is_dark else 0)  # DWMWA_USE_IMMERSIVE_DARK_MODE (button glyphs)
+        for attr, token in ((35, "base"), (36, "text")):  # CAPTION_COLOR, TEXT_COLOR
+            ref = _colorref(token)
+            if ref is not None:
+                _set(attr, ref)
+    except Exception as e:
+        print(f"[themes] title bar colour not applied: {e}", file=sys.stderr)
+
+
 def reapply(app=None) -> None:
     """Re-apply the current active themes to the running QApplication."""
     from PySide6.QtWidgets import QApplication
@@ -598,6 +629,7 @@ def reapply(app=None) -> None:
         w.style().unpolish(w)
         w.style().polish(w)
         w.update()
+        apply_title_bar_color(w)
 
     # Notify all subscribed listeners
     theme_manager().theme_changed.emit()

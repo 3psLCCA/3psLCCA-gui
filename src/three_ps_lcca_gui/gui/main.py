@@ -35,6 +35,7 @@ from PySide6.QtWidgets import (
     QStyle,
     QTableView,
     QTableWidget,
+    QWidget,
 )
 from three_ps_lcca_gui.gui.components.utils.table_widgets import (
     GroupedHeaderView,
@@ -99,6 +100,16 @@ class _TableRowSelectFilter(QObject):
             obj.setMouseTracking(True)
         return super().eventFilter(obj, event)
 
+
+
+class _TitleBarColorFilter(QObject):
+    """Colours the native title bar of every top-level window when it is shown."""
+
+    def eventFilter(self, obj, event):
+        if event.type() == QEvent.Show and isinstance(obj, QWidget) and obj.isWindow():
+            from three_ps_lcca_gui.gui.themes import apply_title_bar_color
+            apply_title_bar_color(obj)
+        return super().eventFilter(obj, event)
 
 
 class _TableHeaderWordWrapFilter(QObject):
@@ -271,6 +282,8 @@ def main():
     app.installEventFilter(table_filter)
     app.installEventFilter(focus_filter)
     app.installEventFilter(hdr_wrap_filter)
+    title_bar_filter  = _TitleBarColorFilter()
+    app.installEventFilter(title_bar_filter)
     from three_ps_lcca_gui.gui.components.utils.spinbox_fix import install as _install_spinbox_fix
     _install_spinbox_fix(app)
 
