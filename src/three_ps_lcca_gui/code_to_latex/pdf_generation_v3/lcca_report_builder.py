@@ -87,7 +87,7 @@ from .latex_helpers import (
     appendix_counter,
 )
 
-from .sections.title_page import title_page_to_latex
+from .sections.title_page import DISCLAIMER_REPORT, title_page as cover_page
 from .sections.appendices import appendices_to_latex
 from .sections.introduction import introduction_to_latex
 from ..social_cost_data_latex import social_cost_data_to_latex
@@ -98,7 +98,9 @@ REPORT_SCHEMA = [
     {
         "title": "Title page",
         "key": KEY_SHOW_TITLE_PAGE,
-        "render": lambda ctrl, config, paths, logo: title_page_to_latex(ctrl, app_logo_path=logo)
+        "render": lambda ctrl, config, paths, logo: cover_page(
+            ctrl, "Bridge Life Cycle Cost Analysis Report",
+            disclaimer=DISCLAIMER_REPORT, app_logo_path=logo)
     },
     {
         "title": "Table of contents",
@@ -720,6 +722,31 @@ def _check_and_report_missing_packages() -> str:
     return ""
 
 
+def run_pdflatex(tex_path: Path, work_dir: Path, *extra_args, context: str = "", tex_msg: str = "") -> None:
+    """Run pdflatex once on *tex_path* (cwd=*work_dir*); raise RuntimeError with the log on failure."""
+    result = subprocess.run(
+        [_PDFLATEX, "-interaction=nonstopmode", *extra_args, tex_path.name],
+        cwd=work_dir,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        log_file = tex_path.with_suffix(".log")
+        log_snippet = ""
+        if log_file.exists():
+            lines = log_file.read_text(encoding="utf-8", errors="replace").splitlines()
+            error_lines = [l for l in lines if l.startswith("!") or "Error" in l or "error" in l]
+            log_snippet = "\n".join(error_lines[-30:]) if error_lines else "\n".join(lines[-40:])
+
+        # On failure, check for missing packages to provide a better error message
+        missing_pkg_msg = _check_and_report_missing_packages()
+
+        raise RuntimeError(
+            f"pdflatex failed (exit {result.returncode}){context}.\n\n"
+            f"LaTeX errors:\n{log_snippet or result.stdout[-3000:] or '(no output)'}{tex_msg}{missing_pkg_msg}"
+        )
+
+
 def compile_lcca_report_pdf(
     controller=None,
     output_dir: str | Path | None = None,
@@ -794,29 +821,11 @@ def compile_lcca_report_pdf(
                 )
 
             def _run_pdflatex(*extra_args):
-                result = subprocess.run(
-                    [_PDFLATEX, "-interaction=nonstopmode", *extra_args, tex_path.name],
-                    cwd=work_dir,
-                    capture_output=True,
-                    text=True,
+                run_pdflatex(
+                    tex_path, work_dir, *extra_args,
+                    context=f" on attempt {attempt}/{max_attempts}",
+                    tex_msg=f"\n\nThe .tex file has been saved to:\n  {final_tex_path}",
                 )
-                if result.returncode != 0:
-                    log_file = tex_path.with_suffix(".log")
-                    log_snippet = ""
-                    if log_file.exists():
-                        lines = log_file.read_text(encoding="utf-8", errors="replace").splitlines()
-                        error_lines = [l for l in lines if l.startswith("!") or "Error" in l or "error" in l]
-                        log_snippet = "\n".join(error_lines[-30:]) if error_lines else "\n".join(lines[-40:])
-                    
-                    tex_msg = f"\n\nThe .tex file has been saved to:\n  {final_tex_path}"
-                    
-                    # On failure, check for missing packages to provide a better error message
-                    missing_pkg_msg = _check_and_report_missing_packages()
-                    
-                    raise RuntimeError(
-                        f"pdflatex failed (exit {result.returncode}) on attempt {attempt}/{max_attempts}.\n\n"
-                        f"LaTeX errors:\n{log_snippet or result.stdout[-3000:] or '(no output)'}{tex_msg}{missing_pkg_msg}"
-                    )
 
             lot_path = tex_path.with_suffix(".lot")
             _run_pdflatex("-draftmode")

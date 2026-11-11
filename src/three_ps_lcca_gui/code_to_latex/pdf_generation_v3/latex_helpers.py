@@ -47,10 +47,11 @@ V3_PREAMBLE = [
     # ── Headers / footers ─────────────────────────────────────────────────────
     r"\fancyhf{}",
     r"\providecommand{\ReportHeaderLogo}{}",
+    r"\setlength{\headheight}{0.8cm}",
     r"\renewcommand{\headrulewidth}{0.4pt}",
     r"\renewcommand{\footrulewidth}{0.4pt}",
     r"\fancyhead[L]{\small\nouppercase{\leftmark}}",
-    r"\fancyhead[R]{\IfFileExists{\ReportHeaderLogo}{\includegraphics[height=0.42cm]{\ReportHeaderLogo}}{\small 3PS LCCA}}",
+    r"\fancyhead[R]{\IfFileExists{\ReportHeaderLogo}{\includegraphics[height=0.65cm]{\ReportHeaderLogo}}{\small 3PS LCCA}}",
     r"\fancyfoot[C]{\small Page~\thepage~of~\pageref*{LastPage}}",
     r"\AtBeginDocument{\pagestyle{fancy}}",
 
