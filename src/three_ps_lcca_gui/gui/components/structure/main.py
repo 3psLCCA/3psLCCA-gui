@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QMessageBox,
     QMenu,
+    QApplication,
 )
 from PySide6.QtCore import QThread, Signal, QSize, Qt
 from PySide6.QtGui import QPalette, QColor
@@ -25,6 +26,7 @@ from .excel_exporter import (
     export_all_chunks,
     count_active_all,
     export_boq,
+    export_boq_pdf,
     BOQ_FORMATS,
 )
 from .widgets.foundation import FoundationWidget
@@ -253,8 +255,8 @@ class StructureTabView(QWidget):
         self.download_btn.setFixedHeight(30)
         self.download_btn.setToolTip("Export structure data")
         export_menu = QMenu(self.download_btn)
-        export_menu.addAction("Export as Excel / ODS", lambda: self._download_excel(False))
-        export_menu.addAction("Export as BOQ", lambda: self._download_excel(True))
+        export_menu.addAction("Data sheet (Excel / ODS), can be re-imported", lambda: self._download_excel(False))
+        export_menu.addAction("Bill of Quantities (PDF / Excel / ODS)", lambda: self._download_excel(True))
         self.download_btn.setMenu(export_menu)
 
         pill_layout.addWidget(self.excel_btn)
@@ -543,7 +545,8 @@ class StructureTabView(QWidget):
             return
 
         available_fmts = [
-            f for f in (BOQ_FORMATS if boq else EXPORT_FORMATS) if format_available(f)[0]
+            f for f in (BOQ_FORMATS if boq else EXPORT_FORMATS)
+            if format_available(f)[0] or f.get("binary")
         ]
         file_filter = ";;".join(f["filter"] for f in available_fmts)
 
@@ -569,7 +572,11 @@ class StructureTabView(QWidget):
         self.download_btn.setEnabled(False)
         self.download_btn.setText("Exporting…")
         try:
-            if boq:
+            if boq and fmt["ext"] == ".pdf":
+                QApplication.processEvents()
+                export_boq_pdf(self.controller, path)
+                msg = "Bill of Quantities exported."
+            elif boq:
                 total = export_boq(self.controller.engine, path)
                 msg = f"{total} item(s) exported to the Bill of Quantities."
             else:

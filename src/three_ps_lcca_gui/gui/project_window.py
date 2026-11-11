@@ -581,6 +581,19 @@ class ProjectWindow(QMainWindow):
             self._export_all_data_json)
         self.menuExport.addAction(self.actionExportAllDataJSON)
 
+        self.menuExport.addSeparator()
+
+        self.actionExportDataSheet = QAction(
+            "Data sheet (Excel / ODS), can be re-imported", self)
+        self.actionExportDataSheet.triggered.connect(
+            lambda: self._export_structure(False))
+        self.menuExport.addAction(self.actionExportDataSheet)
+
+        self.actionExportBOQ = QAction("Bill of Quantities (PDF / Excel / ODS)", self)
+        self.actionExportBOQ.triggered.connect(
+            lambda: self._export_structure(True))
+        self.menuExport.addAction(self.actionExportBOQ)
+
         self.menuProject.addMenu(self.menuExport)
 
         # ── View menu ─────────────────────────────────────────────────────
@@ -1239,6 +1252,12 @@ class ProjectWindow(QMainWindow):
                 self, "Export Complete", f"Project exported to:\n{dest}")
         except Exception as e:
             QMessageBox.warning(self, "Export Failed", str(e))
+
+    def _export_structure(self, boq: bool):
+        """Run the Construction Works export (same as the Export button on that page)."""
+        page = self._get_or_create_widget("Construction Works Data")
+        if page is not None:
+            page._download_excel(boq)
 
     def _export_inputs_json(self):
         for name in self._page_names:

@@ -19,6 +19,8 @@ for it at runtime and show an install hint if missing.
 from __future__ import annotations
 
 import importlib
+import os
+import shutil
 import datetime as _dt
 import pandas as pd
 
@@ -82,6 +84,10 @@ def format_available(fmt: dict) -> tuple[bool, str]:
     pkg = fmt.get("requires")
     if pkg and importlib.util.find_spec(pkg) is None:
         return False, f"pip install {pkg}"
+    if fmt.get("binary"):
+        from three_ps_lcca_gui.code_to_latex.pdf_generation_v3.lcca_report_builder import _PDFLATEX
+        if not (shutil.which(_PDFLATEX) or os.path.exists(_PDFLATEX)):
+            return False, "install a TeX distribution (MiKTeX / TeX Live)"
     return True, ""
 
 
@@ -210,6 +216,13 @@ BOQ_FORMATS: list[dict] = [
         "ext":      ".ods",
         "filter":   "OpenDocument Spreadsheet (*.ods)",
         "requires": "odf",           # pip install odfpy
+    },
+    {
+        "label":    "PDF (.pdf)",
+        "ext":      ".pdf",
+        "filter":   "PDF Files (*.pdf)",
+        "requires": None,
+        "binary":   "pdflatex",      # needs a TeX distribution
     },
 ]
 
@@ -392,11 +405,21 @@ def _write_boq_ods(path, cells, bold, fills, widths):
     doc.save(path)
 
 
+def export_boq_pdf(controller, path: str) -> None:
+    """BOQ as a PDF (LaTeX report pipeline). Needs no calculated results."""
+    ok, hint = format_available(next(f for f in BOQ_FORMATS if f.get("binary")))
+    if not ok:
+        raise RuntimeError(f"PDF export needs pdflatex on PATH: {hint}. Restart the app after installing.")
+    from three_ps_lcca_gui.code_to_latex.boq_latex import build_boq_pdf
+    build_boq_pdf(controller, path)
+
+
 def export_boq(engine, path: str) -> int:
     """
-    Export active materials as a single-sheet Bill of Quantities
-    (category > component > items, subtotals, grand total; Amount = Quantity x Rate
-    as live formulas). Format follows the file extension (.xlsx or .ods).
+    Export active materials as a Bill of Quantities
+    (category > component > items, subtotals, grand total; Amount = Quantity x Rate,
+    live formulas in .xlsx/.ods). Format follows the file extension
+    (.xlsx or .ods; PDF is export_boq_pdf). Needs no calculated results.
     Returns the number of item rows written.
     """
     cells, bold, fills, widths, count = _build_boq(engine)
