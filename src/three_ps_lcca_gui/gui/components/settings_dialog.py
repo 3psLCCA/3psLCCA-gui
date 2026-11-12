@@ -197,33 +197,74 @@ class SettingsPanel(QWidget):
         layout.addWidget(theme_hint)
 
         layout = layout_api
-        # ── Local API ─────────────────────────────────────────────────────
-        self._api_checkbox = QCheckBox("Enable local API server")
-        self._api_checkbox.setChecked(sm.get_pref("api_enabled", "true") == "true")
-        layout.addWidget(self._api_checkbox)
-
+        # ── Local API: Server ─────────────────────────────────────────────
+        layout.addWidget(QLabel("<b>Server</b>"))
         api_hint = QLabel(
-            "Lets external tools read/update an open project over a local HTTP "
-            "API (File → API Access). Change takes effect after restart."
+            "Lets external tools read and update an open project over a "
+            "local HTTP API. Each project's access token is under "
+            "Project → API Access."
         )
         api_hint.setEnabled(False)
         api_hint.setFont(font(FS_SM))
         api_hint.setWordWrap(True)
         layout.addWidget(api_hint)
 
-        # Actual bound URL - the port is picked automatically at startup (the
-        # default may be busy, e.g. a second app instance), so it's shown here
-        # rather than configured here.
+        self._api_checkbox = QCheckBox("Enable local API server")
+        self._api_checkbox.setChecked(sm.get_pref("api_enabled", "true") == "true")
+        layout.addWidget(self._api_checkbox)
+
+        # The server only starts/stops at launch, so flag a pending change.
+        self._api_restart_note = QLabel("Restart the app to apply this change.")
+        self._api_restart_note.setFont(font(FS_SM))
+        self._api_restart_note.setStyleSheet(f"color: {get_token('warning')};")
+        self._api_restart_note.hide()
+        layout.addWidget(self._api_restart_note)
+
+        layout.addSpacing(8)
+
+        # ── Local API: Address ────────────────────────────────────────────
+        # The port is picked automatically at startup (the default may be
+        # busy, e.g. a second app instance), so it's shown, not configured.
         from three_ps_lcca_gui.gui.api.server import get_active_port
         port = get_active_port()
-        if port:
-            api_url_label = QLabel(f"Running at:  http://127.0.0.1:{port}")
-            api_url_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        else:
-            api_url_label = QLabel("Server not running.")
-            api_url_label.setEnabled(False)
-        api_url_label.setFont(font(FS_SM))
-        layout.addWidget(api_url_label)
+        running_url = f"http://127.0.0.1:{port}" if port else ""
+
+        layout.addWidget(QLabel("<b>Address</b>"))
+        addr_hint = QLabel("Assigned automatically each time the app starts.")
+        addr_hint.setEnabled(False)
+        addr_hint.setFont(font(FS_SM))
+        layout.addWidget(addr_hint)
+
+        api_url_edit = QLineEdit(running_url)
+        api_url_edit.setReadOnly(True)
+        api_url_edit.setPlaceholderText("Server is not running")
+        layout.addWidget(api_url_edit)
+
+        addr_row = QHBoxLayout()
+        addr_row.setSpacing(8)
+        api_status = QLabel("● Running" if port else "")
+        api_status.setFont(font(FS_SM))
+        api_status.setStyleSheet(f"color: {get_token('success')};")
+        addr_row.addWidget(api_status, stretch=1)
+        btn_copy = QPushButton("Copy")
+        btn_copy.setAutoDefault(False)
+        btn_copy.setStyleSheet(btn_outline())
+        btn_copy.setEnabled(bool(port))
+
+        def _copy_url():
+            from PySide6.QtWidgets import QApplication
+            from PySide6.QtCore import QTimer
+            QApplication.clipboard().setText(running_url)
+            btn_copy.setText("Copied")
+            QTimer.singleShot(1500, lambda: btn_copy.setText("Copy"))
+
+        btn_copy.clicked.connect(_copy_url)
+        addr_row.addWidget(btn_copy)
+        layout.addLayout(addr_row)
+
+        self._api_checkbox.toggled.connect(
+            lambda on: self._api_restart_note.setVisible(on != bool(port))
+        )
 
         if not self._stacked:
             return
