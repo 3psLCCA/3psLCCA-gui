@@ -23,8 +23,10 @@ One-Time Token Delivery over HTTP:
     outright (no popup) until the project is closed and reopened.
 """
 
+import collections
 import secrets
 import threading
+import time
 
 _lock = threading.Lock()
 _tokens: dict[str, str] = {}
@@ -32,6 +34,13 @@ _delivered: dict[str, bool] = {}  # { project_id: True once handed out over HTTP
 _prompt_count: dict[str, int] = {}  # { project_id: number of popups shown so far }
 
 MAX_PROMPTS = 3
+
+# App-wide cap on top of the per-project one: without it, a process could
+# open N projects (POST /projects/open needs no token) and raise 3*N popups
+# to wear the user down into clicking Allow.
+GLOBAL_PROMPT_LIMIT = 5
+GLOBAL_PROMPT_WINDOW_S = 60.0
+_recent_prompts: collections.deque[float] = collections.deque()
 
 
 def ensure_token(project_id: str) -> str:
@@ -102,13 +111,32 @@ def mark_delivered(project_id: str) -> None:
         _delivered[project_id] = True
 
 
+def global_retry_after() -> float:
+    """Seconds until the app-wide popup cap lets another popup through
+    (0.0 if one is allowed right now). Doesn't count as a prompt."""
+    with _lock:
+        now = time.monotonic()
+        while _recent_prompts and now - _recent_prompts[0] >= GLOBAL_PROMPT_WINDOW_S:
+            _recent_prompts.popleft()
+        if len(_recent_prompts) < GLOBAL_PROMPT_LIMIT:
+            return 0.0
+        return max(0.0, GLOBAL_PROMPT_WINDOW_S - (now - _recent_prompts[0]))
+
+
 def can_prompt(project_id: str) -> bool:
     """True (and counts against MAX_PROMPTS) if this project hasn't hit its
-    popup cap yet - keeps a script that just keeps calling /get_tokens
+    popup cap yet, and the app as a whole hasn't shown GLOBAL_PROMPT_LIMIT
+    popups in the last GLOBAL_PROMPT_WINDOW_S seconds - keeps a script that just keeps calling /get_tokens
     from reopening the Allow/Deny dialog indefinitely."""
     with _lock:
         count = _prompt_count.get(project_id, 0)
         if count >= MAX_PROMPTS:
             return False
+        now = time.monotonic()
+        while _recent_prompts and now - _recent_prompts[0] >= GLOBAL_PROMPT_WINDOW_S:
+            _recent_prompts.popleft()
+        if len(_recent_prompts) >= GLOBAL_PROMPT_LIMIT:
+            return False
+        _recent_prompts.append(now)
         _prompt_count[project_id] = count + 1
         return True

@@ -10,6 +10,8 @@ Message: "An external application wants to access this project using the API"
 - X (close window) → result_allowed = False (treated same as Deny)
 """
 
+import html
+
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import (
@@ -36,28 +38,39 @@ class ApiAccessPrompt(QDialog):
     is guaranteed visible even on the rare chance it doesn't grab focus.
     """
 
-    def __init__(self, project_display_name: str, parent=None):
+    def __init__(self, project_display_name: str, caller: dict | None = None, parent=None):
         super().__init__(parent)
         self.result_allowed: bool = False  # default = denied (covers X button too)
 
         self.setWindowTitle("API Access Request")
         self.setWindowFlag(Qt.WindowType.WindowContextHelpButtonHint, False)
         self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint, True)
-        self.setMinimumWidth(400)
-        self.setMaximumWidth(500)
+        self.setMinimumWidth(420)
+        self.setMaximumWidth(600)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(24, 24, 24, 20)
         layout.setSpacing(16)
 
+        # Everything caller-controlled (the project name can be set through
+        # POST /projects/new; process names/command lines are whatever the
+        # calling program chose) is HTML-escaped - this label renders rich
+        # text, and unescaped input could restyle or fake the dialog.
         msg = QLabel(
-            f"An external application wants to access this project using the API:\n\n"
-            f"<b>{project_display_name}</b>\n\n"
-            f"Do you want to allow API communication?"
+            "A program on this computer wants API access to this project:<br><br>"
+            f"<b>{html.escape(project_display_name)}</b><br><br>"
+            "Only allow it if you just started this program yourself."
         )
         msg.setWordWrap(True)
         msg.setTextFormat(Qt.TextFormat.RichText)
         layout.addWidget(msg)
+
+        who = QLabel(self._describe_caller(caller))
+        who.setWordWrap(True)
+        who.setTextFormat(Qt.TextFormat.RichText)
+        who.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        who.setStyleSheet("padding: 8px; border: 1px solid palette(mid); border-radius: 4px;")
+        layout.addWidget(who)
 
         # Buttons
         btn_row = QHBoxLayout()
@@ -81,18 +94,39 @@ class ApiAccessPrompt(QDialog):
         btn_row.addWidget(btn_allow)
         layout.addLayout(btn_row)
 
-    def showEvent(self, event):
-        super().showEvent(event)
-        # Center on the screen the parent window is on (falls back to the
-        # primary screen if there's no parent) so the dialog can't end up
-        # off-screen or tucked in a corner behind other windows.
-        screen = self.parent().screen() if self.parent() else QGuiApplication.primaryScreen()
+        # Position BEFORE the first show. Moving it from showEvent made it
+        # appear at its default spot and then jump to the centre, which on
+        # Windows looked like the popup opening two or three times.
+        self.adjustSize()
+        screen = parent.screen() if parent is not None else QGuiApplication.primaryScreen()
         if screen:
             geo = screen.availableGeometry()
             self.move(
                 geo.center().x() - self.width() // 2,
                 geo.center().y() - self.height() // 2,
             )
+
+    @staticmethod
+    def _describe_caller(caller: dict | None) -> str:
+        def field(value):
+            return html.escape(str(value)) if value else "<i>unknown</i>"
+
+        if not caller or not caller.get("pid"):
+            return (
+                "<b>Requested by:</b> <i>could not identify the program</i><br>"
+                "Be careful - deny unless you are sure this is your own program."
+            )
+        name = field(caller.get("name"))
+        return (
+            f"<b>Requested by:</b> {name} (PID {int(caller['pid'])})<br>"
+            f"<b>Program:</b> {field(caller.get('exe'))}<br>"
+            f"<b>Command:</b> {field(caller.get('cmdline'))}<br>"
+            f"<b>User:</b> {field(caller.get('username'))}"
+        )
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        # (Centred on the parent's screen in __init__, before showing.)
         self.raise_()
         self.activateWindow()
         # Belt-and-braces: even if Windows' foreground-lock stops

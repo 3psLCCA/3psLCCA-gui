@@ -19,18 +19,63 @@ a `documentation_url` pointing here (RFC 7807 / GitHub API style), so a
 caller that's never seen the docs can always find its way there.
 """
 
+import collections
+import math
 import threading
+import time
 
 from flask import Flask, jsonify, request
 from werkzeug.serving import make_server
 
 from .bridge import ApiBridge
+from .caller_identity import identify_caller
 from .catalog import register_catalog_routes
 from .image_upload import resolve_image_urls
 from .registry import CHUNK_PAGE_MAP, describe_chunk_fields, validate_payload_keys
 from . import tokens
 
 DEFAULT_PORT = 8765
+
+# Largest accepted request body. Logos are capped at 15 MB raw, which is
+# ~20 MB as base64 inside JSON - 32 MB leaves room for that and nothing
+# silly beyond it.
+MAX_BODY_BYTES = 32 * 1024 * 1024
+MAX_PROJECT_NAME_LEN = 200
+RATE_WINDOW_S = 60.0
+PROJECT_CREATE_LIMIT = 20  # successful-looking POST /projects/new per window
+PROJECT_OPEN_LIMIT = 30    # POST /projects/open per window
+
+
+class _RateLimiter:
+    """Sliding-window counter shared by every caller (the API is local, so
+    there is no per-client identity worth keying on)."""
+
+    def __init__(self, limit: int, window: float):
+        self.limit = limit
+        self.window = window
+        self._hits: collections.deque[float] = collections.deque()
+        self._lock = threading.Lock()
+
+    def _prune(self, now: float) -> None:
+        while self._hits and now - self._hits[0] >= self.window:
+            self._hits.popleft()
+
+    def allow(self) -> bool:
+        now = time.monotonic()
+        with self._lock:
+            self._prune(now)
+            if len(self._hits) >= self.limit:
+                return False
+            self._hits.append(now)
+            return True
+
+    def retry_after(self) -> int:
+        now = time.monotonic()
+        with self._lock:
+            self._prune(now)
+            if len(self._hits) < self.limit:
+                return 0
+            return max(1, math.ceil(self.window - (now - self._hits[0])))
 
 _active_port: int | None = None
 
@@ -626,10 +671,100 @@ def _locked_response(result: dict):
 
 def _create_app(bridge: ApiBridge) -> Flask:
     app = Flask(__name__)
+    # Werkzeug answers 413 before reading a larger body into memory.
+    app.config["MAX_CONTENT_LENGTH"] = MAX_BODY_BYTES
+
+    @app.before_request
+    def _block_cross_site_browser_requests():
+        # Stops other web pages open in the user's browser from calling the
+        # API. They can never read a reply (no CORS headers are sent), but
+        # without this they could still trigger side effects: pop the
+        # get_tokens Allow/Deny dialog (an Allow then burns the one-time
+        # delivery on a page that can't see the token), or create/open
+        # projects through the unauthenticated /projects routes.
+        #
+        # Browsers attach these headers themselves and page scripts can't
+        # remove or forge them; curl, Python scripts etc. send neither, so
+        # they're unaffected. Typing a URL into the address bar
+        # (Sec-Fetch-Site: none) and this server's own help page
+        # (same-origin) keep working. "same-site" is blocked too: any other
+        # port on 127.0.0.1 counts as the same site.
+        #
+        # Host is checked first to stop DNS rebinding: a page on evil.com
+        # whose DNS is switched to 127.0.0.1 is "same-origin" to itself, so
+        # the browser would let it read replies (including a token after an
+        # Allow click). The browser still sends Host: evil.com, though.
+        # A missing Host (bare HTTP/1.0 client) is fine - browsers always
+        # send one.
+        host = request.environ.get("HTTP_HOST")
+        if host is not None and not _host_allowed(host):
+            return _browser_blocked(host, "host_not_allowed")
+        # Allow-list, not block-list: anything other than the two values a
+        # browser uses for the address bar / this server's own pages
+        # (including duplicates, which WSGI joins with ", ") is refused.
+        fetch_site = request.headers.get("Sec-Fetch-Site")
+        if fetch_site is not None and fetch_site.strip().lower() not in ("none", "same-origin"):
+            return _browser_blocked(fetch_site)
+        origin = request.headers.get("Origin")
+        if origin is not None and origin != request.host_url.rstrip("/"):
+            return _browser_blocked(origin)
+        return None
+
+    def _host_allowed(host):
+        name, sep, port = host.rpartition(":")
+        return (
+            bool(sep)
+            and name.lower() in ("127.0.0.1", "localhost")
+            and port == str(request.environ.get("SERVER_PORT"))
+        )
+
+    def _browser_blocked(source, error="cross_site_request_blocked"):
+        return jsonify({
+            "error": error,
+            "message": (
+                "Requests from other web pages are not accepted. Call the "
+                "API from a script or tool (curl, Python, ...) instead."
+            ),
+            "source": source,
+        }), 403
 
     @app.errorhandler(404)
     def _not_found(_e):
         return jsonify({"error": "not_found", **_not_found_info()}), 404
+
+    @app.errorhandler(405)
+    def _method_not_allowed(e):
+        allowed = sorted(getattr(e, "valid_methods", None) or [])
+        return jsonify({
+            "error": "method_not_allowed",
+            "message": f"{request.method} is not supported here.",
+            "allowed_methods": allowed,
+            **_usage_info(),
+        }), 405, {"Allow": ", ".join(allowed)}
+
+    @app.errorhandler(413)
+    def _too_large(_e):
+        return jsonify({
+            "error": "payload_too_large",
+            "message": f"Request bodies are limited to {MAX_BODY_BYTES // (1024 * 1024)} MB.",
+            **_usage_info(),
+        }), 413
+
+    # Unauthenticated routes that create things on disk / open windows -
+    # capped so a local process can't fill the disk or bury the screen.
+    create_limiter = _RateLimiter(PROJECT_CREATE_LIMIT, RATE_WINDOW_S)
+    open_limiter = _RateLimiter(PROJECT_OPEN_LIMIT, RATE_WINDOW_S)
+
+    def _rate_limited(what, limiter):
+        return jsonify({
+            "error": "rate_limited",
+            "message": (
+                f"Too many {what} requests - at most {limiter.limit} per "
+                f"{int(limiter.window)} s. Try again shortly."
+            ),
+            "retry_after_s": limiter.retry_after(),
+            **_usage_info(),
+        }), 429, {"Retry-After": str(limiter.retry_after())}
 
     @app.get("/")
     def home_route():
@@ -709,6 +844,8 @@ def _create_app(bridge: ApiBridge) -> Flask:
         unit_system = payload.get("unit_system", "metric")
         if not isinstance(name, str) or not name.strip():
             errors.append("'project_name' is required and must be a non-empty string")
+        elif len(name.strip()) > MAX_PROJECT_NAME_LEN:
+            errors.append(f"'project_name' must be at most {MAX_PROJECT_NAME_LEN} characters")
         if not isinstance(country, str) or country not in COUNTRIES:
             errors.append(
                 f"'country' is required and must exactly match one of: {COUNTRIES}"
@@ -723,6 +860,8 @@ def _create_app(bridge: ApiBridge) -> Flask:
             )
         if errors:
             return jsonify({"error": "invalid_field_values", "details": errors, **_usage_info()}), 400
+        if not create_limiter.allow():
+            return _rate_limited("project creation", create_limiter)
 
         result = bridge.call(
             "create_project", "", "",
@@ -754,6 +893,8 @@ def _create_app(bridge: ApiBridge) -> Flask:
                 "details": ["body must be a JSON object with a \"project_id\" string"],
                 **_usage_info(),
             }), 400
+        if not open_limiter.allow():
+            return _rate_limited("project open", open_limiter)
 
         result = bridge.call("open_project", project_id, "")
         if "error" in result:
@@ -775,7 +916,25 @@ def _create_app(bridge: ApiBridge) -> Flask:
             ),
         })
 
-    @app.route("/<project_id>/get_tokens", methods=["GET", "POST"])
+    # POST only: a GET can be fired by any web page through an <img> tag,
+    # and very old browsers (e.g. Safari < 16.4) send neither Sec-Fetch-Site
+    # nor Origin on those, so the cross-site guard above couldn't see them.
+    # Every browser that can POST cross-site sends Origin, so POST is
+    # always caught.
+    #
+    # The explicit GET rule matters: without it, GET /<id>/get_tokens would
+    # fall through to the generic GET /<project_id>/<chunk> route instead
+    # of being refused.
+    @app.get("/<project_id>/get_tokens")
+    def get_project_tokens_wrong_method(project_id):
+        return jsonify({
+            "error": "method_not_allowed",
+            "message": "get_tokens only accepts POST.",
+            "allowed_methods": ["POST"],
+            **_usage_info(),
+        }), 405, {"Allow": "POST"}
+
+    @app.post("/<project_id>/get_tokens")
     def get_project_tokens(project_id):
         # Fast-path checks that never touch the GUI: already delivered once,
         # or this project has hit its per-session popup cap.
@@ -791,7 +950,16 @@ def _create_app(bridge: ApiBridge) -> Flask:
         # route would return {"error": "timeout"} while the dialog is still
         # open, and the click that eventually comes has no one left to
         # receive its result.
-        result = bridge.call("get_tokens", project_id, "", timeout=120.0)
+        #
+        # The caller's identity (which program opened this TCP connection)
+        # is looked up here, off the GUI thread, and shown in the popup so
+        # the user can tell their own script from something else racing it.
+        caller = identify_caller(
+            request.environ.get("REMOTE_ADDR"),
+            request.environ.get("REMOTE_PORT"),
+            request.environ.get("SERVER_PORT"),
+        )
+        result = bridge.call("get_tokens", project_id, "", {"caller": caller}, timeout=120.0)
 
         if "error" in result:
             status_code = 400
@@ -801,6 +969,13 @@ def _create_app(bridge: ApiBridge) -> Flask:
                 status_code = 403
             elif result["error"] == "too_many_requests":
                 status_code = 429
+            elif result["error"] == "prompt_already_open":
+                status_code = 409
+            elif result["error"] == "popup_rate_limited":
+                resp = jsonify({**result, **_usage_info()})
+                resp.status_code = 429
+                resp.headers["Retry-After"] = str(result.get("retry_after", 60))
+                return resp
             return jsonify({**result, **_usage_info()}), status_code
         return jsonify(result)
 
@@ -1139,7 +1314,11 @@ def start_api_server(manager, port: int = DEFAULT_PORT, max_tries: int = 20) -> 
         # message) rather than letting the OSError propagate - catch
         # SystemExit too or a busy port would kill the whole app.
         try:
-            httpd = make_server("127.0.0.1", candidate, app)
+            # threaded: one slow or stalled client (a popup waiting on a
+            # human, a half-sent request, a long validate) must not block
+            # every other caller. Safe - all GUI work is already marshalled
+            # onto the Qt thread by ApiBridge.call().
+            httpd = make_server("127.0.0.1", candidate, app, threaded=True)
             break
         except (OSError, SystemExit):
             continue

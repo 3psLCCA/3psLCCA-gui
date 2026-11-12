@@ -15,11 +15,12 @@ Why this never triggers a popup:
 
 Covers:
   1. Discovery / server reachability
-  2. GET and POST both routed, 404 project_not_open for unknown/closed ids
+  2. POST routed (404 project_not_open for unknown/closed ids); GET and
+     HEAD refused with 405 - get_tokens is POST-only so a web page can't
+     trigger it through an <img> tag
   3. Path traversal, XSS, SQLi-style, null-byte, and oversized project_id
      payloads - all handled safely (400/404), never a 500
-  4. HTTP method fuzzing: PUT/DELETE/PATCH -> 405; HEAD behaves like GET
-     (Flask auto-registers HEAD for any GET route - it must NOT 405)
+  4. HTTP method fuzzing: GET/HEAD/PUT/DELETE/PATCH -> 405
   5. Token forgery / auth bypass against a real protected endpoint
   6. Flooding a never-opened project never produces anything but 404 -
      there is deliberately NO IP/global rate limiter in the current design
@@ -53,11 +54,10 @@ print("  server reachable")
 # ============================================================================
 # 1. GET & POST routing, unknown/closed project isolation
 # ============================================================================
-step("1. GET & POST /<project_id>/get_tokens - unknown project")
-for method in ("GET", "POST"):
-    status, r = call(method, f"/{FAKE_PROJECT}/get_tokens")
-    ok(f"{method} /{FAKE_PROJECT}/get_tokens -> 404 project_not_open",
-       status == 404 and r.get("error") == "project_not_open")
+step("1. POST /<project_id>/get_tokens - unknown project")
+status, r = call("POST", f"/{FAKE_PROJECT}/get_tokens")
+ok(f"POST /{FAKE_PROJECT}/get_tokens -> 404 project_not_open",
+   status == 404 and r.get("error") == "project_not_open")
 
 
 # ============================================================================
@@ -78,13 +78,13 @@ malicious_ids = [
 from urllib.parse import quote
 
 for raw_id, label in malicious_ids:
-    status, r = call("GET", f"/{quote(raw_id, safe='')}/get_tokens")
-    ok(f"GET /{label} -> safely rejected (400/404, never 500)",
+    status, r = call("POST", f"/{quote(raw_id, safe='')}/get_tokens")
+    ok(f"POST /{label} -> safely rejected (400/404, never 500)",
        status in (400, 404),
        detail=f"got {status}")
 
-status, r = call("GET", "//get_tokens")
-ok("GET //get_tokens (empty project_id segment) -> 404 (route/collapse mismatch)",
+status, r = call("POST", "//get_tokens")
+ok("POST //get_tokens (empty project_id segment) -> 404 (route/collapse mismatch)",
    status == 404)
 
 
@@ -92,16 +92,14 @@ ok("GET //get_tokens (empty project_id segment) -> 404 (route/collapse mismatch)
 # 3. HTTP method fuzzing
 # ============================================================================
 step("3. HTTP Method Fuzzing")
-for method in ["PUT", "DELETE", "PATCH"]:
+for method in ["GET", "HEAD", "PUT", "DELETE", "PATCH"]:
     status, r = call(method, f"/{FAKE_PROJECT}/get_tokens")
     ok(f"{method} /{FAKE_PROJECT}/get_tokens -> 405 Method Not Allowed",
-       status == 405)
-
-# HEAD is auto-registered by Flask for any GET route - must behave like GET
-# (i.e. still resolve project lookup), never 405.
-status, r = call("HEAD", f"/{FAKE_PROJECT}/get_tokens")
-ok("HEAD /<project_id>/get_tokens -> NOT 405 (Flask auto-provides HEAD for GET)",
-   status != 405, detail=f"got {status}")
+       status == 405, detail=f"got {status}")
+status, r = call("GET", f"/{FAKE_PROJECT}/get_tokens")
+ok("405 reply is JSON and names POST as the allowed method",
+   r.get("error") == "method_not_allowed" and "POST" in r.get("allowed_methods", []),
+   detail=str(r)[:200])
 
 
 # ============================================================================
@@ -148,7 +146,7 @@ step("5. Flood a Never-Opened Project (no global rate limiter by design)")
 flood_project = "flood_probe_never_opened_project"
 results = []
 for _ in range(20):
-    status, r = call("GET", f"/{flood_project}/get_tokens")
+    status, r = call("POST", f"/{flood_project}/get_tokens")
     results.append((status, r.get("error")))
 all_404 = all(status == 404 and err == "project_not_open" for status, err in results)
 ok("20 rapid requests to a never-opened project -> always 404 project_not_open, "

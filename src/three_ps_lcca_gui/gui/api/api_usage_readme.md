@@ -184,6 +184,8 @@ curl http://127.0.0.1:8765/proj_a1b2c3d4/get_tokens
 | User clicked Deny (or closed the popup) | `403` | `{"error": "denied", "message": "..."}` |
 | Already handed out once this session | `403` | `{"error": "token_already_delivered", "message": "..."}` |
 | Asked (and been denied) too many times this session | `429` | `{"error": "too_many_requests", "message": "..."}` |
+| More than 5 popups across the whole app in the last minute | `429` + `Retry-After` | `{"error": "popup_rate_limited", "retry_after": <seconds>, "message": "..."}` - wait and retry |
+| A popup for this project is already on screen | `409` | `{"error": "prompt_already_open", "message": "..."}` |
 | User clicked Allow | `200` | `{"ok": true, "token": "<token>"}` |
 
 The token is only ever delivered this way **once** per project per session -

@@ -13,11 +13,48 @@ schema/validation logic that runs off the same registry.
 """
 
 import queue
+import re
+import traceback
+from pathlib import Path
 
 from PySide6.QtCore import QObject, Qt, Signal
 
 from . import pages  # noqa: F401  (import triggers each page's registration)
 from .registry import CHUNK_PAGE_MAP
+
+
+# A project id is a single folder name inside the projects folder - never a
+# path. Real ids are "proj_" + 8 hex chars; this is looser (letters, digits,
+# _ - . and spaces, starting with a letter/digit) so imported projects with
+# other folder names keep working, while ruling out separators, drive
+# letters, UNC prefixes and ".." outright.
+_PROJECT_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_\-. ]{0,127}$")
+
+
+# Windows device names: "CON", "nul.txt", "COM1.json" etc. open a device,
+# not a folder, wherever they appear.
+_WINDOWS_RESERVED = (
+    {"CON", "PRN", "AUX", "NUL", "CONIN$", "CONOUT$"}
+    | {f"COM{i}" for i in range(10)} | {f"LPT{i}" for i in range(10)}
+    | {f"COM{c}" for c in "¹²³"} | {f"LPT{c}" for c in "¹²³"}
+)
+
+
+def _is_safe_project_id(project_id) -> bool:
+    # fullmatch, not match: "$" in re.match also matches before a trailing
+    # "\n", which would let "proj_x\n" through.
+    if not isinstance(project_id, str) or not _PROJECT_ID_RE.fullmatch(project_id):
+        return False
+    if ".." in project_id or project_id.endswith((".", " ")):
+        return False
+    if project_id.split(".", 1)[0].strip().upper() in _WINDOWS_RESERVED:
+        return False
+    from three_ps_lcca_gui.core.safechunk_engine import SafeChunkEngine
+    try:
+        base = Path(SafeChunkEngine.get_default_base_dir()).resolve()
+        return (base / project_id).resolve().parent == base
+    except (OSError, ValueError):
+        return False
 
 
 class ApiBridge(QObject):
@@ -27,6 +64,11 @@ class ApiBridge(QObject):
         super().__init__(parent)
         self.manager = manager
         self._request.connect(self._handle, Qt.QueuedConnection)
+        # Projects whose Allow/Deny popup is currently on screen. With a
+        # threaded server a second get_tokens can arrive while the first
+        # dialog's exec() is still spinning the event loop; without this it
+        # would stack a second popup on top.
+        self._prompting: set[str] = set()
 
     def call(self, method: str, project_id: str, chunk: str, payload=None, timeout: float = 10.0) -> dict:
         """Thread-safe. Call from any thread; blocks until the main thread replies."""
@@ -68,7 +110,15 @@ class ApiBridge(QObject):
             else:
                 result = self._dispatch(method, project_id, chunk, payload)
         except Exception as e:
-            result = {"error": str(e)}
+            # Full detail goes to the app's console/log only - exception text
+            # can carry file paths and internal state a caller has no
+            # business seeing.
+            traceback.print_exc()
+            result = {
+                "error": "internal_error",
+                "message": "The app hit an unexpected error handling this request. Details are in the app's log.",
+                "exception_type": type(e).__name__,
+            }
         result_q.put(result)
 
     def _dispatch(self, method: str, project_id: str, chunk: str, payload) -> dict:
@@ -89,7 +139,7 @@ class ApiBridge(QObject):
         elif method == "create_project":
             return self._create_project(payload)
         elif method == "get_tokens":
-            return self._get_tokens(project_id)
+            return self._get_tokens(project_id, payload)
         elif method == "validate_all":
             return self._validate_all(project_id)
         elif method == "unlock":
@@ -116,10 +166,18 @@ class ApiBridge(QObject):
         win.apply_lock_state(False)
         return {"ok": True, "status": "unlocked"}
 
-    def _get_tokens(self, project_id: str) -> dict:
+    def _get_tokens(self, project_id: str, payload=None) -> dict:
         win = self._find_window(project_id)
         if win is None:
             return {"error": "project_not_open"}
+        if project_id in self._prompting:
+            return {
+                "error": "prompt_already_open",
+                "message": (
+                    "An API access popup for this project is already waiting "
+                    "for the user. Wait for that one to be answered."
+                ),
+            }
 
         from three_ps_lcca_gui.gui.api import tokens
 
@@ -138,6 +196,19 @@ class ApiBridge(QObject):
         # up in one session, without any lingering "denied forever" state -
         # denying just fails this one request; the next ask still prompts,
         # up to the cap.
+        # App-wide cap first, reported separately: it's temporary (wait and
+        # retry), unlike the per-project cap which lasts until reopen.
+        wait = tokens.global_retry_after()
+        if wait > 0:
+            return {
+                "error": "popup_rate_limited",
+                "retry_after": int(wait) + 1,
+                "message": (
+                    "Too many API access popups across the app in the last "
+                    f"minute. Try again in {int(wait) + 1} seconds, or use "
+                    "File -> API Access in the app to grant access manually."
+                ),
+            }
         if not tokens.can_prompt(project_id):
             return {
                 "error": "too_many_requests",
@@ -158,8 +229,13 @@ class ApiBridge(QObject):
 
         from three_ps_lcca_gui.gui.components.api_access_prompt import ApiAccessPrompt
         display_name = win.controller.active_display_name or project_id
-        dlg = ApiAccessPrompt(display_name, parent=win)
-        dlg.exec()
+        caller = (payload or {}).get("caller") if isinstance(payload, dict) else None
+        dlg = ApiAccessPrompt(display_name, caller=caller, parent=win)
+        self._prompting.add(project_id)
+        try:
+            dlg.exec()
+        finally:
+            self._prompting.discard(project_id)
 
         if dlg.result_allowed:
             token = tokens.ensure_token(project_id)
@@ -390,6 +466,13 @@ class ApiBridge(QObject):
         if self.manager.is_project_open(project_id):
             self.manager.open_project(project_id)  # focuses the existing window
             return {"ok": True, "status": "already_open"}
+
+        # Must come before ANY filesystem access: get_project_info() and
+        # open() join the id straight onto the projects folder, so "..\x",
+        # "C:\dir" or "\\host\share" would escape it (the last one even
+        # makes Windows connect out over SMB with the user's credentials).
+        if not _is_safe_project_id(project_id):
+            return {"error": "project_not_found"}
 
         from three_ps_lcca_gui.core.safechunk_engine import SafeChunkEngine
         if not SafeChunkEngine.get_project_info(project_id):
