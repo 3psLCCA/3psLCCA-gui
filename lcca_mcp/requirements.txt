@@ -1,0 +1,3 @@
+# Official MCP Python SDK. Pinned to the 2.x line: 3.x may change the API.
+# Kept separate from the app's own dependencies - the app doesn't need it.
+mcp>=2.3,<3
