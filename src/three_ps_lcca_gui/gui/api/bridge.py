@@ -20,7 +20,7 @@ from pathlib import Path
 from PySide6.QtCore import QObject, Qt, Signal
 
 from . import pages  # noqa: F401  (import triggers each page's registration)
-from .registry import CHUNK_PAGE_MAP
+from .registry import CHUNK_PAGE_MAP, validate_payload_keys
 
 
 # A project id is a single folder name inside the projects folder - never a
@@ -59,11 +59,13 @@ def _is_safe_project_id(project_id) -> bool:
 
 class ApiBridge(QObject):
     _request = Signal(str, str, str, object, object)
+    _notice = Signal(str, str)
 
     def __init__(self, manager, parent=None):
         super().__init__(parent)
         self.manager = manager
         self._request.connect(self._handle, Qt.QueuedConnection)
+        self._notice.connect(self._show_notice, Qt.QueuedConnection)
         # Projects whose Allow/Deny popup is currently on screen. With a
         # threaded server a second get_tokens can arrive while the first
         # dialog's exec() is still spinning the event loop; without this it
@@ -78,6 +80,17 @@ class ApiBridge(QObject):
             return result_q.get(timeout=timeout)
         except queue.Empty:
             return {"error": "timeout"}
+
+    def notify(self, project_id: str, text: str) -> None:
+        """Thread-safe, fire-and-forget: show `text` in the project's status
+        bar (used for changes made through the API)."""
+        self._notice.emit(project_id, text)
+
+    def _show_notice(self, project_id: str, text: str) -> None:
+        win = self._find_window(project_id)
+        bar = getattr(win, "status_bar", None) if win is not None else None
+        if bar is not None:
+            bar.showMessage(text, 15000)
 
     # Methods that mutate a project (or recompute/lock it, in validate_all's
     # case) - gated below on the project NOT being locked, in one place,
@@ -181,14 +194,16 @@ class ApiBridge(QObject):
 
         from three_ps_lcca_gui.gui.api import tokens
 
-        # One-time token delivery defense: once handed out over HTTP once,
-        # every later call is rejected outright - no popup shown.
-        if tokens.is_delivered(project_id):
+        # A token is tied to the process that asked for it, so that process
+        # must be identifiable. Refused before any popup if it isn't.
+        caller = (payload or {}).get("caller") if isinstance(payload, dict) else None
+        if not caller or not caller.get("pid"):
             return {
-                "error": "token_already_delivered",
+                "error": "caller_unidentified",
                 "message": (
-                    "The API token was already delivered once for this project. "
-                    "Open File -> API Access in the app to view and copy the token."
+                    "The app could not tell which program sent this request, "
+                    "so it can't tie a key to it. Use the token from File -> "
+                    "API Access in the app instead."
                 ),
             }
 
@@ -213,8 +228,9 @@ class ApiBridge(QObject):
             return {
                 "error": "too_many_requests",
                 "message": (
-                    "Too many API access requests for this project this session. "
-                    "Use File -> API Access in the app to grant access manually."
+                    "Too many API access popups for this project ended without "
+                    "Allow this session. Use File -> API Access in the app to "
+                    "grant access manually, or reopen the project."
                 ),
             }
 
@@ -229,7 +245,6 @@ class ApiBridge(QObject):
 
         from three_ps_lcca_gui.gui.components.api_access_prompt import ApiAccessPrompt
         display_name = win.controller.active_display_name or project_id
-        caller = (payload or {}).get("caller") if isinstance(payload, dict) else None
         dlg = ApiAccessPrompt(display_name, caller=caller, parent=win)
         self._prompting.add(project_id)
         try:
@@ -238,18 +253,25 @@ class ApiBridge(QObject):
             self._prompting.discard(project_id)
 
         if dlg.result_allowed:
-            token = tokens.ensure_token(project_id)
-            tokens.mark_delivered(project_id)
-            return {"ok": True, "token": token}
-        else:
+            token = tokens.add_grant(project_id, caller)
             return {
-                "error": "denied",
-                "message": (
-                    "API access was denied for this request. If this was a "
-                    "mistake, open File -> API Access in the app to get the "
-                    "key manually."
+                "ok": True,
+                "token": token,
+                "note": (
+                    f"This token works only for the program that asked (PID "
+                    f"{int(caller['pid'])}), until it exits or the user revokes "
+                    "it in File -> API Access. Another program sending it gets 401."
                 ),
             }
+        tokens.record_denied(project_id)
+        return {
+            "error": "denied",
+            "message": (
+                "API access was denied for this request. If this was a "
+                "mistake, open File -> API Access in the app to get the "
+                "key manually."
+            ),
+        }
 
     def _validate_all(self, project_id: str) -> dict:
         """Powers GET /{project_id}/validate. Same aggregate check the
@@ -455,9 +477,12 @@ class ApiBridge(QObject):
         projects = []
         for p in SafeChunkEngine.list_all_projects():
             entry = {k: p.get(k) for k in self._PROJECT_LIST_KEYS}
-            # "status": "locked" just means a .lock file exists - which is
-            # also true for projects open in THIS app instance, so surface an
-            # explicit open flag for clarity.
+            # The engine says "locked" when a .lock file exists, i.e. the
+            # project is open in an app window (this one or another). Callers
+            # read "locked" as "results calculated, edits blocked" (the
+            # project_locked error), so the API calls it "in_use" instead.
+            if entry.get("status") == "locked":
+                entry["status"] = "in_use"
             entry["open"] = p.get("project_id") in open_ids
             projects.append(entry)
         return {"ok": True, "projects": projects}
@@ -538,6 +563,12 @@ class ApiBridge(QObject):
         via_signal = bool(entry and entry.get("refresh_via_signal"))
         use_widget = widget is not None and not via_signal
 
+        # Checked first so a wrong-database row gets that error, not an
+        # unrelated one (e.g. "component doesn't exist").
+        sor_error = self._sor_database_error(win, entry, "update", payload)
+        if sor_error:
+            return sor_error
+
         current = widget.get_data_dict() if use_widget else win.controller.get_chunk(chunk)
 
         # Hooks needing the stored data (e.g. entry-granular validation
@@ -547,6 +578,13 @@ class ApiBridge(QObject):
         validate_hook = entry.get("validate_payload") if entry else None
         if validate_hook is not None:
             errors = validate_hook(payload, current)
+            if errors:
+                return {"error": "invalid_field_values", "details": errors}
+        elif entry and entry.get("dynamic_options"):
+            # Combo fields whose options depend on stored data (e.g.
+            # general_info's sor_database, per country) - the server's
+            # pre-check had no data and skipped them.
+            errors = validate_payload_keys(chunk, payload, current)
             if errors:
                 return {"error": "invalid_field_values", "details": errors}
 
@@ -611,6 +649,23 @@ class ApiBridge(QObject):
         this."""
         return self._run_create_hook(project_id, chunk, payload, "add_manual")
 
+    @staticmethod
+    def _sor_database_error(win, entry, method: str, payload) -> dict | None:
+        """Refuses catalog rows that don't come from the SOR database chosen
+        in General Info (see the chunk's check_sor_database hook)."""
+        check = entry.get("check_sor_database") if entry else None
+        if check is None:
+            return None
+        project_sor = (win.controller.get_chunk("general_info") or {}).get("sor_database") or ""
+        message = check(project_sor, method, payload)
+        if message is None:
+            return None
+        return {
+            "error": "wrong_sor_database",
+            "project_sor_database": project_sor or None,
+            "details": [message],
+        }
+
     def _run_create_hook(self, project_id: str, chunk: str, payload, hook_name: str) -> dict:
         """Shared plumbing for the single-material 'shortcut' create
         endpoints (add_from_catalog, add_manual) - both hooks share the
@@ -629,6 +684,10 @@ class ApiBridge(QObject):
         hook = entry.get(hook_name) if entry else None
         if hook is None:
             return {"error": "not_supported"}
+
+        sor_error = self._sor_database_error(win, entry, hook_name, payload)
+        if sor_error:
+            return sor_error
 
         current = win.controller.get_chunk(chunk)
         registry = win.controller.engine.fetch_chunk("str_component_registry") or {}

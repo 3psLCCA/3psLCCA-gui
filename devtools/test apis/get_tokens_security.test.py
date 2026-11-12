@@ -139,7 +139,7 @@ else:
 # ============================================================================
 step("5. Flood a Never-Opened Project (no global rate limiter by design)")
 # bridge.py's _get_tokens checks _find_window() FIRST, before it ever looks
-# at tokens.is_delivered()/can_prompt() - so a project that was never opened
+# at tokens.can_prompt() - so a project that was never opened
 # can never reach the 3-prompt cap (that's per-OPEN-project state) and can
 # never trigger a popup. Hammering it should just be 404, every single time,
 # with no accidental throttling regression and no risk of a popup appearing.

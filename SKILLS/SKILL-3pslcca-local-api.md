@@ -21,7 +21,7 @@ This skill documents how to interact with the local HTTP API exposed by the runn
 
 * **Base URL**: `http://127.0.0.1:8765` (bound to localhost only; the port auto-increments if 8765 is busy and is not user-configurable).
 * **Detailed Docs**: Call `GET /help` to retrieve the full, live API documentation and JSON schemas (`GET /` serves the same content as an HTML page for humans).
-* **List All Projects**: `GET /projects` — no token needed. Returns `{"projects": [{project_id, display_name, created_at, last_modified, status, open}]}`. Use the `"open"` flag (not `"status"`) to know if a project is reachable by data endpoints — `"status": "locked"` can still apply to a project that's open in this same app instance.
+* **List All Projects**: `GET /projects` — no token needed. Returns `{"projects": [{project_id, display_name, created_at, last_modified, status, open}]}`. Use the `"open"` flag (not `"status"`) to know if a project is reachable by data endpoints — `"status": "in_use"` only means the project file is open in an app window. It does **not** mean the project's results are locked (that is the `423 project_locked` error).
 * **Always Show Project Names, Not Just IDs**: Whenever `GET /projects` or `GET /projects/active` is called for discovery (e.g. before opening a project, before creating a new one, or when the user asks "what projects do I have"), always present the list to the user by `display_name` (with `open`/`status` noted), never bare `project_id`s. `project_id` is an internal handle for subsequent API calls — it should stay behind the scenes in your own tool calls, not be the thing the user reads. If the user refers to a project by name, resolve it against this list yourself rather than asking them for the id.
 * **Active Projects**: `GET /projects/active` — no token needed. Same shape as above, filtered to currently-open projects, plus a `"count"`.
 * **Opening a Project**: If a project is closed, call `POST /projects/open` with `{"project_id": "..."}`. Opening is asynchronous — poll any data endpoint (`GET /{project_id}/{page}`) until it stops returning `404 project_not_open`. Unknown ids return `404 project_not_found`.
@@ -32,36 +32,42 @@ This skill documents how to interact with the local HTTP API exposed by the runn
 ## 2. Authentication
 
 * **Header**: `X-API-Token: <token>` (required for all data and catalog endpoints).
-* **Not required for**: `GET /`, `GET /help`, `GET /projects`, `GET /projects/active`, `GET /projects/new`, `POST /projects/open`, `POST /projects/new`, `GET`/`POST /{project_id}/get_tokens`.
-* **Obtaining a Token — try the automatic handshake first**: Call `GET /{project_id}/get_tokens`. This shows an Allow/Deny popup in the desktop app — a human has to click something, so expect the call to block for a while (it can take up to ~2 minutes; don't treat a slow response as a hang). Only fall back to asking the user to paste a token manually if this fails.
+* **Not required for**: `GET /`, `GET /help`, `GET /projects`, `GET /projects/active`, `GET /projects/new`, `POST /projects/open`, `POST /projects/new`, `POST /{project_id}/get_tokens`.
+* **Obtaining a token — two kinds:**
+  * **Script token (use this with curl / one-off commands).** Ask the user to copy it from **File > API Access** in the desktop app (project open). It works from any program. Never ask for it more than needed, and don't echo it back.
+  * **Program key (long-running programs only).** `POST /{project_id}/get_tokens` shows an Allow/Deny popup naming the calling program. On Allow it returns a key that works **only for the same running process** that asked; any other process sending it gets `401`, and the attempt is shown to the user in File > API Access. It stops working when that process exits or the user revokes it. So it's useless for separate `curl` commands (each is a new process) — use it from one Python process that keeps running, or through the 3pslcca MCP server.
+
+  `get_tokens` blocks while a human decides (up to ~2 minutes; a slow reply isn't a hang):
 
   | Result | Status | What it means |
   | :--- | :--- | :--- |
-  | User clicked Allow | `200` | `{"ok": true, "token": "..."}` — use it directly. |
+  | User clicked Allow | `200` | `{"ok": true, "token": "...", "note": "..."}` — use it from this same process. |
   | Project isn't open | `404` | `project_not_open` — open it first, then retry once. |
-  | User clicked Deny / closed the popup | `403` | `denied` — that one request was refused; asking again will show the popup again (up to the cap below). |
-  | Already handed out once this session | `403` | `token_already_delivered` — this project's token was already sent over HTTP once; it will not be sent again automatically. |
-  | Asked (and denied) too many times this session | `429` | `too_many_requests` — the popup cap for this project was hit; no more automatic popups until the project is closed and reopened. |
+  | User clicked Deny / closed the popup | `403` | `denied` — that one request was refused. |
+  | Calling program couldn't be identified | `403` | `caller_unidentified` — no popup was shown; use the script token. |
+  | Another popup is already waiting | `409` | `prompt_already_open` — wait for the user to answer that one. |
+  | Too many popups ended without Allow | `429` | `too_many_requests` — no more popups for this project until it is reopened. |
+  | Too many popups app-wide | `429` | `popup_rate_limited` — wait `retry_after` seconds. |
 
-  This is a **one-shot** handshake, not something to poll or retry in a loop — one attempt, then fall back.
+  One attempt, then fall back to the script token — never retry it in a loop.
 
   ```python
   import urllib.request, urllib.error, json
 
-  def get_token(project_id: str, base_url="http://127.0.0.1:8765") -> str:
+  # Only useful if THIS process keeps running and makes the later requests.
+  def get_program_key(project_id: str, base_url="http://127.0.0.1:8765") -> str:
+      req = urllib.request.Request(f"{base_url}/{project_id}/get_tokens", data=b"{}", method="POST")
       try:
-          with urllib.request.urlopen(f"{base_url}/{project_id}/get_tokens", timeout=120) as resp:
+          with urllib.request.urlopen(req, timeout=130) as resp:
               return json.loads(resp.read())["token"]
       except urllib.error.HTTPError as e:
           body = json.loads(e.read())
-          print(f"Automatic token request failed ({e.code}): {body.get('error')} - {body.get('message', '')}")
-          # Fall back: ask the user directly - do not retry get_tokens in a loop.
-          return input(f"Paste the API token for {project_id} (from File > API Access): ").strip()
+          print(f"Program key request failed ({e.code}): {body.get('error')} - {body.get('message', '')}")
+          return input(f"Paste the script token for {project_id} (File > API Access): ").strip()
   ```
 
-  If the automatic call fails for any reason above, ask the user to retrieve it from the desktop app via **File > API Access** (with the project open) and paste it — the dialog there shows the token with Generate/Regenerate/Revoke controls, and is always available as a manual fallback regardless of what `/get_tokens` returned.
 * **Reset Behavior**: Tokens live in memory only — they reset on every app restart and clear when the project window closes. A token that worked yesterday will 401 today if the app was restarted since.
-* **On `401 Unauthorized`**: Don't just retry. First call `GET /projects/active`. If the project isn't listed, its window was closed and the old token is gone for good — reopen it via `POST /projects/open` and get a fresh token (try `/get_tokens` again, or ask the user). If it is listed, the token is simply stale or mistyped — ask the user to re-check it.
+* **On `401 Unauthorized`**: Don't just retry. First call `GET /projects/active`. If the project isn't listed, its window was closed and the old token is gone for good — reopen it via `POST /projects/open` and get a fresh token (try `/get_tokens` again, or ask the user). If it is listed: a program key from `/get_tokens` only works from the process that asked for it (and stops when that process exits or is revoked) — switch to the script token. Otherwise the token is stale or mistyped — ask the user to re-check it.
 
 ---
 
@@ -82,7 +88,7 @@ This skill documents how to interact with the local HTTP API exposed by the runn
 ## 4. Data & Catalog Endpoints Reference
 
 ### Token endpoint
-* **`GET`/`POST /{project_id}/get_tokens`** *(no token required — this is how you get one)* — One-shot handshake that pops an Allow/Deny dialog in the desktop app; blocks until a human responds (up to ~2 minutes) or one of the terminal cases in Section 2 fires (`denied`, `token_already_delivered`, `too_many_requests`, `project_not_open`). Returns `{"ok": true, "token": "..."}` on success. See Section 2 for the full result table, retry rules (never poll/retry this in a loop — one attempt, then fall back to File > API Access), and a ready-to-use Python helper.
+* **`POST /{project_id}/get_tokens`** *(no token required — this is how a long-running program gets a key)* — Pops an Allow/Deny dialog naming the calling program; blocks until a human responds (up to ~2 minutes). On Allow returns `{"ok": true, "token": "..."}`, a key that works only for the process that asked. See Section 2 for the result table and when to use the script token instead.
 
 ### Project pages
 Valid `{page}` values: `bridge_data`, `demolition_data`, `financial_data`, `general_info`, `maintenance_data`, `str_component_registry`, `str_foundation`, `str_misc`, `str_sub_structure`, `str_super_structure`. (Confirm against `GET /help` — this list can change with app updates.)
@@ -141,12 +147,18 @@ When instructed to add construction materials (e.g., "add materials related for 
 
 ### Step 1: List and Identify Available Databases
 Check the active Schedule of Rates (SOR) database set in the project:
-1. Retrieve the current settings from the `general_info` chunk under the `sor_database` field. Note: For freshly created projects, `sor_database` field options in `general_info` may be empty `[]`. Attempting to POST `sor_database` via API will return a 400 validation error; simply pass the desired `db_key` directly in all `/catalog/*` API endpoints.
+1. Retrieve the current settings from the `general_info` chunk under the `sor_database` field (its `options` list the databases for the project's country). **Materials can only be added from this database**: `add_from_catalog` and `"catalog_item"` rows from any other `db_key` are refused with `400 wrong_sor_database`. If it is empty (`"- No suggestions -"`), ask the user which database to use and set it with `POST /{project_id}/general_info {"sor_database": "<db_key>"}` before adding catalog materials. A custom database (`custom::...`) can't be searched through the API, so use `add_manual` for those projects.
 2. Query `GET /catalog/databases` to list all available material suggestions databases on the machine.
 
 ### Step 2: Confirm Database Usage
 **Do not proceed without user confirmation.** Present the active database to the user and explicitly ask/confirm:
 * *"Would you like to use the active database [<db_name>] for suggesting materials, or switch to a different available database?"*
+
+> [!CAUTION]
+> **Strict: one confirmed database only.** Search only the database the user confirmed, and always pass its `db_key`. Never search other databases to find a match, and never take a material from another database just to finish the task. If the item isn't there, stop and tell the user; they decide whether to switch database or add it manually.
+
+> [!CAUTION]
+> **Strict: ask where to add.** "Structure works" means one of four pages: Foundation (`str_foundation`), Sub Structure (`str_sub_structure`), Super Structure (`str_super_structure`) or Miscellaneous (`str_misc`). Before adding a material, ask the user which page and which component, unless they already said. Never pick them yourself.
 
 > [!IMPORTANT]
 > **Never assume a value on the user's behalf — always ask.** This applies to every material grade, type, quantity, database choice, component name, and any other field that affects cost, carbon, or design — even when a "typical" or "common" value seems obvious. Guessing a plausible-looking grade (e.g. defaulting to M35 because it's common) can silently misprice or misdesign the structure, and the user has no way to catch it later since it looks like a deliberate choice. When something is ambiguous or unspecified, stop and ask a specific question (using the question bank above as a model) rather than proceeding with an assumption — and help the user answer it: explain the options, what each implies, and what you'd need to look up next once they choose.
@@ -280,11 +292,12 @@ Errors are returned as JSON: `{"error": "<code>", "details"?: [...], "documentat
 | 404 | `project_not_found` | No project with that id exists on this machine. | `GET /projects` for valid ids. |
 | 404 | `project_not_open` | Project exists but isn't open in the app. | `POST /projects/open`, then retry once it's finished opening. |
 | 404 | `not_found` | Unknown route or page name. | Check `"available_pages"` in the response and `GET /help`. |
+| 400 | `wrong_sor_database` | The material's `db_key` isn't the project's SOR database (General Info `sor_database`, returned as `project_sor_database`), or none is set. Nothing was added. | Search the project's own database and use that row. If none is set, ask the user and set `sor_database` first. Don't switch the project's database without asking. |
 | 404 | `not_supported` | Chunk doesn't support `add_from_catalog` (only `str_*` chunks do). | Use `POST /{project_id}/{chunk}` with `"catalog_item"` or `"values"` instead. |
 | 423 | `project_locked` | Project is locked (a calculation completed and auto-locked it, or a human locked it manually). Every write endpoint, including `GET /validate`, is blocked while locked. | `POST /{project_id}/unlock`, then retry. |
 | 403 | `denied` | User clicked Deny (or closed) the `/get_tokens` popup for this request. | Ask again for a fresh popup, or fall back to File > API Access. |
-| 403 | `token_already_delivered` | `/get_tokens` already handed this project's token out once this session. | Ask the user for it via File > API Access instead — it won't be resent automatically. |
-| 429 | `too_many_requests` | `/get_tokens` popup cap hit for this project this session. | Ask the user for it via File > API Access instead of retrying. |
+| 403 | `caller_unidentified` | The app couldn't tell which program sent `/get_tokens`, so it can't tie a key to it. | Use the script token from File > API Access. |
+| 429 | `too_many_requests` | Too many `/get_tokens` popups for this project ended without Allow this session. | Ask the user for the script token via File > API Access instead of retrying. |
 
 **Troubleshooting flow:**
 1. **401 Unauthorized** — First `GET /projects/active` (no token needed). If your project isn't in that list, its window was closed: tokens are cleared on close and a new one is generated on reopen, so the old one will never work again — `POST /projects/open`, then ask the user for the fresh token via File > API Access. If the project *is* listed, the token itself is stale or mistyped — ask the user for the current one.
@@ -298,6 +311,6 @@ Errors are returned as JSON: `{"error": "<code>", "details"?: [...], "documentat
 
 1. `GET http://127.0.0.1:8765/projects` — find your `project_id` (no token needed).
 2. If the project isn't open yet: `POST http://127.0.0.1:8765/projects/open` with `{"project_id": "..."}`, then wait/poll until it is.
-3. Get the project's API token: try `GET http://127.0.0.1:8765/{project_id}/get_tokens` first (a human clicks Allow/Deny in the app; expect it to block a bit). If that doesn't return a token for any reason (denied, already delivered, capped, or not open), fall back to asking a human for it via File > API Access.
+3. Get a token: for curl or separate commands, ask the user for the script token from File > API Access. Only a single long-running process may use `POST http://127.0.0.1:8765/{project_id}/get_tokens` instead (its key works only for that process).
 4. `GET http://127.0.0.1:8765/{project_id}/{page}` with header `X-API-Token: <token>` — the response contains both the data and the full field schema (types, options, ranges, locked flags).
 5. `POST` the same URL with only the fields you want to change — omitted fields keep their current value.

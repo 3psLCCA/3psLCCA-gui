@@ -401,6 +401,62 @@ def _duplicate_name_error(current: dict, comp: str, name: str) -> str | None:
     return None
 
 
+def _catalog_db_keys(method: str, payload) -> list:
+    """db_key of every catalog row this request would add (None for a row
+    that doesn't say which database it came from). [] if it adds nothing
+    from the catalog, so the SOR check below doesn't apply."""
+    if not isinstance(payload, dict):
+        return []
+    if method == "add_from_catalog":
+        return [payload.get("db_key")] if "db_key" in payload else []
+    if method != "update":
+        return []
+    keys = []
+    for patches in payload.values():
+        for patch in patches if isinstance(patches, list) else []:
+            if isinstance(patch, dict) and "id" not in patch and isinstance(patch.get("catalog_item"), dict):
+                keys.append(patch["catalog_item"].get("db_key"))
+    return keys
+
+
+def _check_sor_database(project_sor: str, method: str, payload) -> str | None:
+    """Materials may only come from the SOR database chosen in General Info
+    (the same one the GUI's material dialog searches), so a project set to
+    Maharashtra can't silently get Bihar rates. Returns an error message, or
+    None if the request is fine."""
+    used = _catalog_db_keys(method, payload)
+    if not used:
+        return None
+    project_sor = (project_sor or "").strip()
+    if not project_sor:
+        return (
+            "This project has no SOR database set (General Info -> SOR "
+            "database is '- No suggestions -'), so materials can't be added "
+            "from the catalog. Ask the user which database to use and set "
+            "\"sor_database\" via POST /{project_id}/general_info first (GET "
+            "/{project_id}/general_info lists the options), or add the "
+            "material with its own values via POST "
+            "/{project_id}/{chunk}/add_manual."
+        )
+    if project_sor.startswith("custom::"):
+        return (
+            f"This project uses the custom database {project_sor!r}, which the "
+            f"API catalog can't search. Add the material with its own values "
+            f"via POST /{{project_id}}/{{chunk}}/add_manual, or ask the user to "
+            f"switch General Info -> SOR database to a built-in one."
+        )
+    wrong = sorted({str(k) for k in used if (k or "").strip() != project_sor})
+    if not wrong:
+        return None
+    return (
+        f"This project's SOR database (General Info) is {project_sor!r}, but "
+        f"the material comes from {', '.join(wrong)}. Materials must come "
+        f"from the project's own database. Search it with GET "
+        f"/catalog/search?q=...&db_key={project_sor} and use that row, or ask "
+        f"the user to change the project's SOR database first."
+    )
+
+
 _ADD_FROM_CATALOG_KEYS = {
     "component", "db_key", "material_name", "quantity",
     "include_in_carbon_emission", "include_in_recyclability",
@@ -959,6 +1015,7 @@ for _chunk, _tab in _CHUNK_TABS.items():
         add_from_catalog=_add_from_catalog,
         add_manual=_add_manual,
         trash_by_id=_trash_by_id,
+        check_sor_database=_check_sor_database,
         refresh_via_signal=True,
     )
 

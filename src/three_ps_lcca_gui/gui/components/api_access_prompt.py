@@ -2,7 +2,8 @@
 gui/components/api_access_prompt.py
 
 A minimal Allow / Deny dialog shown when an external caller hits
-/<project_id>/get_tokens for the first time in a session.
+/<project_id>/get_tokens. Allow gives that program its own key, tied to its
+process (see gui/api/tokens.py).
 
 Message: "An external application wants to access this project using the API"
 - Allow  → result_allowed = True
@@ -59,7 +60,9 @@ class ApiAccessPrompt(QDialog):
         msg = QLabel(
             "A program on this computer wants API access to this project:<br><br>"
             f"<b>{html.escape(project_display_name)}</b><br><br>"
-            "Only allow it if you just started this program yourself."
+            "Only allow it if you just started this program yourself. It "
+            "gets its own key that works only for this program while it "
+            "runs; you can revoke it in File &rarr; API Access."
         )
         msg.setWordWrap(True)
         msg.setTextFormat(Qt.TextFormat.RichText)

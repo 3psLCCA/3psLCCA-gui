@@ -16,12 +16,24 @@ specific Schedule of Rates (SOR) database in the local 3psLCCA API
 
 ---
 
-## Step 1 — Ask the user which SOR to search
+## Step 1 — Confirm with the user which SOR to search (STRICT)
 
-Don't assume a database. Call `GET /catalog/databases` (optionally filtered by `country`/
-`region`) to get the list of available SOR databases, and ask the user to pick one
-(e.g. Bihar, Karnataka, MP, Maharashtra, Rajasthan) if they haven't already named one.
-Keep the returned `db_key` (and `region`, if applicable) — every following call needs it.
+> **Strict rules, no exceptions:**
+> - **Confirm the database with the user before any search.** Never guess it.
+> - Search **only** the confirmed database. Always pass its `db_key`.
+> - **Never search other databases** to find a match, and **never take a material from
+>   another database just to finish the task.**
+> - If the item isn't in the confirmed database, **stop and tell the user.** The user
+>   decides: switch the project's database, or add the item manually.
+> - The app enforces this: a material from any database other than the project's
+>   `sor_database` is refused with `400 wrong_sor_database`.
+
+1. Read `general_info` → `sor_database`. Tell the user which database the project uses
+   and ask them to confirm it.
+2. If it is empty, call `GET /catalog/databases` (optionally filtered by `country`/
+   `region`), show the list, and ask the user to pick one. Set it with
+   `POST /{project_id}/general_info {"sor_database": "<db_key>"}` before searching.
+3. Keep that `db_key` (and `region`, if applicable). Every following call needs it.
 
 ---
 

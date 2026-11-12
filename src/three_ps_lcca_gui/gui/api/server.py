@@ -24,15 +24,15 @@ import math
 import threading
 import time
 
-from flask import Flask, jsonify, request
+from flask import Flask, g, jsonify, request
 from werkzeug.serving import make_server
 
 from .bridge import ApiBridge
+from .auth import authorize_request
 from .caller_identity import identify_caller
 from .catalog import register_catalog_routes
 from .image_upload import resolve_image_urls
 from .registry import CHUNK_PAGE_MAP, describe_chunk_fields, validate_payload_keys
-from . import tokens
 
 DEFAULT_PORT = 8765
 
@@ -123,8 +123,9 @@ def _help_payload() -> dict:
             f"1. GET {base}/projects - find your project_id (no token needed).",
             f"2. If the project is not open yet: POST {base}/projects/open "
             "with body {\"project_id\": \"...\"}, then wait/poll until it is.",
-            "3. Get the project's API token from a human: in the desktop app, "
-            "File > API Access shows it (tokens are never returned by the API).",
+            "3. Get a token: ask the user for the one in File > API Access, or "
+            "(long-running programs only) POST /{project_id}/get_tokens - see "
+            "authentication.",
             f"4. GET {base}/{{project_id}}/{{page}} with header 'X-API-Token: "
             "<token>' - the response contains both the data and the full field "
             "schema (types, options, ranges, locked flags).",
@@ -141,10 +142,14 @@ def _help_payload() -> dict:
                 "GET /projects/new", "POST /projects/open", "POST /projects/new",
             ],
             "how_to_obtain": (
-                "Only from the desktop app: open the project, then File > 'API "
-                "Access'. The dialog shows the token with Generate/Regenerate/"
-                "Revoke controls. This is deliberate - the API never returns a "
-                "token, so a human stays in the loop for data access."
+                "Two ways. (1) Script token: File > 'API Access' in the desktop "
+                "app shows the project's token; it works from any program, so "
+                "use it for curl and one-off commands. (2) Program key: POST "
+                "/{project_id}/get_tokens shows an Allow/Deny popup naming the "
+                "calling program; on Allow it returns a key that works ONLY for "
+                "that same running process (others get 401) until it exits or "
+                "the user revokes it. Suits long-running tools such as the MCP "
+                "server, not separate curl commands. Either way a human decides."
             ),
             "lifetime": (
                 "Tokens live in memory only: they reset on every app restart "
@@ -171,9 +176,11 @@ def _help_payload() -> dict:
                     "{\"projects\": [{project_id, display_name, created_at, "
                     "last_modified, status, open}]} - \"open\" tells whether "
                     "the project is currently open in the app (i.e. reachable "
-                    "by data endpoints). status \"locked\" also applies to "
-                    "projects open in this very app, so use \"open\", not "
-                    "status, to decide reachability."
+                    "by data endpoints). status \"in_use\" only means the "
+                    "project file is open in an app window (this one or "
+                    "another); it is NOT the calculated-and-frozen lock "
+                    "(that is the 423 project_locked error). Use \"open\" to "
+                    "decide reachability."
                 ),
                 "example": f"curl {base}/projects",
             },
@@ -450,7 +457,11 @@ def _help_payload() -> dict:
                 "method": "GET",
                 "path": "/catalog/databases",
                 "auth_required": True,
-                "summary": "List the built-in SOR material databases available to search.",
+                "summary": (
+                    "List the built-in SOR material databases available to search. "
+                    "Like every /catalog route, it needs the token of any open "
+                    "project, so open or create a project and get its token first."
+                ),
                 "response": "{\"databases\": [{db_key, country, region}], \"count\"}. Optional query: country, region.",
                 "example": f"curl {base}/catalog/databases -H 'X-API-Token: <any current project token>'",
             },
@@ -543,6 +554,7 @@ def _help_payload() -> dict:
             "catalogue": [
                 {"status": 400, "error": "invalid_json_body", "meaning": "Body missing or not a JSON object.", "resolve": "Send a JSON object as the request body."},
                 {"status": 400, "error": "invalid_field_values", "meaning": "One or more values don't match the field schema; nothing was applied.", "resolve": "Fix the fields listed in \"details\" - the GET response's \"fields\" schema states the valid options/ranges."},
+                {"status": 400, "error": "wrong_sor_database", "meaning": "A material from the catalog (add_from_catalog, or \"catalog_item\" on POST /{project_id}/{chunk}) must come from the SOR database chosen in General Info (\"sor_database\", returned as \"project_sor_database\"). Nothing was added.", "resolve": "Search that database (GET /catalog/search?q=...&db_key=<project_sor_database>) and use its row. If no database is set or it is a custom one, ask the user, or use add_manual."},
                 {"status": 401, "error": "unauthorized", "meaning": "Missing or incorrect X-API-Token.", "resolve": "First GET /projects/active: if the project is not listed, its window was closed and the token is gone for good - reopen via POST /projects/open and ask the user for the new token (File > API Access). If it is listed, ask the user to re-check the current token. See troubleshooting."},
                 {"status": 404, "error": "project_not_found", "meaning": "No project with that id exists on this machine.", "resolve": "GET /projects lists valid project ids."},
                 {"status": 404, "error": "project_not_open", "meaning": "The project exists but is not open in the app.", "resolve": "POST /projects/open, then retry once it has finished opening."},
@@ -679,8 +691,8 @@ def _create_app(bridge: ApiBridge) -> Flask:
         # Stops other web pages open in the user's browser from calling the
         # API. They can never read a reply (no CORS headers are sent), but
         # without this they could still trigger side effects: pop the
-        # get_tokens Allow/Deny dialog (an Allow then burns the one-time
-        # delivery on a page that can't see the token), or create/open
+        # get_tokens Allow/Deny dialog (wearing the user down into a stray
+        # Allow, and using up the popup cap), or create/open
         # projects through the unauthenticated /projects routes.
         #
         # Browsers attach these headers themselves and page scripts can't
@@ -709,6 +721,19 @@ def _create_app(bridge: ApiBridge) -> Flask:
         if origin is not None and origin != request.host_url.rstrip("/"):
             return _browser_blocked(origin)
         return None
+
+    @app.after_request
+    def _announce_api_change(response):
+        # A successful change made with a token is flashed in that project's
+        # status bar and logged in File -> API Access, so the user sees edits
+        # they didn't ask for (the one defence against a program that holds
+        # a valid key).
+        who = g.get("api_who")
+        project_id = (request.view_args or {}).get("project_id")
+        if who and project_id and request.method == "POST" and response.status_code < 400:
+            what = request.path.split("/", 2)[-1]
+            bridge.notify(project_id, f"API: {who} - {what}")
+        return response
 
     def _host_allowed(host):
         name, sep, port = host.rpartition(":")
@@ -936,15 +961,6 @@ def _create_app(bridge: ApiBridge) -> Flask:
 
     @app.post("/<project_id>/get_tokens")
     def get_project_tokens(project_id):
-        # Fast-path checks that never touch the GUI: already delivered once,
-        # or this project has hit its per-session popup cap.
-        if tokens.is_delivered(project_id):
-            return jsonify({
-                "error": "token_already_delivered",
-                "message": "The API token was already delivered once for this project. Open File -> API Access in the app to view and copy the token.",
-                **_usage_info()
-            }), 403
-
         # bridge.call()'s default 10s timeout is far too short for a modal
         # popup waiting on a human - give it a lot more slack, otherwise this
         # route would return {"error": "timeout"} while the dialog is still
@@ -965,7 +981,7 @@ def _create_app(bridge: ApiBridge) -> Flask:
             status_code = 400
             if result["error"] == "project_not_open":
                 status_code = 404
-            elif result["error"] in ("denied", "token_already_delivered"):
+            elif result["error"] in ("denied", "caller_unidentified"):
                 status_code = 403
             elif result["error"] == "too_many_requests":
                 status_code = 429
@@ -992,8 +1008,7 @@ def _create_app(bridge: ApiBridge) -> Flask:
         # walks every registered page at once, so it's declared as its own
         # literal route rather than going through CHUNK_PAGE_MAP like every
         # other project data endpoint.
-        provided = request.headers.get("X-API-Token")
-        if not tokens.check_token(project_id, provided):
+        if not authorize_request(project_id):
             return jsonify({"error": "unauthorized", **_usage_info()}), 401
 
         # timeout > the bridge's own 60s calculation-wait safety cap (see
@@ -1036,8 +1051,7 @@ def _create_app(bridge: ApiBridge) -> Flask:
         if chunk not in CHUNK_PAGE_MAP:
             return jsonify({"error": "not_found", **_not_found_info()}), 404
 
-        provided = request.headers.get("X-API-Token")
-        if not tokens.check_token(project_id, provided):
+        if not authorize_request(project_id):
             return jsonify({"error": "unauthorized", **_usage_info()}), 401
 
         result = bridge.call("get", project_id, chunk)
@@ -1069,8 +1083,7 @@ def _create_app(bridge: ApiBridge) -> Flask:
         if chunk not in CHUNK_PAGE_MAP:
             return jsonify({"error": "not_found", **_not_found_info()}), 404
 
-        provided = request.headers.get("X-API-Token")
-        if not tokens.check_token(project_id, provided):
+        if not authorize_request(project_id):
             return jsonify({"error": "unauthorized", **_usage_info()}), 401
 
         payload = request.get_json(silent=True, force=True)
@@ -1117,8 +1130,7 @@ def _create_app(bridge: ApiBridge) -> Flask:
         if chunk not in CHUNK_PAGE_MAP:
             return jsonify({"error": "not_found", **_not_found_info()}), 404
 
-        provided = request.headers.get("X-API-Token")
-        if not tokens.check_token(project_id, provided):
+        if not authorize_request(project_id):
             return jsonify({"error": "unauthorized", **_usage_info()}), 401
 
         payload = request.get_json(silent=True, force=True)
@@ -1153,8 +1165,7 @@ def _create_app(bridge: ApiBridge) -> Flask:
         if chunk not in CHUNK_PAGE_MAP:
             return jsonify({"error": "not_found", **_not_found_info()}), 404
 
-        provided = request.headers.get("X-API-Token")
-        if not tokens.check_token(project_id, provided):
+        if not authorize_request(project_id):
             return jsonify({"error": "unauthorized", **_usage_info()}), 401
 
         payload = request.get_json(silent=True, force=True)
@@ -1191,8 +1202,7 @@ def _create_app(bridge: ApiBridge) -> Flask:
                 **_not_found_info(),
             }), 404
 
-        provided = request.headers.get("X-API-Token")
-        if not tokens.check_token(project_id, provided):
+        if not authorize_request(project_id):
             return jsonify({"error": "unauthorized", **_usage_info()}), 401
 
         result = bridge.call("get", project_id, chunk)
@@ -1222,8 +1232,7 @@ def _create_app(bridge: ApiBridge) -> Flask:
         if chunk not in CHUNK_PAGE_MAP:
             return jsonify({"error": "not_found", **_not_found_info()}), 404
 
-        provided = request.headers.get("X-API-Token")
-        if not tokens.check_token(project_id, provided):
+        if not authorize_request(project_id):
             return jsonify({"error": "unauthorized", **_usage_info()}), 401
 
         payload = request.get_json(silent=True, force=True)
@@ -1256,8 +1265,7 @@ def _create_app(bridge: ApiBridge) -> Flask:
         # GET .../validate) is gated on - see ApiBridge._handle()'s
         # _WRITE_METHODS check and _unlock(). Idempotent: unlocking an
         # already-unlocked project is a no-op 200, not an error.
-        provided = request.headers.get("X-API-Token")
-        if not tokens.check_token(project_id, provided):
+        if not authorize_request(project_id):
             return jsonify({"error": "unauthorized", **_usage_info()}), 401
 
         result = bridge.call("unlock", project_id, "")

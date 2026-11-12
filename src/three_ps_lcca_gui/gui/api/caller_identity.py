@@ -30,10 +30,9 @@ except ImportError:  # pragma: no cover - psutil is a declared dependency
 _MAX_CMDLINE_CHARS = 400
 
 
-def identify_caller(remote_addr, remote_port, server_port) -> dict | None:
-    """Returns {"pid", "name", "exe", "cmdline", "username"} for the process
-    on the other end of this request's connection, or None if it can't be
-    found. Never raises."""
+def caller_pid(remote_addr, remote_port, server_port) -> int | None:
+    """PID of the process that owns the client end of this request's
+    loopback connection, or None. Never raises. About 1 ms."""
     if psutil is None:
         return None
     try:
@@ -41,24 +40,31 @@ def identify_caller(remote_addr, remote_port, server_port) -> dict | None:
         server_port = int(server_port)
     except (TypeError, ValueError):
         return None
-
     try:
-        conns = psutil.net_connections(kind="tcp")
+        conns = psutil.net_connections(kind="tcp4")
     except Exception:
         return None
-
-    pid = None
     for c in conns:
         if not c.laddr or not c.raddr:
             continue
         if (c.laddr.port == remote_port and c.raddr.port == server_port
                 and (remote_addr is None or c.laddr.ip == remote_addr)):
-            pid = c.pid
-            break
-    if not pid:
-        return {"pid": None, "name": None, "exe": None, "cmdline": None, "username": None}
+            return c.pid or None
+    return None
 
-    info = {"pid": pid, "name": None, "exe": None, "cmdline": None, "username": None}
+
+def identify_caller(remote_addr, remote_port, server_port) -> dict | None:
+    """Returns {"pid", "started", "name", "exe", "cmdline", "username"} for
+    the process on the other end of this request's connection, or None if
+    psutil is unavailable. "started" is the process start time, used with
+    the PID to tie a token to this exact process. Never raises."""
+    if psutil is None:
+        return None
+    pid = caller_pid(remote_addr, remote_port, server_port)
+    if not pid:
+        return {"pid": None, "started": None, "name": None, "exe": None, "cmdline": None, "username": None}
+
+    info = {"pid": pid, "started": None, "name": None, "exe": None, "cmdline": None, "username": None}
     try:
         proc = psutil.Process(pid)
     except Exception:
@@ -68,6 +74,7 @@ def identify_caller(remote_addr, remote_port, server_port) -> dict | None:
         ("exe", proc.exe),
         ("cmdline", lambda: " ".join(proc.cmdline())),
         ("username", proc.username),
+        ("started", proc.create_time),
     ):
         try:
             info[key] = getter() or None

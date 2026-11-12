@@ -98,10 +98,11 @@ on disk, and opening/creating only shows a window. Reading or writing project
 ### `GET /projects`
 
 Lists every project on this machine: `project_id`, `display_name`, dates,
-`status` (`ok`/`locked`/`crashed`/`corrupted`), and an `open` flag for whether
-it's currently open in the app. Note `status: "locked"` is also true for
-projects open in *this* app instance (they hold the lock) - `open` is the
-authoritative "can I talk to it right now" signal.
+`status` (`ok`/`in_use`/`crashed`/`corrupted`), and an `open` flag for whether
+it's currently open in the app. `status: "in_use"` only means the project file
+is open in an app window (this one or another). It is **not** the
+calculated-and-frozen lock that blocks edits (that is the `423 project_locked`
+error). `open` is the authoritative "can I talk to it right now" signal.
 
 ```bash
 curl http://127.0.0.1:8765/projects
@@ -168,60 +169,61 @@ process can open a window" and "something can read/write project data."
 
 ## Getting the URL and token
 
-### `GET`/`POST /<project_id>/get_tokens` - ask for a token programmatically
+### `POST /<project_id>/get_tokens` - a key for one running program
 
-Unauthenticated (it's how you get authenticated in the first place). The
-first time a project is asked this way in a running session, a human sees
-an Allow/Deny popup in the GUI - nothing is handed out silently:
+Unauthenticated (it's how you get authenticated in the first place). A
+human sees an Allow/Deny popup in the GUI naming the program that asked -
+nothing is handed out silently. POST only, so a web page can't trigger it
+with an `<img>` tag.
 
-```bash
-curl http://127.0.0.1:8765/proj_a1b2c3d4/get_tokens
-```
+On Allow, the app creates a **new key tied to the calling process** (its PID
+and start time). A request carrying that key is accepted only if the OS
+reports it came from that same process; anything else gets `401`, and the
+attempt is shown in File → API Access → Recent activity. The key ends when
+the process exits, the project closes, or the user revokes it.
+
+So this is for long-running programs (the `lcca_mcp` server, or one Python
+process that keeps going). It is **not** for curl: every curl command is a
+new process, so a key fetched by one curl is refused on the next. Use the
+script token from File → API Access for that.
 
 | Result | Status | Body |
 |---|---|---|
 | Project not open | `404` | `{"error": "project_not_open"}` |
 | User clicked Deny (or closed the popup) | `403` | `{"error": "denied", "message": "..."}` |
-| Already handed out once this session | `403` | `{"error": "token_already_delivered", "message": "..."}` |
-| Asked (and been denied) too many times this session | `429` | `{"error": "too_many_requests", "message": "..."}` |
+| Calling program couldn't be identified (no popup shown) | `403` | `{"error": "caller_unidentified", "message": "..."}` |
+| 3 popups for this project already ended without Allow this session | `429` | `{"error": "too_many_requests", "message": "..."}` |
 | More than 5 popups across the whole app in the last minute | `429` + `Retry-After` | `{"error": "popup_rate_limited", "retry_after": <seconds>, "message": "..."}` - wait and retry |
 | A popup for this project is already on screen | `409` | `{"error": "prompt_already_open", "message": "..."}` |
-| User clicked Allow | `200` | `{"ok": true, "token": "<token>"}` |
+| User clicked Allow | `200` | `{"ok": true, "token": "<key>", "note": "..."}` |
 
-The token is only ever delivered this way **once** per project per session -
-this is a one-shot handshake, not a login you can repeat. If it fails for any
-reason (denied, already delivered, capped, or the project isn't open), fall
-back to a human copying it from **File → API Access** in the app instead of
-retrying the endpoint in a loop.
-
-A minimal client that tries the automatic handshake first and falls back to
-asking a human to paste the token:
+Ask once; if it fails, fall back to the script token instead of retrying in a
+loop.
 
 ```python
-import urllib.request
-import urllib.error
 import json
+import urllib.error
+import urllib.request
 
 BASE_URL = "http://127.0.0.1:8765"
 
 
-def get_token(project_id: str) -> str:
-    url = f"{BASE_URL}/{project_id}/get_tokens"
+def get_program_key(project_id: str) -> str:
+    """Only useful if THIS process keeps running and makes the requests."""
+    req = urllib.request.Request(
+        f"{BASE_URL}/{project_id}/get_tokens", data=b"{}", method="POST"
+    )
     try:
-        with urllib.request.urlopen(url, timeout=120) as resp:
-            body = json.loads(resp.read())
-            return body["token"]
+        with urllib.request.urlopen(req, timeout=130) as resp:
+            return json.loads(resp.read())["token"]
     except urllib.error.HTTPError as e:
         body = json.loads(e.read())
-        print(f"Automatic token request failed ({e.code}): {body.get('error')}")
+        print(f"Key request failed ({e.code}): {body.get('error')}")
         print(body.get("message", ""))
-
-    # Fall back to a human: open File -> API Access in the app and paste
-    # the token shown there.
-    return input(f"Paste the API token for {project_id} manually: ").strip()
+    return input(f"Paste the script token for {project_id} (File -> API Access): ").strip()
 
 
-token = get_token("proj_a1b2c3d4")
+token = get_program_key("proj_a1b2c3d4")
 req = urllib.request.Request(
     f"{BASE_URL}/proj_a1b2c3d4/bridge_data",
     headers={"X-API-Token": token},
@@ -230,24 +232,25 @@ with urllib.request.urlopen(req) as resp:
     print(json.loads(resp.read()))
 ```
 
-The `urlopen` call above blocks until the popup is answered (or the request
-times out) - that's expected, since a human has to click something. Don't
-poll `/get_tokens` in a tight loop; one attempt, then fall back to manual
-entry, as shown above.
-
-### The manual fallback: File → API Access
+### The script token: File → API Access
 
 With a project open in the GUI: **File → API Access**. The dialog shows:
 
 - The full URL, e.g. `http://127.0.0.1:8765/proj_a1b2c3d4/bridge_data`
-- The project's bearer token, with three controls:
-  - **Regenerate Token** - issues a new token, invalidating the old one immediately
-  - **Revoke Token** - clears the token entirely; every request against this
+- The project's script token (works from any program), with three controls:
+  - **Regenerate** - issues a new token, invalidating the old one immediately
+  - **Revoke** - clears the token entirely; every request against this
     project returns `401` until a new one is generated. Use this if you want to
     shut off API access for a project without disabling the API globally or
     closing the project.
   - **Generate Token** - shown in place of the above once a token has been
     revoked; creates a fresh token and restores access
+- **Programs you allowed** - every program given a key through the popup,
+  with when it was last used and its own **Revoke** button
+- **Recent activity** - the last few API requests and who made them;
+  refused attempts with another program's key are shown in red
+
+Changes made through the API also flash in the project window's status bar.
 
 The token is generated the moment the project opens and discarded when it closes -
 requests against a closed/never-opened project always fail, regardless of token.
@@ -611,8 +614,13 @@ curl -X POST http://127.0.0.1:8765/proj_a1b2c3d4/str_super_structure/add_from_ca
 
 Rules:
 
-- `component`, `db_key`, `material_name`, `quantity` are required. `db_key` comes
-  from `GET /catalog/databases` or a search result. `material_name` must **exactly**
+- `component`, `db_key`, `material_name`, `quantity` are required. `db_key` **must
+  be the project's own SOR database** (`general_info` -> `sor_database`). Any
+  other database, none set, or a custom one is refused with `400
+  wrong_sor_database` (its `project_sor_database` says which one is set). The same
+  rule applies to `"catalog_item"` rows on `POST /{project_id}/{chunk}`. Set the
+  database with `POST /{project_id}/general_info {"sor_database": "<db_key>"}`;
+  the options for the project's country are listed by `GET .../general_info`. `material_name` must **exactly**
   match one row's name in that `db_key` (case/whitespace-insensitive) - no match or
   more than one match (ambiguous, e.g. the same name in two categories) rejects
   with `400` and, for the ambiguous case, the candidates' `src_id`s so you can fall

@@ -10,7 +10,7 @@ Pure Python, no Qt, no project window: MaterialSearchEngine loads static JSON
 databases from disk, so these routes run directly on the Flask worker thread
 - no ApiBridge.call(), no main-thread hop, no project_not_open case. Not
 project-scoped (the catalog is the same for every project), but still gated
-behind auth: any currently-valid project token is accepted (tokens.check_any)
+behind auth: any currently-valid project token is accepted (auth.authorize_request(None))
 so the endpoints stay unreachable when no project is open, matching the rest
 of the API's "only usable while the app has something open" contract.
 
@@ -22,7 +22,7 @@ import threading
 
 from flask import jsonify, request
 
-from . import tokens
+from .auth import authorize_request
 from three_ps_lcca_gui.gui.components.structure.registry.material_entry import _validate_item
 
 _DEFAULT_LIMIT = 50
@@ -78,7 +78,16 @@ def _paginate(items: list[dict]) -> tuple[list[dict], int, int, int]:
 
 
 def _unauthorized(usage_info: dict):
-    return jsonify({"error": "unauthorized", **usage_info}), 401
+    return jsonify({
+        "error": "unauthorized",
+        "message": (
+            "The catalog needs the X-API-Token of any open project. Open or "
+            "create a project first, then get a token: POST "
+            "/{project_id}/get_tokens (the user clicks Allow in a popup), or "
+            "the script token from File -> API Access."
+        ),
+        **usage_info,
+    }), 401
 
 
 def register_catalog_routes(app, usage_info) -> None:
@@ -87,8 +96,7 @@ def register_catalog_routes(app, usage_info) -> None:
     for consistent error shapes with the rest of the API."""
 
     def _require_token():
-        provided = request.headers.get("X-API-Token")
-        return tokens.check_any(provided)
+        return authorize_request(None)
 
     @app.get("/catalog/databases")
     def catalog_databases():

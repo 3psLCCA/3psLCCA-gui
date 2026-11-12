@@ -45,6 +45,7 @@ def register_chunk(
     add_from_catalog=None,
     add_manual=None,
     trash_by_id=None,
+    check_sor_database=None,
     read_only: bool = False,
     refresh_via_signal: bool = False,
     dynamic_options: dict | None = None,
@@ -100,7 +101,12 @@ def register_chunk(
                    powering POST /{project_id}/{chunk}/trash - trashes one
                    entry addressed by `{"id": ...}` alone (no component
                    needed - the hook searches for it).
-    read_only    - POSTs are rejected with 405 read_only_chunk
+    check_sor_database - optional hook `(project_sor, method, payload) ->
+                   error_message_or_None`, run by the bridge before "update"
+                   and "add_from_catalog" writes with general_info's
+                   "sor_database". Refuses catalog rows from any other SOR
+                   database, matching the GUI's material dialog.
+    read_only   - POSTs are rejected with 405 read_only_chunk
     refresh_via_signal - bridge updates write via the controller only and emit
                    controller.chunk_updated; the page widget (which has no
                    load_data_dict) repaints itself from that signal
@@ -136,6 +142,7 @@ def register_chunk(
         "add_from_catalog": add_from_catalog,
         "add_manual": add_manual,
         "trash_by_id": trash_by_id,
+        "check_sor_database": check_sor_database,
         "read_only": read_only,
         "refresh_via_signal": refresh_via_signal,
         "dynamic_options": dynamic_options or {},
@@ -264,7 +271,17 @@ def validate_payload_keys(chunk: str, payload: dict, current: dict | None = None
             continue
 
         if fd.field_type == "combo":
-            options = fd.options or []
+            dynamic = entry["dynamic_options"].get(key)
+            if dynamic is not None:
+                # Options depend on the stored data (e.g. sor_database on
+                # the project's country). Without it (the server's pre-check
+                # on the Flask thread) skip; the bridge re-runs this with the
+                # stored data. "" is the GUI's "- No suggestions -" choice.
+                if current is None:
+                    continue
+                options = ["", *dynamic(current)]
+            else:
+                options = fd.options or []
             if value not in options:
                 errors.append(f"'{key}': {value!r} is not a valid option - must be one of {options}")
 
