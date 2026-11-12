@@ -1,3 +1,5 @@
+import json
+
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -25,6 +27,7 @@ class TrashTabWidget(QWidget):
         self.controller = controller
         # (chunk_id, comp_name) → StructureTableWidget; populated by on_refresh
         self._trash_tables: dict[tuple, StructureTableWidget] = {}
+        self._built_sig = None  # _trash_signature() of what is currently shown
         self.layout = QVBoxLayout(self)
 
         # Header row
@@ -90,8 +93,30 @@ class TrashTabWidget(QWidget):
         if main_view:
             main_view.update_trash_count()
 
-    def on_refresh(self):
-        """Clears the view and re-populates based on nested state['in_trash']."""
+    def _trash_signature(self):
+        """Snapshot of every trashed item, used to skip rebuilding an unchanged view."""
+        if not self.controller or not self.controller.engine:
+            return None
+        sig = []
+        for chunk_id in self.chunks:
+            data = self.controller.engine.fetch_chunk(chunk_id) or {}
+            for comp_name, items in data.items():
+                for idx, item in enumerate(items):
+                    if item.get("state", {}).get("in_trash", False):
+                        sig.append((chunk_id, comp_name, idx,
+                                    json.dumps(item.get("values", {}), sort_keys=True, default=str)))
+        return sig
+
+    def on_refresh(self, force=False):
+        """Clears the view and re-populates based on nested state['in_trash'].
+
+        Building the tables is slow, so the rebuild is skipped when the trashed
+        items are the same as last time, unless force=True.
+        """
+        sig = self._trash_signature()
+        if not force and sig is not None and sig == self._built_sig:
+            return
+        self._built_sig = sig
         self._trash_tables.clear()
 
         # Clear existing widgets
@@ -159,6 +184,8 @@ class TrashTabWidget(QWidget):
                     t.remove_row_by_index(di, reindex=True)
                     if t.rowCount() == 0:
                         self.on_refresh()
+                    else:
+                        self._built_sig = self._trash_signature()
                 else:
                     self.on_refresh()
                 main_view = self.window().findChild(QWidget, "StructureTabView")
@@ -231,6 +258,8 @@ class TrashTabWidget(QWidget):
                         t.remove_row_by_index(di)
                         if t.rowCount() == 0:
                             self.on_refresh()
+                        else:
+                            self._built_sig = self._trash_signature()
                     else:
                         self.on_refresh()
 

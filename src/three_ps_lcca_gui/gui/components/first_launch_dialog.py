@@ -18,7 +18,7 @@ from three_ps_lcca_gui.gui.styles import font, btn_primary, btn_outline
 from three_ps_lcca_gui.gui.theme import (
     SP2, SP4, SP6, SP8, SP10,
     BTN_MD,
-    FS_BASE, FS_DISP,
+    FS_MD, FS_DISP,
     FW_BOLD, FW_MEDIUM,
 )
 from three_ps_lcca_gui.gui.themes import get_token
@@ -53,7 +53,7 @@ class FirstLaunchDialog(QDialog):
 
         # Subtitle
         sub = QLabel("Life Cycle Cost Analysis for bridge projects.")
-        sub.setFont(font(FS_BASE))
+        sub.setFont(font(FS_MD))
         sub.setEnabled(False)
         layout.addWidget(sub)
         layout.addSpacing(SP8)
@@ -70,14 +70,14 @@ class FirstLaunchDialog(QDialog):
 
         btn_skip = QPushButton("Skip")
         btn_skip.setFixedHeight(BTN_MD)
-        btn_skip.setFont(font(FS_BASE))
+        btn_skip.setFont(font(FS_MD))
         btn_skip.setStyleSheet(btn_outline())
         btn_skip.clicked.connect(self.reject)
         btn_row.addWidget(btn_skip)
 
         btn_ok = QPushButton("Get Started")
         btn_ok.setFixedHeight(BTN_MD)
-        btn_ok.setFont(font(FS_BASE, FW_MEDIUM))
+        btn_ok.setFont(font(FS_MD, FW_MEDIUM))
         btn_ok.setDefault(True)
         btn_ok.setStyleSheet(btn_primary())
         btn_ok.clicked.connect(self._accept)

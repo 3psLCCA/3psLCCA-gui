@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (
     QAbstractScrollArea,
 )
 from ..utils.table_widgets import TableDoubleSpinBox, TABLE_SPINBOX_BASE_QSS, round_table_viewport
+from three_ps_lcca_gui.gui.theme import FS_SM
 
 # ── Vehicles ──────────────────────────────────────────────────────────────────
 
@@ -193,7 +194,7 @@ class _WPITable(QTableWidget):
         """Row 1 - individual column labels."""
         small_bold = QFont()
         small_bold.setBold(True)
-        small_bold.setPointSize(8)
+        small_bold.setPointSize(FS_SM)
         for col, cdef in enumerate(_COLUMNS):
             item = QTableWidgetItem(cdef.label)
             item.setFlags(Qt.ItemIsEnabled)

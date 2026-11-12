@@ -1,5 +1,6 @@
 from PySide6.QtWidgets import (
     QFormLayout,
+    QGroupBox,
     QHBoxLayout,
     QHeaderView,
     QLabel,
@@ -13,10 +14,11 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QBrush, QColor
 from three_ps_lcca_gui.gui.themes import get_token, theme_manager
+from three_ps_lcca_gui.gui.theme import FS_SECTION
 
 from ...base_widget import ScrollableForm
-from ...utils.form_builder.form_definitions import FieldDef
-from ...utils.form_builder.form_builder import build_form
+from ...utils.form_builder.form_definitions import FieldDef, Section
+from ...utils.form_builder.form_builder import build_form, make_section_header
 from ...utils.remarks_editor import RemarksEditor
 from ...utils.display_format import fmt
 from ...utils.table_widgets import TableDoubleSpinBox, TABLE_SPINBOX_BASE_QSS, mark_editable_column, TooltipTableMixin
@@ -295,7 +297,10 @@ class TrafficEmissions(ScrollableForm):
         # never fires for it and never writes a partial dict to the chunk.
         build_form(
             self,
-            [FieldDef("mode", "Calculation Mode", "", "combo", options=_MODES, combo_placeholder="")],
+            [
+                Section("Calculation Mode"),
+                FieldDef("mode", "Select Mode", "", "combo", options=_MODES, combo_placeholder=""),
+            ],
         )
         self._field_map.pop("mode", None)  # ← prevent base save loop from firing
 
@@ -330,7 +335,8 @@ class TrafficEmissions(ScrollableForm):
 
         self._reroute_label = QLabel("-")
         calc_layout.addRow("Reroute Distance (from Traffic Data):", self._reroute_label)
-        calc_layout.addRow(QLabel("<b>Vehicle Emission Factors</b>"))
+        for widget in make_section_header("Vehicle Emission Factors"):
+            calc_layout.addRow(widget)
 
         self._emissions_table = _EmissionsTable(
             on_change=self._on_field_changed,
@@ -344,8 +350,22 @@ class TrafficEmissions(ScrollableForm):
 
         calc_layout.addRow(table_container)
 
-        self._total_label = QLabel("0.0000")
-        calc_layout.addRow("<b>Total Daily Emissions (kgCO₂e/day):</b>", self._total_label)
+        total_banner = QGroupBox()
+        banner_layout = QHBoxLayout(total_banner)
+        banner_layout.setContentsMargins(16, 12, 16, 12)
+
+        title_lbl = QLabel("<b>Total Daily Emissions:</b>")
+        title_lbl.setStyleSheet(f"font-size: {FS_SECTION}pt; font-weight: bold;")
+
+        self._total_label = QLabel("0.0000 kgCO₂e/day")
+        self._total_label.setStyleSheet(f"font-size: {FS_SECTION}pt; font-weight: bold; color: {get_token('primary')};")
+
+        banner_layout.addWidget(title_lbl)
+        banner_layout.addSpacing(8)
+        banner_layout.addWidget(self._total_label)
+        banner_layout.addStretch()
+
+        calc_layout.addRow(total_banner)
 
         self.btn_defaults = QPushButton("Load Default Factors")
         self.btn_defaults.setFixedWidth(160)
@@ -422,7 +442,7 @@ class TrafficEmissions(ScrollableForm):
         self._refresh_total()
 
     def _refresh_total(self):
-        self._total_label.setText(fmt(self._emissions_table.total_emissions()))
+        self._total_label.setText(f"{fmt(self._emissions_table.total_emissions())} kgCO₂e/day")
 
 
 

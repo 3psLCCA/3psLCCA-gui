@@ -8,7 +8,8 @@ SettingsDialog - sidebar gear-button dialog (Save / Cancel).
 """
 
 import three_ps_lcca_gui.core.start_manager as sm
-from PySide6.QtCore import Qt, Signal
+from three_ps_lcca_gui.core.safechunk_engine import SafeChunkEngine
+from PySide6.QtCore import Qt, Signal, QStandardPaths
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -39,10 +40,15 @@ from three_ps_lcca_gui.gui.themes import (
     reapply,
 )
 import three_ps_lcca_gui.gui.themes as _themes
+from three_ps_lcca_gui.gui.theme import FS_SM
 from three_ps_lcca_gui.gui.styles import btn_outline, font
 from three_ps_lcca_gui.gui.theme import FS_SM, FW_MEDIUM
 from three_ps_lcca_gui.gui.components.agency_profile_dialog import AgencyProfileForm
 from three_ps_lcca_gui.gui.themes import get_token
+
+
+# Subfolder created inside a user-chosen location to hold the projects
+PROJECTS_SUBFOLDER = "3psLCCA_User_Files"
 
 
 # ── Shared form panel ─────────────────────────────────────────────────────────
@@ -54,15 +60,26 @@ class SettingsPanel(QWidget):
     Contains no buttons or title; embed this inside any dialog.
     """
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, stacked: bool = True):
+        """stacked=False: don't lay the sections out here - the caller places
+        each widget in self.sections itself (e.g. one tab each)."""
         super().__init__(parent)
+        self._stacked = stacked
         self._build()
 
     def _build(self):
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(10)
+        # Each category is its own widget so SettingsDialog can put them in
+        # separate tabs; on their own (FirstLaunchDialog) they stack with headings.
+        general, layout_general = self._section()
+        storage, layout_storage = self._section()
+        api, layout_api = self._section()
+        self.sections = [
+            ("General", general),
+            ("Storage", storage),
+            ("Local API", api),
+        ]
 
+        layout = layout_general
         # ── Display Name ──────────────────────────────────────────────────
         layout.addWidget(QLabel("<b>Display Name</b>"))
         # name_hint = QLabel("Shown in reports and exports.")
@@ -72,7 +89,6 @@ class SettingsPanel(QWidget):
 
         self._name_edit = QLineEdit()
         self._name_edit.setPlaceholderText("Enter your name…")
-        self._name_edit.setFixedHeight(34)
         # Restore loading the saved name so it's visible if already set
         current_name = sm.get_profile().get("display_name", "")
         self._name_edit.setText(current_name)
@@ -85,8 +101,53 @@ class SettingsPanel(QWidget):
         )
         layout.addWidget(self._name_edit)
 
-        layout.addSpacing(8)
+        layout = layout_storage
+        # ── Projects Folder ───────────────────────────────────────────────
+        layout.addWidget(QLabel("<b>Projects Folder</b>"))
+        folder_hint = QLabel("Where your projects are saved.")
+        folder_hint.setEnabled(False)
+        folder_hint.setFont(font(FS_SM))
+        layout.addWidget(folder_hint)
 
+        self._saved_projects_dir = sm.get_pref("projects_dir") or ""
+        self._projects_dir = self._saved_projects_dir
+
+        self._folder_edit = QLineEdit()
+        self._folder_edit.setReadOnly(True)
+        layout.addWidget(self._folder_edit)
+
+        folder_row = QHBoxLayout()
+        folder_row.setSpacing(8)
+        self._folder_status = QLabel()
+        self._folder_status.setFont(font(FS_SM))
+        self._folder_status.setWordWrap(True)
+        folder_row.addWidget(self._folder_status, stretch=1)
+        self._btn_default = QPushButton("Reset to Default")
+        self._btn_default.setFixedHeight(30)
+        self._btn_default.setAutoDefault(False)
+        self._btn_default.setStyleSheet(btn_outline())
+        self._btn_default.clicked.connect(lambda: self._set_folder(""))
+        folder_row.addWidget(self._btn_default)
+        btn_browse = QPushButton("Change…")
+        btn_browse.setFixedHeight(30)
+        btn_browse.setAutoDefault(False)
+        btn_browse.setStyleSheet(btn_outline())
+        btn_browse.clicked.connect(self._browse_folder)
+        folder_row.addWidget(btn_browse)
+        layout.addLayout(folder_row)
+
+        move_hint = QLabel(
+            "Changing the folder does not move existing projects - "
+            "use Export / Load Project to bring them over."
+        )
+        move_hint.setEnabled(False)
+        move_hint.setFont(font(FS_SM))
+        move_hint.setWordWrap(True)
+        layout.addWidget(move_hint)
+        self._refresh_folder_view()
+
+        layout = layout_general
+        layout.addSpacing(8)
         # ── Appearance Mode ───────────────────────────────────────────────
         layout.addWidget(QLabel("<b>Appearance Mode</b>"))
         mode_hint = QLabel("Switch between light and dark mode. 'Auto' follows your OS setting.")
@@ -96,7 +157,6 @@ class SettingsPanel(QWidget):
         layout.addWidget(mode_hint)
 
         self._mode_combo = QComboBox()
-        self._mode_combo.setFixedHeight(34)
         for value, label in [
             ("auto", "Auto (follow OS)"),
             ("light", "Light"),
@@ -136,11 +196,8 @@ class SettingsPanel(QWidget):
         theme_hint.setFont(font(FS_SM))
         layout.addWidget(theme_hint)
 
-        layout.addSpacing(8)
-
+        layout = layout_api
         # ── Local API ─────────────────────────────────────────────────────
-        layout.addWidget(QLabel("<b>Local API</b>"))
-
         self._api_checkbox = QCheckBox("Enable local API server")
         self._api_checkbox.setChecked(sm.get_pref("api_enabled", "true") == "true")
         layout.addWidget(self._api_checkbox)
@@ -168,7 +225,34 @@ class SettingsPanel(QWidget):
         api_url_label.setFont(font(FS_SM))
         layout.addWidget(api_url_label)
 
-        layout.addStretch()
+        if not self._stacked:
+            return
+
+        # Stacked view (used when the panel itself is shown)
+        root = QVBoxLayout(self)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(10)
+        for i, (title, section) in enumerate(self.sections):
+            if i:
+                divider = QFrame()
+                divider.setFixedHeight(1)
+                divider.setStyleSheet(f"background: {get_token('surface_mid')};")
+                root.addSpacing(6)
+                root.addWidget(divider)
+                root.addSpacing(6)
+            heading = QLabel(title)
+            heading.setFont(font(FS_SM + 3, FW_MEDIUM))
+            root.addWidget(heading)
+            root.addWidget(section)
+        root.addStretch()
+
+    @staticmethod
+    def _section():
+        w = QWidget()
+        lay = QVBoxLayout(w)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(10)
+        return w, lay
 
     # ── Public API ────────────────────────────────────────────────────────────
 
@@ -178,6 +262,10 @@ class SettingsPanel(QWidget):
     def save(self) -> None:
         """Persist name + theme choices; re-applies theme live if anything changed."""
         sm.set_name(self.get_name())
+
+        if self._projects_dir != self._saved_projects_dir:
+            sm.set_pref("projects_dir", self._projects_dir)
+            SafeChunkEngine.PROJECTS_DIR = self._projects_dir or None
 
         mode = self._mode_combo.currentData()
         light_mod = self._light_combo.currentData()
@@ -199,9 +287,57 @@ class SettingsPanel(QWidget):
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 
+    def _browse_folder(self) -> None:
+        start = self._projects_dir or QStandardPaths.writableLocation(
+            QStandardPaths.DocumentsLocation
+        )
+        path = QFileDialog.getExistingDirectory(self, "Choose Projects Folder", start)
+        if not path:
+            return
+        path = os.path.normpath(path)
+        # Keep projects in their own subfolder (unless the user picked it directly)
+        if os.path.basename(path).lower() != PROJECTS_SUBFOLDER.lower():
+            path = os.path.join(path, PROJECTS_SUBFOLDER)
+        try:
+            os.makedirs(path, exist_ok=True)
+        except OSError as e:
+            QMessageBox.warning(self, "Folder Error", f"Could not create the folder:\n{path}\n\n{e}")
+            return
+        self._set_folder(path)
+
+    def _set_folder(self, path: str) -> None:
+        """Stage a new projects folder ('' = default). Applied on save()."""
+        if any(p["status"] == "locked" for p in SafeChunkEngine.list_all_projects()):
+            QMessageBox.warning(
+                self, "Projects Open",
+                "Close all open projects before changing the projects folder.",
+            )
+            return
+        default = SafeChunkEngine.get_default_base_dir(ignore_custom=True)
+        if path and os.path.normcase(path) == os.path.normcase(os.path.normpath(default)):
+            path = ""
+        self._projects_dir = path
+        self._refresh_folder_view()
+
+    def _refresh_folder_view(self) -> None:
+        path = self._projects_dir or SafeChunkEngine.get_default_base_dir(ignore_custom=True)
+        self._folder_edit.setText(path)
+        self._folder_edit.setCursorPosition(0)  # show the drive, not the tail
+        self._folder_edit.setToolTip(path)
+        is_default = not self._projects_dir
+        self._btn_default.setVisible(not is_default)
+        if is_default:
+            self._folder_status.setText(
+                "Default location on the system drive - keep backups of "
+                "important projects (Export Project)."
+            )
+            self._folder_status.setStyleSheet(f"color: {get_token('warning')};")
+        else:
+            self._folder_status.setText("Custom location.")
+            self._folder_status.setStyleSheet("")
+
     def _theme_combo(self, variant: str, current: str) -> QComboBox:
         combo = QComboBox()
-        combo.setFixedHeight(34)
         for module_name in list_themes(variant):
             combo.addItem(get_theme_name(variant, module_name), userData=module_name)
             if module_name == current:
@@ -313,7 +449,7 @@ class _CircularAvatar(QWidget):
             p.drawEllipse(r)
             p.setPen(QColor("white"))
             f = p.font()
-            f.setPixelSize(10)
+            f.setPointSize(FS_SM)
             f.setBold(True)
             p.setFont(f)
             p.drawText(r, Qt.AlignCenter, "CHANGE")
@@ -322,8 +458,8 @@ class _CircularAvatar(QWidget):
 class SettingsDialog(QDialog):
     """
     Settings dialog with a multi-tab system.
-    Tab 1: General (Name, Themes)
-    Tab 2: Profiles (Chrome-like Management)
+    General / Storage / Local API: SettingsPanel sections, one tab each
+    Profiles: Chrome-like profile management
     """
 
     def __init__(self, parent=None):
@@ -341,20 +477,26 @@ class SettingsDialog(QDialog):
 
         self.tabs = QTabWidget()
         
-        # ── Tab 1: General ──────────────────────────────────────────────
-        self.gen_tab = QWidget()
-        gen_layout = QVBoxLayout(self.gen_tab)
-        gen_layout.setContentsMargins(24, 24, 24, 24)
-        
-        self._panel = SettingsPanel(self)
-        gen_scroll = QScrollArea()
-        gen_scroll.setWidgetResizable(True)
-        gen_scroll.setFrameShape(QFrame.NoFrame)
-        gen_scroll.setWidget(self._panel)
-        gen_layout.addWidget(gen_scroll)
-        self.tabs.addTab(self.gen_tab, "General")
+        # ── Tabs: General / Storage / Local API ─────────────────────────────────────
 
-        # ── Tab 2: Profiles ─────────────────────────────────────────────
+        # One tab per SettingsPanel section (General / Storage / Local API).
+        # The panel itself stays hidden; it only owns the widgets and save().
+        self._panel = SettingsPanel(self, stacked=False)
+        self._panel.hide()
+        for title, section in self._panel.sections:
+            content = QWidget()
+            content_layout = QVBoxLayout(content)
+            content_layout.setContentsMargins(24, 24, 24, 24)
+            content_layout.addWidget(section)
+            content_layout.addStretch()
+            scroll = QScrollArea()
+            scroll.setWidgetResizable(True)
+            scroll.setFrameShape(QFrame.NoFrame)
+            scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+            scroll.setWidget(content)
+            self.tabs.addTab(scroll, title)
+
+        # ── Tab: Profiles ───────────────────────────────────────────────
         self.prof_tab = QWidget()
         prof_layout = QVBoxLayout(self.prof_tab)
         prof_layout.setContentsMargins(24, 16, 24, 16)

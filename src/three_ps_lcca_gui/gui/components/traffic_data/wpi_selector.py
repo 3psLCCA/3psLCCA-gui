@@ -18,6 +18,7 @@ from __future__ import annotations
 from typing import Optional
 
 from three_ps_lcca_gui.gui.themes import get_token, theme_manager
+from three_ps_lcca_gui.gui.theme import FS_SECTION
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QFont, QScreen
 from PySide6.QtWidgets import (
@@ -306,7 +307,7 @@ class _WPISelector(QWidget):
         icon, token_key, tip = _BADGE[profile.integrity]
         self._badge.setText(icon)
         self._badge.setToolTip(f"{tip}\n({'DB' if not profile.is_custom else 'Custom'})")
-        self._badge.setStyleSheet(f"color: {get_token(token_key)}; font-size: 14px;")
+        self._badge.setStyleSheet(f"color: {get_token(token_key)}; font-size: {FS_SECTION}pt;")
 
     # ── Slot handlers ─────────────────────────────────────────────────────────
 

@@ -12,7 +12,7 @@ from PySide6.QtGui import QColor, QPainter, QPixmap
 from PySide6.QtWidgets import QApplication, QWidget
 
 from three_ps_lcca_gui.gui.themes import get_token
-from three_ps_lcca_gui.gui.theme import SP4, SP8, SP10, FS_DISP, FS_BASE, FW_BOLD
+from three_ps_lcca_gui.gui.theme import SP4, SP8, SP10, FS_DISP, FS_MD, FW_BOLD
 from three_ps_lcca_gui.gui.styles import font
 
 MIN_DISPLAY_MS = 1_500
@@ -137,7 +137,7 @@ class SplashScreen(QWidget):
 
         # Subtitle
         p.setPen(QColor(get_token("text_secondary")))
-        p.setFont(font(FS_BASE))
+        p.setFont(font(FS_MD))
         p.drawText(
             margin,
             margin + logo_size + SP8 + SP4,

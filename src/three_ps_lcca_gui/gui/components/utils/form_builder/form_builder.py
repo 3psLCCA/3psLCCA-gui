@@ -23,6 +23,7 @@ from typing import Any
 from PySide6.QtCore import Qt, QRegularExpression
 from PySide6.QtGui import QPixmap, QRegularExpressionValidator
 from three_ps_lcca_gui.gui.themes import get_token
+from three_ps_lcca_gui.gui.theme import FS_SECTION
 from PySide6.QtWidgets import (
     QComboBox,
     QDoubleSpinBox,
@@ -52,18 +53,27 @@ _PLACEHOLDER = "-- select --"
 # ---------------------------------------------------------------------------
 
 
-def _make_section_header(title: str) -> list[QWidget]:
-    """Return [header QLabel, divider QWidget] ready to add to a QFormLayout."""
+def make_section_label(title: str, pad_top: int = 16, pad_bottom: int = 4) -> QLabel:
+    """Return a QLabel styled according to Tier 2 section heading typography."""
     header = QLabel(title)
     header.setStyleSheet(
-        f"font-size: 15px; font-weight: {get_token('weight-semibold')}; padding-top: 16px; padding-bottom: 4px;"
+        f"font-size: {FS_SECTION}pt; font-weight: {get_token('weight-semibold')}; padding-top: {pad_top}px; padding-bottom: {pad_bottom}px;"
     )
+    return header
+
+
+def make_section_header(title: str, pad_top: int = 16, pad_bottom: int = 4) -> list[QWidget]:
+    """Return [header QLabel, divider QWidget] ready to add to a QFormLayout or QBoxLayout."""
+    header = make_section_label(title, pad_top=pad_top, pad_bottom=pad_bottom)
 
     divider = QWidget()
     divider.setFixedHeight(1)
     divider.setStyleSheet("background-color: palette(mid);")
 
     return [header, divider]
+
+
+_make_section_header = make_section_header
 
 
 

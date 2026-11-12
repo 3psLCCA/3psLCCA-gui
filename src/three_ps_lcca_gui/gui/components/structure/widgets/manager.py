@@ -53,7 +53,7 @@ class StructureManagerWidget(QWidget):
         summary_bar = QWidget()
         summary_layout = QHBoxLayout(summary_bar)
         summary_layout.setContentsMargins(4, 4, 4, 4)
-        self.total_lbl = QLabel("Total: -")
+        self.total_lbl = QLabel("<b>Total:</b> -")
         self.count_lbl = QLabel("Items: -")
         sep = QFrame()
         sep.setFrameShape(QFrame.VLine)
@@ -204,7 +204,7 @@ class StructureManagerWidget(QWidget):
         suffix = f" ({currency})" if currency else ""
         item_str = f"{count} item{'s' if count != 1 else ''}"
         comp_str = f"{components} component{'s' if components != 1 else ''}"
-        self.total_lbl.setText(f"Total{suffix}: {fmt_comma(total)}  |  {item_str} in {comp_str}")
+        self.total_lbl.setText(f"<b>Total{suffix}:</b> {fmt_comma(total)}  |  {item_str} in {comp_str}")
         self.count_lbl.hide()
         self.total_changed.emit()
 

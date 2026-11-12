@@ -13,6 +13,8 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtGui import QFont, QColor
 from three_ps_lcca_gui.gui.themes import get_token
+from three_ps_lcca_gui.gui.theme import FS_SECTION, FW_BOLD
+from three_ps_lcca_gui.gui.styles import font as _f
 
 
 class RecoveryWorker(QThread):
@@ -56,10 +58,7 @@ class RecoveryDialog(QDialog):
 
         # ── Title ─────────────────────────────────────────────────────────────
         title = QLabel("⚠  Project Needs Recovery")
-        f = QFont()
-        f.setPointSize(12)
-        f.setBold(True)
-        title.setFont(f)
+        title.setFont(_f(FS_SECTION, FW_BOLD))
         layout.addWidget(title)
 
         # ── Issue summary ─────────────────────────────────────────────────────

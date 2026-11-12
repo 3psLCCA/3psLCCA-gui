@@ -20,7 +20,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 
 from three_ps_lcca_gui.gui.theme import (
-    FS_LG, FS_BASE, FS_SM,
+    FS_MD, FS_MD, FS_SM,
     FW_SEMIBOLD, FW_NORMAL,
     BTN_MD, BTN_SM,
     SP2, SP3, SP4, SP8, SP10,
@@ -49,7 +49,7 @@ class SaveCheckpointDialog(QDialog):
 
         # Header
         header = QLabel("Save Checkpoint")
-        header.setFont(_f(FS_LG, FW_SEMIBOLD))
+        header.setFont(_f(FS_MD, FW_SEMIBOLD))
         layout.addWidget(header)
 
         desc = QLabel(
@@ -132,7 +132,7 @@ class CheckpointManagerDialog(QDialog):
 
         # Header
         header = QLabel("Checkpoint Manager")
-        header.setFont(_f(FS_LG, FW_SEMIBOLD))
+        header.setFont(_f(FS_MD, FW_SEMIBOLD))
         layout.addWidget(header)
 
         desc = QLabel(
@@ -213,7 +213,7 @@ class CheckpointManagerDialog(QDialog):
             _ro = Qt.ItemIsEnabled | Qt.ItemIsSelectable
 
             label_item = QTableWidgetItem(cp.get("label", ""))
-            label_item.setFont(_f(FS_BASE, FW_SEMIBOLD))
+            label_item.setFont(_f(FS_MD, FW_SEMIBOLD))
             label_item.setFlags(_ro)
 
             date_item = QTableWidgetItem(formatted_date)

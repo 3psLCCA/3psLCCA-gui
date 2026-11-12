@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
 from three_ps_lcca_gui.gui.themes import get_token
 from three_ps_lcca_gui.gui._CONFIG import DEV_MODE
 from three_ps_lcca_gui.gui.theme import (
-    FS_LG, FS_MD, FS_BASE, FS_SM,
+    FS_MD, FS_MD, FS_MD, FS_SM,
     FW_SEMIBOLD, FW_NORMAL,
 )
 from ....base_widget import ScrollableForm
@@ -268,7 +268,7 @@ class RickeWidget(ScrollableForm):
             lbl.setWordWrap(True)
 
         self._lbl_scc.setStyleSheet(
-            f"color: {get_token('text')}; font-size: {FS_LG}pt; font-weight: {FW_SEMIBOLD};"
+            f"color: {get_token('text')}; font-size: {FS_MD}pt; font-weight: {FW_SEMIBOLD};"
         )
         self._lbl_range.setStyleSheet(
             f"color: {get_token('text_secondary')}; font-size: {FS_MD}pt; font-weight: {FW_NORMAL};"
@@ -277,7 +277,7 @@ class RickeWidget(ScrollableForm):
             f"color: {get_token('text_secondary')}; font-size: {FS_SM}pt; font-weight: {FW_NORMAL};"
         )
         self._lbl_status.setStyleSheet(
-            f"color: {get_token('text_secondary')}; font-size: {FS_BASE}pt; font-weight: {FW_NORMAL};"
+            f"color: {get_token('text_secondary')}; font-size: {FS_MD}pt; font-weight: {FW_NORMAL};"
         )
 
         for lbl in (self._lbl_scc, self._lbl_range, self._lbl_params, self._lbl_status):
@@ -391,11 +391,11 @@ class RickeWidget(ScrollableForm):
 
         if unfilled_names:
             self._lbl_scc.setText("-")
-            self._lbl_scc.setStyleSheet(f"color: {get_token('text')}; font-size: {FS_LG}pt; font-weight: {FW_SEMIBOLD};")
+            self._lbl_scc.setStyleSheet(f"color: {get_token('text')}; font-size: {FS_MD}pt; font-weight: {FW_SEMIBOLD};")
             self._lbl_range.setText("")
             self._lbl_params.setText("")
             self._lbl_status.setText(f"Waiting for: {', '.join(unfilled_names)}")
-            self._lbl_status.setStyleSheet(f"color: {get_token('text_secondary')}; font-size: {FS_BASE}pt; font-weight: {FW_NORMAL};")
+            self._lbl_status.setStyleSheet(f"color: {get_token('text_secondary')}; font-size: {FS_MD}pt; font-weight: {FW_NORMAL};")
             print(f"[RickeWidget] waiting for: {', '.join(unfilled_names)}")
             return
 
@@ -442,12 +442,12 @@ class RickeWidget(ScrollableForm):
                 "This combination was not found in the DB - please change one or more selections above."
             )
             self._lbl_scc.setText("No Result")
-            self._lbl_scc.setStyleSheet(f"color: {get_token('danger')}; font-size: {FS_LG}pt; font-weight: {FW_SEMIBOLD};")
+            self._lbl_scc.setStyleSheet(f"color: {get_token('danger')}; font-size: {FS_MD}pt; font-weight: {FW_SEMIBOLD};")
             self._lbl_range.setText("")
             self._lbl_params.setText(summary)
             self._lbl_params.setStyleSheet(f"color: {get_token('text_secondary')}; font-size: {FS_SM}pt; font-weight: {FW_NORMAL};")
             self._lbl_status.setText(msg)
-            self._lbl_status.setStyleSheet(f"color: {get_token('danger')}; font-size: {FS_BASE}pt; font-weight: {FW_NORMAL};")
+            self._lbl_status.setStyleSheet(f"color: {get_token('danger')}; font-size: {FS_MD}pt; font-weight: {FW_NORMAL};")
             if DEV_MODE:
                 print(f"[RickeWidget] {msg}")
         else:
@@ -472,7 +472,7 @@ class RickeWidget(ScrollableForm):
                 ci_text  = f"66.7% Confidence Interval:  {lo:,.{DECIMAL_PLACES}f}  –  {hi:,.{DECIMAL_PLACES}f} {currency} / tCO₂"
 
             self._lbl_scc.setText(scc_text)
-            self._lbl_scc.setStyleSheet(f"color: {get_token('success')}; font-size: {FS_LG}pt; font-weight: {FW_SEMIBOLD};")
+            self._lbl_scc.setStyleSheet(f"color: {get_token('success')}; font-size: {FS_MD}pt; font-weight: {FW_SEMIBOLD};")
             self._lbl_range.setText(ci_text)
             self._lbl_range.setStyleSheet(f"color: {get_token('text_secondary')}; font-size: {FS_MD}pt; font-weight: {FW_NORMAL};")
             self._lbl_params.setText(summary)

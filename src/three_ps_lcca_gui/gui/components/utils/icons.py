@@ -24,6 +24,9 @@ from PySide6.QtWidgets import QApplication, QGraphicsOpacityEffect, QPushButton
 
 _ICONS: dict[str, str] = {
     # ── Navigation / UI ──────────────────────────────────────────────────────
+    "menu": (
+        '<path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/>'
+    ),
     "home": (
         '<path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>'
     ),
@@ -61,6 +64,15 @@ _ICONS: dict[str, str] = {
     "trash": (
         '<path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1'
         '-1h-5l-1 1H5v2h14V4z"/>'
+    ),
+    "trash-outline": (
+        '<g fill="none" stroke="{color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'
+        '<path d="M3 6h18"/>'
+        '<path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/>'
+        '<path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>'
+        '<line x1="10" y1="11" x2="10" y2="17"/>'
+        '<line x1="14" y1="11" x2="14" y2="17"/>'
+        '</g>'
     ),
     "exclude": (
         '<polygon points="12,19 2,5 22,5"/>'
@@ -177,7 +189,7 @@ class _SvgIconEngine(QIconEngine):
         app = QApplication.instance()
         if mode == QIcon.Mode.Disabled:
             from three_ps_lcca_gui.gui.themes import get_token
-            return app.palette().placeholderText().color().name() if app else get_token("icon-muted")
+            return app.palette().placeholderText().color().name() if app else get_token("text_disabled")
         from three_ps_lcca_gui.gui.themes import get_token
         return app.palette().windowText().color().name() if app else get_token("text")
 
@@ -185,7 +197,8 @@ class _SvgIconEngine(QIconEngine):
     def _render(cls, body: str, color: str, w: int, h: int) -> QPixmap:
         key = (body, color, w, h)
         if key not in cls._cache:
-            svg = _TEMPLATE.format(color=color, body=body).encode()
+            resolved_body = body.replace("{color}", color) if "{color}" in body else body
+            svg = _TEMPLATE.format(color=color, body=resolved_body).encode()
             renderer = QSvgRenderer(QByteArray(svg))
             pix = QPixmap(w, h)
             pix.fill(Qt.GlobalColor.transparent)
@@ -288,7 +301,8 @@ def make_icon(name: str, color: str | None = None, size: int = 64) -> QIcon:
         return QIcon(_SvgIconEngine(body))
 
     # Fixed-colour rendering (e.g. branded window icon)
-    svg = _TEMPLATE.format(color=color, body=body).encode()
+    resolved_body = body.replace("{color}", color) if "{color}" in body else body
+    svg = _TEMPLATE.format(color=color, body=resolved_body).encode()
     renderer = QSvgRenderer(QByteArray(svg))
     pix = QPixmap(size, size)
     pix.fill(Qt.GlobalColor.transparent)
