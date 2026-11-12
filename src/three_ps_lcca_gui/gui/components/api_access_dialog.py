@@ -53,9 +53,8 @@ class ApiAccessDialog(QDialog):
         active_layout.setSpacing(12)
 
         self._hint = QLabel(
-            "Append a page name below to the base URL to GET/POST it, e.g. "
-            "<code>&lt;base URL&gt;/bridge_data</code>. Every request must "
-            "include the token below as an <b>X-API-Token</b> header."
+            "Call <i>Base URL/&lt;page&gt;</i> with the token in an "
+            "<b>X-API-Token</b> header."
         )
         self._hint.setWordWrap(True)
         active_layout.addWidget(self._hint)
@@ -66,10 +65,6 @@ class ApiAccessDialog(QDialog):
         self._url_edit = self._readonly_row("", form, "Base URL")
         self._token_edit = self._readonly_row("", form, "Token")
         active_layout.addLayout(form)
-
-        self._pages_label = QLabel()
-        self._pages_label.setWordWrap(True)
-        active_layout.addWidget(self._pages_label)
 
         layout.addWidget(self._active_block)
 
@@ -85,13 +80,16 @@ class ApiAccessDialog(QDialog):
         btn_row = QHBoxLayout()
         self._btn_generate = QPushButton("Generate Token")
         self._btn_generate.clicked.connect(self._on_generate)
-        self._btn_regen = QPushButton("Regenerate Token")
+        self._btn_regen = QPushButton("Regenerate")
         self._btn_regen.clicked.connect(self._on_regenerate)
-        self._btn_revoke = QPushButton("Revoke Token")
+        self._btn_revoke = QPushButton("Revoke")
         self._btn_revoke.clicked.connect(self._on_revoke)
         btn_close = QPushButton("Close")
         btn_close.clicked.connect(self.accept)
 
+        for b in (self._btn_generate, self._btn_regen, self._btn_revoke, btn_close):
+            b.setMinimumWidth(110)
+            b.setMinimumHeight(34)
         btn_row.addWidget(self._btn_generate)
         btn_row.addWidget(self._btn_regen)
         btn_row.addWidget(self._btn_revoke)
@@ -106,7 +104,9 @@ class ApiAccessDialog(QDialog):
         edit = QLineEdit(value)
         edit.setReadOnly(True)
         btn_copy = QPushButton("Copy")
-        btn_copy.setFixedWidth(60)
+        btn_copy.setMinimumWidth(80)
+        btn_copy.setMinimumHeight(34)
+        edit.setMinimumHeight(34)
         btn_copy.clicked.connect(lambda: QApplication.clipboard().setText(edit.text()))
         row.addWidget(edit)
         row.addWidget(btn_copy)
@@ -129,8 +129,11 @@ class ApiAccessDialog(QDialog):
             base_url = f"http://127.0.0.1:{self._port}/{self.project_id}"
             self._url_edit.setText(base_url)
             self._token_edit.setText(token)
-            pages = ", ".join(sorted(CHUNK_PAGE_MAP.keys())) or "(none registered)"
-            self._pages_label.setText(f"<b>Available pages:</b> {pages}")
+            # Page list lives in a tooltip instead of filling the dialog.
+            pages = "\n".join(sorted(CHUNK_PAGE_MAP.keys())) or "(none registered)"
+            tip = f"Available pages:\n{pages}"
+            self._hint.setToolTip(tip)
+            self._url_edit.setToolTip(tip)
 
     def _on_generate(self):
         tokens.ensure_token(self.project_id)
