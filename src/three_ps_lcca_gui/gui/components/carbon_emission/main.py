@@ -15,7 +15,7 @@ from three_ps_lcca_gui.gui.components.carbon_emission.widgets.scc_widget import 
 class CarbonEmissionTabView(QWidget):
     tab_changed = Signal(str)  # emits the tab name when user clicks a tab
 
-    def __init__(self, controller=None):
+    def __init__(self, controller=None, on_step=None):
         super().__init__()
 
         main_layout = QVBoxLayout(self)
@@ -31,19 +31,19 @@ class CarbonEmissionTabView(QWidget):
         palette.setColor(QPalette.Base, palette.color(QPalette.Window))
         self.tab_view.setPalette(palette)
 
-        self.tab_view.addTab(SCCWidget(controller=controller), "Social Cost of Carbon")
-        self.tab_view.addTab(
-            MaterialEmissions(controller=controller), "Material Emissions"
-        )
-        self.tab_view.addTab(
-            TransportEmissions(controller=controller), "Transportation Emissions"
-        )
-        self.tab_view.addTab(
-            MachineryEmissions(controller=controller), "Machinery/Equipment Emissions"
-        )
-        self.tab_view.addTab(
-            TrafficEmissions(controller=controller), "Traffic Rerouting Emissions"
-        )
+        tabs = [
+            (SCCWidget, "Social Cost of Carbon"),
+            (MaterialEmissions, "Material Emissions"),
+            (TransportEmissions, "Transportation Emissions"),
+            (MachineryEmissions, "Machinery/Equipment Emissions"),
+            (TrafficEmissions, "Traffic Rerouting Emissions"),
+        ]
+        for k, (cls, title) in enumerate(tabs, 1):
+            # on_step(tab_name, k, total) reports each sub-tab before it is
+            # built, so the loading UI can say what is happening.
+            if on_step:
+                on_step(title, k, len(tabs))
+            self.tab_view.addTab(cls(controller=controller), title)
 
         main_layout.addWidget(self.tab_view)
         self.tab_view.currentChanged.connect(self._on_tab_changed)

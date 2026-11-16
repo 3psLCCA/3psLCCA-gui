@@ -180,9 +180,16 @@ class ProjectManager:
 
                     # Ring progress: page i of n fills to i/(n+1), leaving the
                     # last slice for the results step below.
-                    def _on_progress(name, i, n):
-                        _set_step("Opening", (i - 1) / (n + 1),
-                                  f"Building {name} page… ({i}/{n})")
+                    # Tabbed pages also pass sub=(tab_name, k, m): show the tab
+                    # and move the ring within this page's slice.
+                    def _on_progress(name, i, n, sub=None):
+                        done = i - 1
+                        text = f"Building {name} page… ({i}/{n})"
+                        if sub:
+                            tab, k, m = sub
+                            done += (k - 1) / m
+                            text = f"Building {name} › {tab}… ({i}/{n})"
+                        _set_step("Opening", done / (n + 1), text)
 
                     def _on_complete():
                         # show_project_view() can run the calculation's data
