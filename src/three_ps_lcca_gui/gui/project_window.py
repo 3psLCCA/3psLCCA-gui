@@ -1190,7 +1190,15 @@ class ProjectWindow(QMainWindow):
             f"Storage error:\n\n{error_message}\n\nSave a checkpoint now if possible, then restart.",
         )
 
+    def _show_closing_status(self):
+        # Status only - the save itself still happens inside the normal
+        # teardown order below (flush disconnects signals first).
+        if self.isVisible() and self.controller.engine:
+            self.status_bar.showMessage("Saving project…")
+            self.status_bar.repaint()  # main thread blocks next
+
     def _close_project(self):
+        self._show_closing_status()
         if FLUSH_MODE:
             if DEV_MODE:
                 SysTracker.instance().snapshot(
@@ -1440,6 +1448,7 @@ class ProjectWindow(QMainWindow):
         self._update_sidebar_mode()
 
     def closeEvent(self, event):
+        self._show_closing_status()
         if FLUSH_MODE:
             if DEV_MODE:
                 SysTracker.instance().snapshot(
