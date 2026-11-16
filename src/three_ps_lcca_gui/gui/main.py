@@ -1,3 +1,4 @@
+import time as _tt; _T0 = _tt.perf_counter()  # startup clock for dev timing logs
 import sys
 import os
 import platform
@@ -36,20 +37,19 @@ from PySide6.QtWidgets import (
     QTableView,
     QTableWidget,
 )
-from three_ps_lcca_gui.gui.components.utils.table_widgets import (
-    GroupedHeaderView,
-    WordWrapHeaderView,
-)
 from PySide6.QtCore import QObject, QEvent, Qt, QTimer, QCoreApplication
 from PySide6.QtGui import QFont, QFontDatabase, QIcon
 
-# Custom UI Components and Managers
+# Only what the splash needs is imported at module level, so the splash can
+# appear as early as possible. Everything heavy (ProjectManager, which pulls in
+# the whole project window) is imported inside main() while the splash animates.
 from three_ps_lcca_gui.gui.components.splash_screen import SplashScreen
-from three_ps_lcca_gui.gui.project_manager import ProjectManager
 from three_ps_lcca_gui.gui.themes import reapply as _reapply
-from three_ps_lcca_gui.gui.components.utils.unit_resolver import load_custom_units
 from three_ps_lcca_gui.gui.version import VERSION
 from three_ps_lcca_gui.gui.theme import FONT_FAMILY, FS_MD
+
+# Set in main() - used by _TableHeaderWordWrapFilter.
+GroupedHeaderView = WordWrapHeaderView = None
 
 
 _GUI_DIR = os.path.abspath(os.path.dirname(__file__))
@@ -229,6 +229,85 @@ def main():
     splash = SplashScreen()
     splash.show()
     app.processEvents()
+    _tlog("splash shown")
+
+    manager = None
+    try:
+        manager = _load_app(app, splash)
+    finally:
+        # Close the splash even if startup failed, so it never lingers.
+        main_win = manager.windows[0] if manager and manager.windows else None
+        splash.finish(main_win)
+    _tlog("home shown")
+
+    from three_ps_lcca_gui.gui._CONFIG import AUTO_OPEN_FIRST_PROJECT
+    if AUTO_OPEN_FIRST_PROJECT and manager and manager.windows:
+        _dev_open_first_project(manager)
+    sys.exit(app.exec())
+
+
+# ── Dev helpers (DEV_MODE only) ────────────────────────────────────────
+def _tlog(what):
+    """Print a startup timing line (dev mode only)."""
+    from three_ps_lcca_gui.gui._CONFIG import DEV_MODE
+    if not DEV_MODE:
+        return
+    sys.__stderr__.write(f"[TIMING] {what:<16} {_tt.perf_counter() - _T0:6.2f} s\n")
+    sys.__stderr__.flush()
+
+
+_DEV_OPEN_PROJECT_NAME = "Steel_35m_2L_F_Darbhanga (imported) - Copy"
+
+
+def _dev_open_first_project(manager):
+    """Open _DEV_OPEN_PROJECT_NAME (else the first Home project) and log how long it takes."""
+    from PySide6.QtCore import QTimer
+    from three_ps_lcca_gui.gui.project_window import ProjectWindow
+    win = manager.windows[0]
+    projects = getattr(win.home_widget, "_all_projects", []) or []
+    proj = next((p for p in projects
+                 if p.get("display_name") == _DEV_OPEN_PROJECT_NAME), None)
+    if not proj:
+        grid = win.home_widget.grid_list
+        item = grid.item(0) if grid.count() else None
+        proj = item.data(Qt.UserRole) if item else None
+    if not proj:
+        _tlog("no project")
+        return
+    orig = ProjectWindow.show_project_view
+
+    def spv(self, *a, **k):
+        r = orig(self, *a, **k)
+        ProjectWindow.show_project_view = orig
+        QTimer.singleShot(0, lambda: _tlog("project open"))
+        return r
+    ProjectWindow.show_project_view = spv
+
+    _tlog(f"window title = {win.windowTitle()!r}")
+    win.windowTitleChanged.connect(
+        lambda t: _tlog(f"window title = {t!r}"))
+
+    def go():
+        _tlog("click open")
+        sys.__stderr__.write(f"[TIMING] project = {proj.get('display_name')}\n")
+        win.home_widget._safe_open_project(proj["project_id"])
+    QTimer.singleShot(300, go)
+
+
+
+def _load_app(app, splash):
+    """Everything after the splash is on screen. Returns the ProjectManager."""
+    global GroupedHeaderView, WordWrapHeaderView
+
+    # Heavy imports - the splash keeps animating while they run.
+    splash.set_stage(0.1, "Loading modules…")
+    with splash.pumping_imports():
+        from three_ps_lcca_gui.gui.components.utils.table_widgets import (
+            GroupedHeaderView,
+            WordWrapHeaderView,
+        )
+        from three_ps_lcca_gui.gui.components.utils.unit_resolver import load_custom_units
+        from three_ps_lcca_gui.gui.project_manager import ProjectManager
 
     # Load Bundled Fonts
     _font_dir = os.path.join(_ASSETS_DIR, "themes", "Ubuntu_font")
@@ -271,6 +350,8 @@ def main():
     app.installEventFilter(table_filter)
     app.installEventFilter(focus_filter)
     app.installEventFilter(hdr_wrap_filter)
+    # Keep them alive after _load_app() returns.
+    app._lcca_event_filters = (wheel_filter, table_filter, focus_filter, hdr_wrap_filter)
     from three_ps_lcca_gui.gui.components.utils.spinbox_fix import install as _install_spinbox_fix
     _install_spinbox_fix(app)
 
@@ -313,7 +394,9 @@ def main():
         from three_ps_lcca_gui.gui.sys_tracker import SysTracker
         SysTracker.instance().start()
 
-    # Initialize Project Manager and Close Splash
+    # Initialize Project Manager and build the Home window.
+    # pump_splash() calls inside the Home build keep the splash animating.
+    splash.set_stage(0.6, "Preparing workspace…")
     manager = ProjectManager()
 
     # Local HTTP API - lets external tools read/update an open project's GUI.
@@ -327,14 +410,9 @@ def main():
         if api_handle:
             app.aboutToQuit.connect(api_handle.shutdown)
 
-    # Heavy work first - splash stays visible during entire load
+    splash.set_stage(0.7, "Loading projects…")
     manager.open_project()
-
-    # Pass main window so Qt waits until it's visible AND MIN_DISPLAY_MS has elapsed
-    main_win = manager.windows[0] if manager.windows else None
-    splash.finish(main_win)
-
-    sys.exit(app.exec())
+    return manager
 
 
 if __name__ == "__main__":
