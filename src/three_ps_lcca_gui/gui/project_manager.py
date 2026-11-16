@@ -139,15 +139,45 @@ class ProjectManager:
                     # Pre-warm controller chunk cache before any widget is built
                     _warm_cache(target)
 
-                    def _on_complete():
+                    # The status bar belongs to the window (it shows "Project:
+                    # <name>", save state, ...). Borrow it while loading and
+                    # hand the owner's message back when done.
+                    owner_msg = target.status_bar.currentMessage()
+
+                    def _set_step(card_text, progress, status_text):
+                        # Card pill: short label + progress ring.
                         for win in self.windows:
-                            win.home_widget.clear_card_loading()
-                        target.show_project_view()
+                            win.home_widget.set_card_loading_text(card_text, progress)
+                        # Bottom status bar: what is actually happening.
+                        # repaint() now - the main thread is about to block.
+                        target.status_bar.showMessage(status_text)
+                        target.status_bar.repaint()
+
+                    # Ring progress: page i of n fills to i/(n+1), leaving the
+                    # last slice for the results step below.
+                    def _on_progress(name, i, n):
+                        _set_step("Opening", (i - 1) / (n + 1),
+                                  f"Building {name} page… ({i}/{n})")
+
+                    def _on_complete():
+                        # show_project_view() can run the calculation's data
+                        # gathering on this thread - say so before it blocks.
+                        _set_step("Almost ready", 0.9, "Preparing results…")
+                        try:
+                            target.show_project_view()
+                        finally:
+                            # Hand the status bar and cards back even on error.
+                            if owner_msg:
+                                target.status_bar.showMessage(owner_msg)
+                            else:
+                                target.status_bar.clearMessage()
+                            for win in self.windows:
+                                win.home_widget.clear_card_loading()
                         target.show()
                         target.activateWindow()
                         QTimer.singleShot(0, self.refresh_all_home_screens)
 
-                    target.preload_all(_on_complete)
+                    target.preload_all(_on_complete, _on_progress)
                 else:
                     for win in self.windows:
                         win.home_widget.clear_card_loading()

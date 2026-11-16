@@ -405,6 +405,8 @@ class _GridCardDelegate(QStyledItemDelegate):
         self._mouse_pos    = QPoint(-1, -1)
         self._loading_pid  = None
         self._loading_dots = 0
+        self._loading_text = None   # pill label while opening, e.g. "Almost ready"
+        self._loading_progress = None  # 0..1 for the progress ring, None = no ring
         self.comparison_mode     = False
         self._comp_selected = _OrderedSet()   # pids selected for comparison, in click order
 
@@ -486,8 +488,14 @@ class _GridCardDelegate(QStyledItemDelegate):
             painter.drawRoundedRect(rect, self.RADIUS, self.RADIUS)
 
             dots = "." * (self._loading_dots + 1)
-            pill_label = f"Opening{dots}"
-            pill_h, pill_w = 22, 72
+            pill_label = self._loading_text or f"Opening{dots}"
+            painter.setFont(_f(FS_SM, FW_MEDIUM))
+            progress = self._loading_progress
+            ring_d = 12
+            ring_space = ring_d + 6 if progress is not None else 0
+            pill_h = 22
+            pill_w = max(72, painter.fontMetrics().horizontalAdvance(pill_label)
+                         + 24 + ring_space)
             pill_x = R - 32 - SP2 - pill_w
             pill_y = rect.top() + (card_h - pill_h) // 2
             pill_rect = QRect(pill_x, pill_y, pill_w, pill_h)
@@ -496,8 +504,25 @@ class _GridCardDelegate(QStyledItemDelegate):
             painter.setPen(QPen(m, 1))
             painter.setBrush(Qt.NoBrush)
             painter.drawRoundedRect(pill_rect, pill_h // 2, pill_h // 2)
+
+            # Progress ring: fills step by step (a spinner would freeze while
+            # pages build on the main thread; a ring that pauses looks normal).
+            if progress is not None:
+                ring = QRectF(pill_x + 10, pill_y + (pill_h - ring_d) / 2,
+                              ring_d, ring_d)
+                track = QColor(muted_col)
+                track.setAlpha(60)
+                painter.setPen(QPen(track, 2))
+                painter.drawEllipse(ring)
+                arc_pen = QPen(QColor(get_token("primary")), 2)
+                arc_pen.setCapStyle(Qt.RoundCap)
+                painter.setPen(arc_pen)
+                painter.drawArc(ring, 90 * 16, -int(360 * 16 * max(0.0, min(1.0, progress))))
+                painter.setPen(QPen(m, 1))
+
             painter.setFont(_f(FS_SM, FW_MEDIUM))
-            painter.drawText(pill_rect, Qt.AlignCenter, pill_label)
+            painter.drawText(pill_rect.adjusted(ring_space, 0, 0, 0),
+                             Qt.AlignCenter, pill_label)
 
             painter.setFont(_f(FS_MD, FW_MEDIUM))
             dim = QColor(text_col)
@@ -1632,6 +1657,8 @@ class HomePage(QWidget):
         delegate = self.grid_list.itemDelegate()
         delegate._loading_pid = pid
         delegate._loading_dots = 0
+        delegate._loading_text = None
+        delegate._loading_progress = None
         if not hasattr(self, "_loading_timer"):
             self._loading_timer = QTimer(self)
             self._loading_timer.setInterval(600)
@@ -1644,12 +1671,26 @@ class HomePage(QWidget):
         delegate._loading_dots = (delegate._loading_dots + 1) % 3
         self.grid_list.viewport().update()
 
+    def set_card_loading_text(self, text: str, progress: float | None = None):
+        """Show the current open step (and a 0..1 progress ring) on the loading
+        card and paint it now (the main thread is about to be busy, so a queued
+        update would wait)."""
+        delegate = self.grid_list.itemDelegate()
+        if delegate._loading_pid is None:
+            return
+        delegate._loading_text = text
+        delegate._loading_progress = progress
+        if self.grid_list.isVisible():
+            self.grid_list.viewport().repaint()
+
     def clear_card_loading(self):
         if hasattr(self, "_loading_timer"):
             self._loading_timer.stop()
         delegate = self.grid_list.itemDelegate()
         delegate._loading_pid = None
         delegate._loading_dots = 0
+        delegate._loading_text = None
+        delegate._loading_progress = None
         self.grid_list.viewport().update()
 
     def set_active_project(self, project_id: str | None):
