@@ -194,7 +194,7 @@ class _TrashBadgeButton(QWidget):
 class StructureTabView(QWidget):
     tab_changed = Signal(str)  # emits the tab name when user clicks a tab
 
-    def __init__(self, controller=None):
+    def __init__(self, controller=None, on_step=None):
         super().__init__()
         self.setObjectName("StructureTabView")  # For identification in Manager
         self.controller = controller
@@ -280,9 +280,19 @@ class StructureTabView(QWidget):
         palette.setColor(QPalette.Base, palette.color(QPalette.Window))
         self.tab_view.setPalette(palette)
 
+        # on_step(tab_name, k, total) reports each sub-tab before it is built,
+        # so the loading UI can say what is happening during this long call.
+        def _step(name, k):
+            if on_step:
+                on_step(name, k, 4)
+
+        _step("Foundation", 1)
         self.foundation_tab = FoundationWidget(controller=controller)
+        _step("Sub-Structure", 2)
         self.substructure_tab = SubStructureWidget(controller=controller)
+        _step("Super-Structure", 3)
         self.superstructure_tab = SuperStructureWidget(controller=controller)
+        _step("Miscellaneous", 4)
         self.misc_tab = MiscWidget(controller=controller)
 
         self.tab_view.addTab(self.foundation_tab, "Foundation")

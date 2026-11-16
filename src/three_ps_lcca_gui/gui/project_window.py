@@ -784,8 +784,10 @@ class ProjectWindow(QMainWindow):
 
         self._update_sidebar_mode()
 
-    def _get_or_create_widget(self, name: str):
-        """Return the page widget for *name*, creating it on first access."""
+    def _get_or_create_widget(self, name: str, on_step=None):
+        """Return the page widget for *name*, creating it on first access.
+        on_step(tab_name, k, total) is passed to tabbed pages so they can
+        report each sub-tab as it is built."""
         if name in self.widget_map:
             return self.widget_map[name]
         if name not in self._page_names:
@@ -796,13 +798,13 @@ class ProjectWindow(QMainWindow):
         elif name == "Bridge Data":
             widget = BridgeData(controller=self.controller)
         elif name == "Construction Works Data":
-            widget = StructureTabView(controller=self.controller)
+            widget = StructureTabView(controller=self.controller, on_step=on_step)
         elif name == "Traffic Data":
             widget = TrafficData(controller=self.controller)
         elif name == "Financial Data":
             widget = FinancialData(controller=self.controller)
         elif name == "Carbon Emissions Data":
-            widget = CarbonEmissionTabView(controller=self.controller)
+            widget = CarbonEmissionTabView(controller=self.controller, on_step=on_step)
         elif name == "Maintenance and Repair":
             widget = Maintenance(controller=self.controller)
         elif name == "Recycling":
@@ -936,10 +938,14 @@ class ProjectWindow(QMainWindow):
             name = order[index]
             index += 1
             if name not in self.widget_map:
+                step = None
                 if on_progress:
                     on_progress(name, index, len(order))
+                    # Tabbed pages report each sub-tab: (tab_name, k, total)
+                    step = (lambda sub, k, m, nm=name, i=index:
+                            on_progress(nm, i, len(order), (sub, k, m)))
                 t0 = time.perf_counter()
-                self._get_or_create_widget(name)
+                self._get_or_create_widget(name, on_step=step)
                 if DEV_MODE:
                     sys.__stderr__.write(
                         f"[TIMING] build page {name:<26} {time.perf_counter() - t0:6.2f} s\n")
