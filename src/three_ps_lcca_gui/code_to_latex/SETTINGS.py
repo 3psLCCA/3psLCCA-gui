@@ -112,6 +112,8 @@ LATEX_TABLE_COLUMN_BG_COLORS = ("gray!4", "blue!3")
 LATEX_TABLE_LAYOUTS = {
     "field_table": r">{\raggedright\arraybackslash}p{0.40\linewidth}>{\raggedleft\arraybackslash}p{0.40\linewidth}",
     "structure_work": r">{\raggedright\arraybackslash}p{0.34\linewidth}>{\raggedleft\arraybackslash}p{0.09\linewidth}>{\centering\arraybackslash}p{0.09\linewidth}>{\raggedleft\arraybackslash}p{0.10\linewidth}>{\centering\arraybackslash}p{0.14\linewidth}>{\raggedleft\arraybackslash}p{0.10\linewidth}",
+    "boq": r">{\raggedright\arraybackslash}p{0.08\linewidth}>{\raggedright\arraybackslash}p{0.34\linewidth}>{\centering\arraybackslash}p{0.07\linewidth}>{\raggedleft\arraybackslash}p{0.13\linewidth}>{\raggedleft\arraybackslash}p{0.15\linewidth}>{\raggedleft\arraybackslash}p{0.17\linewidth}",
+    "boq_summary": r">{\raggedright\arraybackslash}p{0.10\linewidth}>{\raggedright\arraybackslash}p{0.62\linewidth}>{\raggedleft\arraybackslash}p{0.22\linewidth}",
     "material_emissions": r">{\raggedright\arraybackslash}p{0.23\linewidth}>{\raggedleft\arraybackslash}p{0.09\linewidth}>{\centering\arraybackslash}p{0.07\linewidth}>{\raggedleft\arraybackslash}p{0.12\linewidth}>{\raggedleft\arraybackslash}p{0.12\linewidth}>{\centering\arraybackslash}p{0.11\linewidth}>{\raggedleft\arraybackslash}p{0.10\linewidth}",
     "material_emissions_excluded": r">{\raggedright\arraybackslash}p{0.47\linewidth}>{\raggedleft\arraybackslash}p{0.47\linewidth}",
     "recycling_included": r">{\raggedright\arraybackslash}p{0.25\linewidth}>{\raggedleft\arraybackslash}p{0.12\linewidth}>{\raggedleft\arraybackslash}p{0.14\linewidth}>{\centering\arraybackslash}p{0.08\linewidth}>{\raggedleft\arraybackslash}p{0.13\linewidth}>{\raggedleft\arraybackslash}p{0.13\linewidth}",

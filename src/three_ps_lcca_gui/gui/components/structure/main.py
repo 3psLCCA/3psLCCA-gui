@@ -9,6 +9,8 @@ from PySide6.QtWidgets import (
     QStackedWidget,
     QFileDialog,
     QMessageBox,
+    QMenu,
+    QApplication,
 )
 from PySide6.QtCore import QThread, Signal, QSize, Qt
 from PySide6.QtGui import QPalette, QColor
@@ -18,7 +20,15 @@ from three_ps_lcca_gui.gui.theme import FS_SM
 from ..utils.form_builder.form_builder import make_section_label
 from ..utils.validation_helpers import LOCK_TOOLTIP, freeze_widgets
 from .excel_importer import parse_excel, verify_schema, ImportPreviewWindow
-from .excel_exporter import EXPORT_FORMATS, format_available, export_all_chunks, count_active_all
+from .excel_exporter import (
+    EXPORT_FORMATS,
+    format_available,
+    export_all_chunks,
+    count_active_all,
+    export_boq,
+    export_boq_pdf,
+    BOQ_FORMATS,
+)
 from .widgets.foundation import FoundationWidget
 from .widgets.super_structure import SuperStructureWidget
 from .widgets.substructure import SubStructureWidget
@@ -245,7 +255,11 @@ class StructureTabView(QWidget):
         self.download_btn.setCursor(Qt.PointingHandCursor)
         self.download_btn.setIconSize(QSize(16, 16))
         self.download_btn.setFixedHeight(30)
-        self.download_btn.setToolTip("Export structure data to Excel (.xlsx)")
+        self.download_btn.setToolTip("Export structure data")
+        export_menu = QMenu(self.download_btn)
+        export_menu.addAction("Data sheet (Excel / ODS), can be re-imported", lambda: self._download_excel(False))
+        export_menu.addAction("Bill of Quantities (PDF / Excel / ODS)", lambda: self._download_excel(True))
+        self.download_btn.setMenu(export_menu)
 
         pill_layout.addWidget(self.excel_btn)
         pill_layout.addWidget(self.pill_divider, 0, Qt.AlignVCenter)
@@ -299,6 +313,8 @@ class StructureTabView(QWidget):
         self.tab_view.addTab(self.substructure_tab, "Sub-Structure")
         self.tab_view.addTab(self.superstructure_tab, "Super-Structure")
         self.tab_view.addTab(self.misc_tab, "Miscellaneous")
+        for i, tab in enumerate((self.foundation_tab, self.substructure_tab, self.superstructure_tab, self.misc_tab)):
+            tab.set_section_name(self.tab_view.tabText(i))
 
         # 2. Trash View
         self.trash_view = TrashTabWidget(controller=controller)
@@ -313,7 +329,6 @@ class StructureTabView(QWidget):
             tab.total_changed.connect(self._save_str_summary)
 
         self.excel_btn.clicked.connect(self._open_excel_import)
-        self.download_btn.clicked.connect(self._download_excel)
         self.trash_btn.clicked.connect(self.toggle_trash_view)
         self.tab_view.currentChanged.connect(self._on_tab_changed)
 
@@ -343,6 +358,10 @@ class StructureTabView(QWidget):
                 color: {text_col};
                 min-height: 0px;
                 height: 30px;
+            }}
+            QPushButton::menu-indicator {{
+                image: none;
+                width: 0px;
             }}
             QPushButton:hover {{
                 background-color: {hover_col};
@@ -380,6 +399,10 @@ class StructureTabView(QWidget):
             "grand_total":     foundation["total"] + substructure["total"] + super_str["total"] + misc["total"],
             "total_items":     foundation["items"] + substructure["items"] + super_str["items"] + misc["items"],
         })
+
+        # Every tab's summary line shows the project total just saved above.
+        for tab in (self.foundation_tab, self.substructure_tab, self.superstructure_tab, self.misc_tab):
+            tab.refresh_summary()
 
     def on_refresh(self):
         """Refreshes all active tabs and updates the global trash count."""
@@ -526,7 +549,7 @@ class StructureTabView(QWidget):
         else:
             QMessageBox.critical(self, "Parse Error", msg)
 
-    def _download_excel(self):
+    def _download_excel(self, boq: bool = False):
         if not self.controller or not self.controller.engine:
             QMessageBox.warning(self, "No Project", "Open a project before exporting.")
             return
@@ -539,17 +562,23 @@ class StructureTabView(QWidget):
             )
             return
 
-        available_fmts = [f for f in EXPORT_FORMATS if format_available(f)[0]]
+        available_fmts = [
+            f for f in (BOQ_FORMATS if boq else EXPORT_FORMATS)
+            if format_available(f)[0] or f.get("binary")
+        ]
         file_filter = ";;".join(f["filter"] for f in available_fmts)
 
         import datetime as _dt, re
         gi = self.controller.engine.fetch_chunk("general_info") or {}
         _proj = gi.get("project_name", "").strip()
         _safe = re.sub(r'[\\/:*?"<>|]+', "_", _proj) if _proj else "construction_works"
-        _default_name = f"{_safe}_{_dt.date.today().isoformat()}"
+        _default_name = f"{_safe}{'_BOQ' if boq else ''}_{_dt.date.today().isoformat()}"
 
         path, selected_filter = QFileDialog.getSaveFileName(
-            self, "Save Construction Works Data", _default_name, file_filter
+            self,
+            "Save Bill of Quantities" if boq else "Save Construction Works Data",
+            _default_name,
+            file_filter,
         )
         if not path:
             return
@@ -561,13 +590,20 @@ class StructureTabView(QWidget):
         self.download_btn.setEnabled(False)
         self.download_btn.setText("Exporting…")
         try:
-            total, sheets = export_all_chunks(self.controller.engine, path, fmt)
+            if boq and fmt["ext"] == ".pdf":
+                QApplication.processEvents()
+                export_boq_pdf(self.controller, path)
+                msg = "Bill of Quantities exported."
+            elif boq:
+                total = export_boq(self.controller.engine, path)
+                msg = f"{total} item(s) exported to the Bill of Quantities."
+            else:
+                total, sheets = export_all_chunks(self.controller.engine, path, fmt)
+                msg = f"{total} row(s) exported across {len(sheets)} sheet(s)."
             self.download_btn.setEnabled(True)
             self.download_btn.setText("  Export")
             QMessageBox.information(
-                self,
-                "Export Complete",
-                f"{total} row(s) exported across {len(sheets)} sheet(s).\n\nFile saved to:\n{path}",
+                self, "Export Complete", f"{msg}\n\nFile saved to:\n{path}"
             )
         except Exception as exc:
             self.download_btn.setEnabled(True)
