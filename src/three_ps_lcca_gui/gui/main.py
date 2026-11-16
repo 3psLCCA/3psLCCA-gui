@@ -401,14 +401,13 @@ def _load_app(app, splash):
 
     # Local HTTP API - lets external tools read/update an open project's GUI.
     # LOCAL_API_ENABLED is a hard kill switch (off by default, not yet ready
-    # for release); the settings toggle only matters once it's True. Failure
-    # to bind must never block startup.
-    if LOCAL_API_ENABLED and sm.get_pref("api_enabled", "true") == "true":
-        from three_ps_lcca_gui.gui.api.server import start_api_server
+    # for release); the settings toggle only matters once it's True, and then
+    # starts/stops the server live (api/runtime.py). Failure to bind must
+    # never block startup.
+    if LOCAL_API_ENABLED:
+        from three_ps_lcca_gui.gui.api import runtime as api_runtime
 
-        api_handle = start_api_server(manager)
-        if api_handle:
-            app.aboutToQuit.connect(api_handle.shutdown)
+        api_runtime.init(manager, app, sm.get_pref("api_enabled", "true") == "true")
 
     splash.set_stage(0.7, "Loading projects…")
     manager.open_project()

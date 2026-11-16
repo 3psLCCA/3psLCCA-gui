@@ -213,24 +213,25 @@ class SettingsPanel(QWidget):
         self._api_checkbox.setChecked(sm.get_pref("api_enabled", "true") == "true")
         layout.addWidget(self._api_checkbox)
 
-        # The server only starts/stops at launch, so flag a pending change.
-        self._api_restart_note = QLabel("Restart the app to apply this change.")
-        self._api_restart_note.setFont(font(FS_SM))
-        self._api_restart_note.setStyleSheet(f"color: {get_token('warning')};")
-        self._api_restart_note.hide()
-        layout.addWidget(self._api_restart_note)
+        # The toggle is applied on Save (api/runtime.py starts/stops the
+        # server live) - say so while the choice differs from the current state.
+        self._api_pending_note = QLabel()
+        self._api_pending_note.setEnabled(False)
+        self._api_pending_note.setFont(font(FS_SM))
+        self._api_pending_note.hide()
+        layout.addWidget(self._api_pending_note)
 
         layout.addSpacing(8)
 
         # ── Local API: Address ────────────────────────────────────────────
-        # The port is picked automatically at startup (the default may be
-        # busy, e.g. a second app instance), so it's shown, not configured.
-        from three_ps_lcca_gui.gui.api.server import get_active_port
-        port = get_active_port()
+        # The port is picked automatically when the server starts (the default
+        # may be busy, e.g. a second app instance), so it's shown, not configured.
+        from three_ps_lcca_gui.gui.api import runtime as api_runtime
+        port = api_runtime.active_port()
         running_url = f"http://127.0.0.1:{port}" if port else ""
 
         layout.addWidget(QLabel("<b>Address</b>"))
-        addr_hint = QLabel("Assigned automatically each time the app starts.")
+        addr_hint = QLabel("Assigned automatically each time the server starts.")
         addr_hint.setEnabled(False)
         addr_hint.setFont(font(FS_SM))
         layout.addWidget(addr_hint)
@@ -262,9 +263,14 @@ class SettingsPanel(QWidget):
         addr_row.addWidget(btn_copy)
         layout.addLayout(addr_row)
 
-        self._api_checkbox.toggled.connect(
-            lambda on: self._api_restart_note.setVisible(on != bool(port))
-        )
+        def _on_api_toggled(on: bool):
+            self._api_pending_note.setText(
+                "The server will start when you save." if on
+                else "The server will stop when you save."
+            )
+            self._api_pending_note.setVisible(on != bool(port))
+
+        self._api_checkbox.toggled.connect(_on_api_toggled)
 
         if not self._stacked:
             return
@@ -321,7 +327,10 @@ class SettingsPanel(QWidget):
         set_appearance_mode(mode)
         set_active_theme("light", light_mod)
         set_active_theme("dark", dark_mod)
-        sm.set_pref("api_enabled", "true" if self._api_checkbox.isChecked() else "false")
+        api_on = self._api_checkbox.isChecked()
+        sm.set_pref("api_enabled", "true" if api_on else "false")
+        from three_ps_lcca_gui.gui.api import runtime as api_runtime
+        api_runtime.set_enabled(api_on)  # applies now - no restart needed
 
         if changed:
             reapply()
