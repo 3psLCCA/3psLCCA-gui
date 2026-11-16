@@ -745,6 +745,7 @@ class _ComparisonHistoryTab(QWidget):
     def _render(self):
         from three_ps_lcca_gui.core.safechunk_engine import SafeChunkEngine
         from three_ps_lcca_gui.gui.components.outputs.comparison_page import _read_cache_from_disk
+        from three_ps_lcca_gui.gui.components.splash_screen import pump_splash
 
         while self._rows_layout.count():
             item = self._rows_layout.takeAt(0)
@@ -757,6 +758,7 @@ class _ComparisonHistoryTab(QWidget):
         live_caches = {}
         on_disk_pids = {proj["project_id"] for proj in projects}
         for proj in projects:
+            pump_splash()
             if not proj.get("user_meta", {}).get("fit_for_comparison"):
                 continue
             c = _read_cache_from_disk(base, proj["project_id"])
@@ -781,6 +783,7 @@ class _ComparisonHistoryTab(QWidget):
             self._rows_layout.addWidget(empty)
         else:
             for entry in all_entries:
+                pump_splash()
                 row = _HistoryRow(
                     entry,
                     manager=self._manager,

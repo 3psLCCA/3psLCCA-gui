@@ -956,11 +956,16 @@ class HomePage(QWidget):
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
 
+        from three_ps_lcca_gui.gui.components.splash_screen import pump_splash
         root.addWidget(self._make_sidebar())
         root.addWidget(self._make_divider_v())
+        pump_splash()
 
         self._stack = QStackedWidget()
-        self._stack.addWidget(self._make_right_panel())      # index 0: project grid
+        right_panel = self._make_right_panel()
+        pump_splash()
+        self._stack.addWidget(right_panel)      # index 0: project grid
+        pump_splash()
         # Wire history tab to this home page for window dedup & GC prevention
         self._history_tab.set_picker_panel(self)
         # Seed tab label count on first render
