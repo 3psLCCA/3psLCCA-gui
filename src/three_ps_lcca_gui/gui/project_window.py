@@ -1,4 +1,6 @@
 import os
+import sys
+import time
 
 from PySide6.QtCore import Qt, QRect, QSize, QEvent, QPoint, QTimer, QStandardPaths
 from PySide6.QtWidgets import (
@@ -906,9 +908,10 @@ class ProjectWindow(QMainWindow):
                 if items:
                     self.sidebar.setCurrentItem(items[0])
 
-    def preload_all(self, on_complete):
+    def preload_all(self, on_complete, on_progress=None):
         """Setup project UI if needed, then build every page widget one per
-        event-loop tick (non-blocking), then call on_complete."""
+        event-loop tick (non-blocking), then call on_complete.
+        on_progress(name, index, total) is called just before each page is built."""
         if not self._project_ui_ready:
             self._setup_project_ui()
             self._project_ui_ready = True
@@ -918,17 +921,25 @@ class ProjectWindow(QMainWindow):
             "Bridge Data", "Traffic Data", "Financial Data",
             "Maintenance and Repair", "Recycling", "Demolition",
         ]
-        QTimer.singleShot(0, lambda: self._do_preload(_order, 0, on_complete))
+        QTimer.singleShot(
+            0, lambda: self._do_preload(_order, 0, on_complete, on_progress))
 
-    def _do_preload(self, order, index, on_complete):
+    def _do_preload(self, order, index, on_complete, on_progress=None):
         """Build one unbuilt widget, yield to event loop, then continue."""
         while index < len(order):
             name = order[index]
             index += 1
             if name not in self.widget_map:
+                if on_progress:
+                    on_progress(name, index, len(order))
+                t0 = time.perf_counter()
                 self._get_or_create_widget(name)
+                if DEV_MODE:
+                    sys.__stderr__.write(
+                        f"[TIMING] build page {name:<26} {time.perf_counter() - t0:6.2f} s\n")
+                    sys.__stderr__.flush()
                 QTimer.singleShot(
-                    0, lambda i=index: self._do_preload(order, i, on_complete))
+                    0, lambda i=index: self._do_preload(order, i, on_complete, on_progress))
                 return
         on_complete()
 
