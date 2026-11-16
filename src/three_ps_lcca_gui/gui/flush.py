@@ -110,6 +110,10 @@ def flush_project_window(window: "ProjectWindow"):
                 _try(lambda e=engine, a=attr: setattr(e, a, None), f"null {attr}")
 
     # 6. Remove page widgets from content stack (let Qt manage lifetime)
+    # Hide first: removing pages from a VISIBLE stack makes Qt show and lay
+    # out each next page in turn (~1 s on close, plus ~1 s more on delete).
+    # The window is closing anyway; signals are already disconnected above.
+    _try(window.hide, "hide window")
     cs = getattr(window, "content_stack", None)
     wm = getattr(window, "widget_map", {})
 
