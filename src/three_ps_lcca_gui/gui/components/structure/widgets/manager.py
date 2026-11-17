@@ -1,3 +1,4 @@
+from PySide6.QtGui import QColor
 from PySide6.QtCore import Signal
 from PySide6.QtWidgets import (
     QWidget,
@@ -5,29 +6,72 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QPushButton,
     QScrollArea,
-    QGroupBox,
     QInputDialog,
     QMessageBox,
     QLabel,
     QFrame,
+    QMenu,
 )
 from PySide6.QtCore import Qt, QTimer, QEvent, QVariantAnimation, QEasingCurve
-from three_ps_lcca_gui.gui.theme import SP3, SP5, SP8
+from three_ps_lcca_gui.gui.theme import (
+    BTN_SM, FS_MD, FS_SECTION, FS_SM, FW_BOLD, FW_SEMIBOLD, RADIUS_LG,
+    SP1, SP2, SP3, SP4, SP5, SP8,
+)
+from three_ps_lcca_gui.gui.themes import get_token, theme_manager
 import time
 import uuid
 import datetime
 import traceback
 
-from .base_table import StructureTableWidget, _make_msgbox
+from .base_table import StructureTableWidget, _make_msgbox, _muted
 from .material_dialog import MaterialDialog
 from ...utils.definitions import UNIT_DISPLAY
 from ...utils.validation_helpers import freeze_widgets
 from ...utils.display_format import fmt, fmt_comma
-from three_ps_lcca_gui.gui.styles import btn_danger
+from three_ps_lcca_gui.gui.styles import font
+from ...utils.icons import make_icon
 from ...utils.common_requested_data import get_chunk
 
 
 _FAB_FULL_TEXT = "+ Add Component"
+
+
+class _AddRow(QPushButton):
+    """Card footer: the whole row is the "+ Add material" button, its
+    text centred. Hovering anywhere on the row shades the link."""
+
+    HEIGHT = BTN_SM + 2 * SP2  # set in the stylesheet - QSS overrides setFixedHeight
+
+    def __init__(self):
+        super().__init__()
+        self.setObjectName("cardFooter")
+        self.setCursor(Qt.PointingHandCursor)
+        lay = QHBoxLayout(self)
+        lay.setContentsMargins(SP3, 0, SP3, 0)
+        self.link = QLabel()
+        self.link.setFont(font(FS_MD, FW_SEMIBOLD))
+        self.link.setAttribute(Qt.WA_TransparentForMouseEvents)
+        lay.addWidget(self.link, 0, Qt.AlignCenter)
+        self._colors = ("", "")
+
+    def set_colors(self, normal, hover):
+        self._colors = (normal, hover)
+        self._shade(self.underMouse())
+
+    def _shade(self, hot):
+        self.link.setStyleSheet(f"color: {self._colors[hot]}; background: transparent;")
+        if self.property("hot") != hot:  # row background shade, see _style_card
+            self.setProperty("hot", hot)
+            self.style().unpolish(self)
+            self.style().polish(self)
+
+    def enterEvent(self, event):
+        super().enterEvent(event)
+        self._shade(True)
+
+    def leaveEvent(self, event):
+        super().leaveEvent(event)
+        self._shade(False)
 _FAB_SIZE = 50  # px; keep in sync with border-radius (half) in main.qss
 
 # ---------------------------------------------------------------------------
@@ -51,30 +95,37 @@ class StructureManagerWidget(QWidget):
         self._del_comp_btns = []
         self._del_comp_btn_map: dict = {}
         self._section_search_cats: dict = {}
+        self._cards = []  # (card, footer row) - restyled on theme change
 
         self.main_layout = QVBoxLayout(self)
 
-        # ── Summary bar ──────────────────────────────────────────────────
+        # ── Page header: tab name, component count, tab total ────────────
         summary_bar = QWidget()
         summary_layout = QHBoxLayout(summary_bar)
-        summary_layout.setContentsMargins(4, 4, 4, 4)
-        self.total_lbl = QLabel("<b>Total:</b> -")
-        self.count_lbl = QLabel("Items: -")
-        sep = QFrame()
-        sep.setFrameShape(QFrame.VLine)
-        sep.setFrameShadow(QFrame.Sunken)
-        summary_layout.addWidget(self.total_lbl)
-        summary_layout.addWidget(sep)
-        summary_layout.addWidget(self.count_lbl)
+        summary_layout.setContentsMargins(SP1, SP2, SP1, SP1)
+        summary_layout.setSpacing(SP3)
+        self.title_lbl = QLabel()
+        self.title_lbl.setFont(font(FS_SECTION, FW_BOLD))
+        self.count_lbl = QLabel()
+        self.count_lbl.setFont(font(FS_MD))
+        self.total_lbl = QLabel()
+        self.total_lbl.setFont(font(FS_SECTION, FW_BOLD))
+        self.total_lbl.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        summary_layout.addWidget(self.title_lbl, 0, Qt.AlignBottom)
+        summary_layout.addWidget(self.count_lbl, 0, Qt.AlignBottom)
         summary_layout.addStretch()
+        summary_layout.addWidget(self.total_lbl, 0, Qt.AlignBottom)
         self._summary_bar = summary_bar  # lives inside the scroll area (see refresh_ui)
 
         self.scroll = QScrollArea()
         self.scroll.setWidgetResizable(True)
+        # keep the scrollbar's room so cards don't change width when it appears
+        self.scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
         self.scroll.setStyleSheet("QScrollArea { border: none; }")
 
         self.container = QWidget()
         self.container_layout = QVBoxLayout(self.container)
+        self.container_layout.setSpacing(SP4)
         self.scroll.setWidget(self.container)
         self.main_layout.addWidget(self.scroll)
 
@@ -94,6 +145,31 @@ class StructureManagerWidget(QWidget):
         self._fab_anim.finished.connect(self._on_fab_anim_done)
         self._set_fab_collapsed(True)
         self._place_fab(self._fab_h)
+        theme_manager().theme_changed.connect(self._apply_theme)
+
+    def _apply_theme(self):
+        for card, footer in self._cards:
+            self._style_card(card, footer)
+        self.refresh_summary()
+
+    @staticmethod
+    def _style_card(card, footer):
+        card.setStyleSheet(
+            f"QFrame#compCard {{ background-color: {get_token('base')};"
+            f" border: 1px solid {get_token('surface_mid')}; border-radius: {RADIUS_LG}px; }}"
+        )
+        primary = QColor(get_token("primary"))
+        r, g, b = primary.red(), primary.green(), primary.blue()
+        footer.setStyleSheet(
+            f"QPushButton#cardFooter {{ background: transparent; border: none; padding: 0px;"
+            f" border-bottom-left-radius: {RADIUS_LG - 1}px; border-bottom-right-radius: {RADIUS_LG - 1}px;"
+            f" min-height: {_AddRow.HEIGHT}px; max-height: {_AddRow.HEIGHT}px; }}"
+            f"QPushButton#cardFooter[hot=\"true\"] {{ background: rgba({r}, {g}, {b}, 28); }}"
+            f"QPushButton#cardFooter:pressed {{ background: rgba({r}, {g}, {b}, 40); }}"
+        )
+        dark = QColor(get_token("base")).lightness() < 128
+        hover = (primary.lighter(130) if dark else primary.darker(130)).name()
+        footer.set_colors(primary.name(), hover)
 
     def eventFilter(self, obj, event):
         # Collapsed "+" circle that expands to "+ Add Component" on hover
@@ -225,6 +301,7 @@ class StructureManagerWidget(QWidget):
         self._summary_bar.show()
 
         self.sections = {}
+        self._cards = []
         self._add_material_btns = []
         self._del_comp_btns = []
         self._del_comp_btn_map = {}
@@ -275,7 +352,6 @@ class StructureManagerWidget(QWidget):
         self._computed_total      = total
         self._computed_count      = count
         self._computed_components = components
-        self.count_lbl.hide()
         self.refresh_summary()
         self.total_changed.emit()
 
@@ -299,50 +375,72 @@ class StructureManagerWidget(QWidget):
         self.refresh_summary()
 
     def refresh_summary(self):
-        """Tab subtotal + the project total already kept in the str_summary chunk."""
-        name = getattr(self, "_section_name", "") or "Section"
-        text = f"<b>{name}:</b> {fmt_comma(getattr(self, '_computed_total', 0.0))}"
-        engine = getattr(self.controller, "engine", None)
-        grand = (engine.fetch_chunk("str_summary") or {}).get("grand_total") if engine else None
-        if grand is not None:
-            text += f"  |  <b>Project total:</b> {fmt_comma(grand)}"
-        self.total_lbl.setText(text)
+        """Page header: tab name, count of components with materials, tab subtotal."""
+        muted = _muted().name()
+        cur = getattr(self, "_currency", "")
+        cur_html = (f"<span style='font-size: {FS_SM}pt; font-weight: {FW_SEMIBOLD};"
+                    f" color: {muted};'> {cur}</span>" if cur else "")
+        self.title_lbl.setText(getattr(self, "_section_name", "") or "Section")
+        n = getattr(self, "_computed_components", 0)
+        self.count_lbl.setText(f"{n} component" + ("" if n == 1 else "s"))
+        self.count_lbl.setStyleSheet(f"color: {muted}; padding-bottom: 2px;")
+        self.total_lbl.setText(fmt_comma(getattr(self, "_computed_total", 0.0)) + cur_html)
 
     def create_section(self, name, has_items=False, search_cat=None):
         self._section_search_cats[name] = search_cat
 
-        group = QGroupBox()
+        # Card: the table (heading row with a "more" menu, column titles,
+        # rows) and an "Add material" footer, inside one rounded border.
+        group = QFrame()
+        group.setObjectName("compCard")
         g_layout = QVBoxLayout(group)
+        g_layout.setContentsMargins(1, 1, 1, 1)  # inside the 1 px border
+        g_layout.setSpacing(0)
 
-        table = StructureTableWidget(self, name)
+        table = StructureTableWidget(self, name, framed=False)
         self.sections[name] = table
 
-        btn_bar = QHBoxLayout()
+        menu = QMenu(group)
+        # even spacing: icon, gap, text and separator share the SP2/SP3 grid
+        menu.setStyleSheet(
+            f"QMenu {{ padding: {SP1}px; }}"
+            f"QMenu::item {{ padding: {SP2}px {SP4}px {SP2}px {SP2}px; }}"
+            f"QMenu::icon {{ padding-left: {SP3}px; }}"
+            f"QMenu::separator {{ margin: {SP1}px {SP2}px; }}"
+        )
+        rename_act = menu.addAction("Rename component")
+        rename_act.triggered.connect(lambda checked=False, n=name: self.rename_component(n))
+        menu.addSeparator()
+        del_act = menu.addAction("Clear all items" if has_items else "Delete component")
+        del_act.triggered.connect(lambda checked=False, n=name: self.delete_component(n))
+        # rows and theme change without a rebuild - set label and icons when it opens
+        def _on_menu_show(t=table, r=rename_act, d=del_act):
+            r.setIcon(make_icon("edit"))
+            d.setIcon(make_icon("trash", color=get_token("danger")))
+            d.setText("Clear all items" if t.rowCount() else "Delete component")
+        menu.aboutToShow.connect(_on_menu_show)
+        more_btn = table.set_menu(menu)
+        freeze_widgets(self._frozen, more_btn)
+        self._del_comp_btns.append(more_btn)
+        self._del_comp_btn_map[name] = del_act
 
-        add_row_btn = QPushButton(f"Add Material to {name}")
-        add_row_btn.clicked.connect(lambda checked=False, n=name: self.open_dialog(n))
-        freeze_widgets(self._frozen, add_row_btn)
-        self._add_material_btns.append(add_row_btn)
+        footer = _AddRow()
+        footer.clicked.connect(lambda checked=False, n=name: self.open_dialog(n))
+        freeze_widgets(self._frozen, footer)
+        self._add_material_btns.append(footer)
 
-        rename_btn = QPushButton("Rename")
-        rename_btn.clicked.connect(lambda checked=False, n=name: self.rename_component(n))
-        freeze_widgets(self._frozen, rename_btn)
+        def _sync_footer(*_, t=table, f=footer):
+            empty = t.rowCount() == 0
+            f.link.setText("+  Add first material" if empty else "+  Add material")
 
-        del_label = "Clear All" if has_items else "Delete Component"
-        del_btn = QPushButton(del_label)
-        del_btn.setObjectName("deleteButton")
-        del_btn.setStyleSheet(btn_danger())
-        del_btn.clicked.connect(lambda checked=False, n=name: self.delete_component(n))
-        freeze_widgets(self._frozen, del_btn)
-        self._del_comp_btns.append(del_btn)
-        self._del_comp_btn_map[name] = del_btn
-
-        btn_bar.addWidget(add_row_btn, 1)
-        btn_bar.addWidget(rename_btn)
-        btn_bar.addWidget(del_btn)
+        table.model().rowsInserted.connect(_sync_footer)
+        table.model().rowsRemoved.connect(_sync_footer)
+        _sync_footer()
+        self._style_card(group, footer)
+        self._cards.append((group, footer))
 
         g_layout.addWidget(table)
-        g_layout.addLayout(btn_bar)
+        g_layout.addWidget(footer)
         # Sections added after refresh_ui (Add Component) must go above the
         # trailing stretch + spacer, otherwise they leave a blank gap above them.
         tail = 2 if self._has_layout_tail else 0
@@ -407,9 +505,6 @@ class StructureManagerWidget(QWidget):
         if table:
             table.insert_row_at_position(new_entry, original_index)
             self._update_summary()
-            btn = self._del_comp_btn_map.get(comp_name)
-            if btn:
-                btn.setText("Clear All")
         else:
             self.on_refresh()
 
@@ -660,9 +755,6 @@ class StructureManagerWidget(QWidget):
                     table.add_row(item, data_index)
                     table.update_height()
                     self._update_summary()
-                    btn = self._del_comp_btn_map.get(comp_name)
-                    if btn:
-                        btn.setText("Clear All")
                 else:
                     # Section was hidden (all items were trashed) — rebuild
                     self.on_refresh()
@@ -708,6 +800,7 @@ class StructureManagerWidget(QWidget):
             self.controller.engine.stage_update(chunk_name=self.chunk_name, data=current_data)
             sc = registry[self.chunk_name][clean_name]["search_cat"]
             self.create_section(clean_name, has_items=False, search_cat=sc)
+            self.refresh_summary()  # component count
             self.save_current_state()
 
     def rename_component(self, old_name):

@@ -403,6 +403,8 @@ def freeze_widgets(frozen: bool, *widgets) -> None:
     for w in widgets:
         if w is None:
             continue
+        if w.property("_own_tip") is None:  # keep the widget's own tooltip for unlock
+            w.setProperty("_own_tip", w.toolTip())
         if frozen:
             w.setToolTip(LOCK_TOOLTIP)
             w.installEventFilter(_lock_filter)
@@ -414,7 +416,7 @@ def freeze_widgets(frozen: bool, *widgets) -> None:
             else:
                 w.setEnabled(False)
         else:
-            w.setToolTip("")
+            w.setToolTip(w.property("_own_tip") or "")
             w.removeEventFilter(_lock_filter)
             if isinstance(w, QAbstractButton):
                 w.unsetCursor()

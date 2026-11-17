@@ -8,10 +8,11 @@ from PySide6.QtWidgets import (
     QStyle,
     QStyledItemDelegate,
     QStyleOptionViewItem,
+    QToolButton,
     QWidget,
 )
 from PySide6.QtCore import Qt, QSize, QEvent, QRect, QTimer
-from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPainterPath
+from PySide6.QtGui import QColor, QFont, QFontMetrics, QFontMetricsF, QPainter, QPainterPath
 from ...utils.definitions import UNIT_DISPLAY
 from ...utils.display_format import fmt, fmt_comma
 from ...utils.icons import make_icon
@@ -21,7 +22,7 @@ from ...utils.table_widgets import (
     BaseActionDelegate,
     TooltipTableMixin,
 )
-from three_ps_lcca_gui.gui.theme import FS_MD, FS_SM, FW_BOLD, FW_SEMIBOLD, SP3
+from three_ps_lcca_gui.gui.theme import BTN_SM, FS_MD, FS_SM, FW_BOLD, FW_SEMIBOLD, SP2, SP3
 
 
 _HDR_FONT = QFont("Ubuntu", FS_SM, FW_SEMIBOLD)
@@ -66,8 +67,10 @@ def _band() -> QColor:
 def _divider(painter, option):
     """Thin line under a row, except where the card border already closes it."""
     rect = option.rect
-    vp = option.widget.viewport() if option.widget else None
-    if vp is not None and rect.bottom() >= vp.height() - 1:
+    w = option.widget
+    table = getattr(w, "_parent_table", w)
+    vp = w.viewport() if w else None
+    if getattr(table, "_framed", True) and vp is not None and rect.bottom() >= vp.height() - 1:
         return
     painter.save()
     painter.setPen(QColor(get_token("surface_mid")))
@@ -85,7 +88,7 @@ class _CellDelegate(QStyledItemDelegate):
             return QSize(0, 0)  # one line - the row's minimum height covers it
         fm = QFontMetrics(option.font)
         w = max(1, option.rect.width() - 2 * SP3)
-        text = index.data() or ""
+        text = " ".join((index.data() or "").split())  # same as paint
         h = fm.boundingRect(QRect(0, 0, w, 100000), Qt.TextWordWrap, text).height()
         return QSize(w, h + SP3)
 
@@ -113,6 +116,8 @@ class _CellDelegate(QStyledItemDelegate):
                 rect = rect.adjusted(0, 0, -fm.horizontalAdvance(" " + unit), 0)
         painter.setPen(muted if col in _MUTED_COLS else QColor(get_token("text")))
         if col == 0:
+            # names saved with line breaks (e.g. from Excel) read as one line
+            text = " ".join(text.split())
             painter.drawText(rect, opt.displayAlignment | Qt.TextWordWrap, text)
         else:
             painter.drawText(rect, opt.displayAlignment, fm.elidedText(text, Qt.ElideRight, rect.width()))
@@ -127,6 +132,44 @@ class _Caption(QWidget):
     def __init__(self, table):
         super().__init__(table)
         self._table = table
+        self.menu_btn = None
+
+    def set_menu(self, menu):
+        btn = QToolButton(self)
+        btn.setText("•••")
+        btn.setToolTip("More actions")
+        btn.setCursor(Qt.PointingHandCursor)
+        btn.setPopupMode(QToolButton.InstantPopup)
+        btn.setFixedSize(BTN_SM, BTN_SM)
+        btn.setMenu(menu)
+        self.menu_btn = btn
+        self.apply_style()
+        self._place_btn()
+        btn.show()
+        return btn
+
+    def apply_style(self):
+        if self.menu_btn:
+            self.menu_btn.setStyleSheet(
+                f"QToolButton {{ border: none; border-radius: {SP2 - 2}px; background: transparent;"
+                f" color: {_muted().name()}; font-size: {FS_SM}pt; font-weight: {FW_BOLD}; padding: 0px; }}"
+                f"QToolButton:hover, QToolButton:pressed {{ background: {get_token('surface_mid')};"
+                f" color: {get_token('text')}; }}"
+                f"QToolButton::menu-indicator {{ image: none; width: 0px; }}"
+            )
+
+    def _place_btn(self):
+        if self.menu_btn:
+            b = self.menu_btn
+            b.move(self.width() - SP2 - b.width(), (self.height() - b.height()) // 2)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._place_btn()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        self._place_btn()
 
     def paintEvent(self, event):
         t = self._table
@@ -156,6 +199,8 @@ class _Caption(QWidget):
         band.closeSubpath()
         p.fillPath(band, _band())
         rect = self.rect().adjusted(SP3, 0, -SP3, 0)
+        if self.menu_btn:  # keep the total clear of the menu button (placed by _place_btn)
+            rect.setRight(self.width() - SP2 - self.menu_btn.width() - SP2)
         bold = QFont(t.font())
         bold.setPointSize(FS_MD)
         bold.setWeight(QFont.Weight(FW_BOLD))
@@ -174,8 +219,9 @@ class _Caption(QWidget):
         p.drawText(rect, Qt.AlignRight | Qt.AlignVCenter, cur)
         p.restore()
 
-        count_text = f"  ·  {count} item" + ("" if count == 1 else "s")
-        title_w = min(p.fontMetrics().horizontalAdvance(t.title), max(0, room - QFontMetrics(small).horizontalAdvance(count_text)))
+        count_text = "  ·  " + (f"{count} item" + ("" if count == 1 else "s") if count else "No materials yet")
+        # QFontMetrics rounds down; elidedText measures fractionally - use the true width
+        title_w = min(int(QFontMetricsF(p.font()).horizontalAdvance(t.title)) + 1, max(0, room - QFontMetrics(small).horizontalAdvance(count_text)))
         p.drawText(rect.adjusted(0, 0, -(rect.width() - title_w), 0), Qt.AlignLeft | Qt.AlignVCenter,
                    p.fontMetrics().elidedText(t.title, Qt.ElideRight, title_w))
         p.setFont(small)
@@ -199,6 +245,7 @@ class _ActionDelegate(BaseActionDelegate):
         self._manager = manager
         self._component = component_name
         self._trash_view = is_trash_view
+        self._icon_size = 16  # base default (80% of the 28 px button) is too heavy here
 
         if not is_trash_view:
             self._btns = [
@@ -378,8 +425,10 @@ class StructureTableWidget(TooltipTableMixin, QTableWidget):
     _GROUPS = []
 
     def __init__(self, parent_manager, component_name, is_trash_view=False, read_only=False,
-                 show_component=False, title=None):
+                 show_component=False, title=None, framed=True):
         super().__init__()
+        self._framed = framed  # False: an outer card draws the border
+        self._read_only = read_only
         self.manager = parent_manager
         self.component_name = component_name
         self.title = title or component_name
@@ -462,8 +511,6 @@ class StructureTableWidget(TooltipTableMixin, QTableWidget):
         self.apply_style()
         theme_manager().theme_changed.connect(self.apply_style)
 
-        if read_only:  # no Action column
-            self._frozen_col.hide()
 
         self._show_component = show_component
         if show_component:  # col 7 holds the component name, shown first
@@ -484,9 +531,11 @@ class StructureTableWidget(TooltipTableMixin, QTableWidget):
         # Plain one-line titles: muted, no fill, a line underneath. Also
         # reaches the frozen Action overlay's header, a child widget.
         self.setStyleSheet(
-            f"StructureTableWidget {{ background-color: {get_token('base')};"
-            f" border: 1px solid {get_token('surface_mid')}; border-radius: {_RADIUS}px; }}"
-            f"QHeaderView {{ background-color: transparent; }}"
+            (f"StructureTableWidget {{ background-color: {get_token('base')};"
+             f" border: 1px solid {get_token('surface_mid')}; border-radius: {_RADIUS}px; }}"
+             if self._framed else
+             "StructureTableWidget { background-color: transparent; border: none; }")
+            + f"QHeaderView {{ background-color: transparent; }}"
             f"QHeaderView::section {{ background-color: transparent;"
             f" color: {_muted().name()}; font-weight: {FW_SEMIBOLD};"
             f" border: none; border-bottom: 1px solid {get_token('surface_mid')};"
@@ -494,6 +543,7 @@ class StructureTableWidget(TooltipTableMixin, QTableWidget):
             f"QHeaderView#structHdr::section {{ padding-top: {_CAP_H}px; }}"
         )
         self._frozen_col.apply_style()
+        self._caption.apply_style()
         self.viewport().update()
         self._caption.update()
 
@@ -504,6 +554,10 @@ class StructureTableWidget(TooltipTableMixin, QTableWidget):
         if cell is None:
             return
         self.manager.open_edit_dialog(self.component_name, cell.data(Qt.UserRole))
+
+    def set_menu(self, menu):
+        """Add a "more actions" button to the heading row; returns it."""
+        return self._caption.set_menu(menu)
 
     def set_currency(self, code: str):
         self.currency = code or ""
@@ -703,6 +757,9 @@ class StructureTableWidget(TooltipTableMixin, QTableWidget):
 
     def _layout_columns(self):
         self._layout_pending = False
+        empty = self.rowCount() == 0
+        self.horizontalHeader().setFixedHeight(_CAP_H if empty else _CAP_H + _HDR_H)
+        self._frozen_col.setVisible(not (empty or self._read_only))
         vp_w = self.viewport().width()
 
         ratios = {
