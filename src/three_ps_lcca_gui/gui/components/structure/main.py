@@ -12,8 +12,10 @@ from PySide6.QtWidgets import (
     QMenu,
     QApplication,
 )
-from PySide6.QtCore import QThread, Signal, QSize, Qt
-from PySide6.QtGui import QPalette, QColor
+import os
+
+from PySide6.QtCore import QThread, Signal, QSize, Qt, QStandardPaths, QUrl
+from PySide6.QtGui import QPalette, QColor, QDesktopServices
 from ..utils.icons import make_icon
 from three_ps_lcca_gui.gui.themes import get_token, theme_manager
 from three_ps_lcca_gui.gui.theme import FS_SM
@@ -573,6 +575,9 @@ class StructureTabView(QWidget):
         _proj = gi.get("project_name", "").strip()
         _safe = re.sub(r'[\\/:*?"<>|]+', "_", _proj) if _proj else "construction_works"
         _default_name = f"{_safe}{'_BOQ' if boq else ''}_{_dt.date.today().isoformat()}"
+        # Open in Documents like every other export (a bare name opens in the cwd).
+        _default_name = os.path.join(
+            QStandardPaths.writableLocation(QStandardPaths.DocumentsLocation), _default_name)
 
         path, selected_filter = QFileDialog.getSaveFileName(
             self,
@@ -605,6 +610,9 @@ class StructureTabView(QWidget):
             QMessageBox.information(
                 self, "Export Complete", f"{msg}\n\nFile saved to:\n{path}"
             )
+            # Bill of Quantities: open the file once the user clicks OK.
+            if boq and os.path.exists(path):
+                QDesktopServices.openUrl(QUrl.fromLocalFile(path))
         except Exception as exc:
             self.download_btn.setEnabled(True)
             self.download_btn.setText("  Export")
