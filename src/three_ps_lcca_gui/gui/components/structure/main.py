@@ -36,6 +36,7 @@ from .widgets.super_structure import SuperStructureWidget
 from .widgets.substructure import SubStructureWidget
 from .widgets.misc_widget import MiscWidget
 from .widgets.trash_tab import TrashTabWidget
+from .widgets.summary import StructureSummaryWidget
 
 
 _PAGES = [
@@ -211,6 +212,7 @@ class StructureTabView(QWidget):
         self.setObjectName("StructureTabView")  # For identification in Manager
         self.controller = controller
         self._loaded = False
+        self._before_trash = 0  # content_stack page to go back to from Trash
         if controller and hasattr(controller, "project_loaded"):
             controller.project_loaded.connect(self._on_project_reloaded)
 
@@ -219,7 +221,7 @@ class StructureTabView(QWidget):
         self.main_layout.setSpacing(16)
 
         # --- TOP AREA ---
-        top_area = QWidget()
+        self.top_area = top_area = QWidget()
         top_layout = QHBoxLayout(top_area)
         top_layout.setContentsMargins(0, 0, 0, 0)
         # Trash button widget is 44px tall (button centred, 4px above/below for the count badge);
@@ -229,7 +231,7 @@ class StructureTabView(QWidget):
         region_info = QVBoxLayout()
         region_info.setContentsMargins(0, 0, 0, 0)
         region_info.setSpacing(2)
-        title_lbl = make_section_label("Construction Works Data", pad_top=4, pad_bottom=14)
+        title_lbl = make_section_label("Construction Works Data", pad_top=4, pad_bottom=0)
         region_info.addWidget(title_lbl)
         top_layout.addLayout(region_info)
 
@@ -278,12 +280,6 @@ class StructureTabView(QWidget):
 
         self.main_layout.addWidget(top_area)
 
-        # --- HORIZONTAL DIVIDER (hr) ---
-        hr = QWidget()
-        hr.setFixedHeight(1)
-        hr.setStyleSheet("background-color: palette(mid);")
-        self.main_layout.addWidget(hr)
-
         # --- CONTENT AREA (Tabs + Trash View) ---
         self.content_stack = QStackedWidget()
 
@@ -324,6 +320,10 @@ class StructureTabView(QWidget):
         self.content_stack.addWidget(self.tab_view)  # Index 0
         self.content_stack.addWidget(self.trash_view)  # Index 1
 
+        # 3. Summary: its own page (opened from the sidebar), no tab bar
+        self.summary_tab = StructureSummaryWidget(controller=controller)
+        self.content_stack.addWidget(self.summary_tab)  # Index 2
+
         self.main_layout.addWidget(self.content_stack)
 
         # --- CONNECTIONS ---
@@ -333,6 +333,8 @@ class StructureTabView(QWidget):
         self.excel_btn.clicked.connect(self._open_excel_import)
         self.trash_btn.clicked.connect(self.toggle_trash_view)
         self.tab_view.currentChanged.connect(self._on_tab_changed)
+        self.summary_tab.export_requested.connect(lambda ext: self._download_excel(True, ext))
+        self.summary_tab.open_requested.connect(self._open_from_summary)
 
     def _apply_theme_colors(self):
         """Applies theme colors from active YAML palette tokens to the action buttons."""
@@ -463,13 +465,14 @@ class StructureTabView(QWidget):
 
     def toggle_trash_view(self):
         """Swaps between normal tabs and the Trash list."""
-        if self.content_stack.currentIndex() == 0:
+        if self.content_stack.currentIndex() != 1:
+            self._before_trash = self.content_stack.currentIndex()
             self.trash_view.on_refresh()
             self.content_stack.setCurrentIndex(1)
             self.action_pill.setVisible(False)
             self.trash_btn.set_back_mode(True)
         else:
-            self.content_stack.setCurrentIndex(0)
+            self.content_stack.setCurrentIndex(self._before_trash)
             self.action_pill.setVisible(True)
             self.trash_btn.set_back_mode(False)
 
@@ -551,7 +554,7 @@ class StructureTabView(QWidget):
         else:
             QMessageBox.critical(self, "Parse Error", msg)
 
-    def _download_excel(self, boq: bool = False):
+    def _download_excel(self, boq: bool = False, ext: str = ""):
         if not self.controller or not self.controller.engine:
             QMessageBox.warning(self, "No Project", "Open a project before exporting.")
             return
@@ -568,6 +571,8 @@ class StructureTabView(QWidget):
             f for f in (BOQ_FORMATS if boq else EXPORT_FORMATS)
             if format_available(f)[0] or f.get("binary")
         ]
+        if ext:  # format already chosen (Summary's Export BOQ)
+            available_fmts = [f for f in available_fmts if f["ext"] == ext] or available_fmts
         file_filter = ";;".join(f["filter"] for f in available_fmts)
 
         import datetime as _dt, re
@@ -740,6 +745,12 @@ class StructureTabView(QWidget):
             },
         }
 
+    def _open_from_summary(self, tab_name: str, comp_name: str, data_index: int):
+        """Summary double-click: go to the item's tab and select its row."""
+        self.select_tab(tab_name)
+        self.tab_changed.emit(tab_name)  # move the sidebar highlight off Summary
+        self.tab_view.currentWidget().focus_item(comp_name, data_index)
+
     def _on_tab_changed(self, index: int):
         name = self.tab_view.tabText(index)
         self.tab_changed.emit(name)
@@ -752,6 +763,10 @@ class StructureTabView(QWidget):
             self.trash_btn.set_back_mode(False)
             self.update_trash_count()
 
+    def _set_summary_header(self, on: bool):
+        """Summary page: no top bar (title, Import/Export, Trash)."""
+        self.top_area.setVisible(not on)
+
     def select_tab(self, name: str):
         """External helper to switch tabs (e.g., from a Sidebar)."""
         mapping = {
@@ -761,8 +776,12 @@ class StructureTabView(QWidget):
             "Miscellaneous": 3,
         }
         idx = mapping.get(name)
-        if idx is not None:
+        if name == "Summary":
+            self.content_stack.setCurrentIndex(2)
+            self._set_summary_header(True)
+        elif idx is not None:
             self.content_stack.setCurrentIndex(0)
+            self._set_summary_header(False)
             self.action_pill.setVisible(True)
             self.trash_btn.set_back_mode(False)
             self.tab_view.setCurrentIndex(idx)

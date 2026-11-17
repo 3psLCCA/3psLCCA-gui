@@ -279,6 +279,21 @@ class StructureManagerWidget(QWidget):
         self.refresh_summary()
         self.total_changed.emit()
 
+    def focus_item(self, comp_name: str, data_index: int):
+        """Scroll to the item's row and select it (used by the Summary tab).
+        Deferred one tick so a tab that was just switched to has its layout."""
+        def _do():
+            table = self.sections.get(comp_name)
+            if table is None:
+                return
+            for r in range(table.rowCount()):
+                cell = table.item(r, 6)
+                if cell and cell.data(Qt.UserRole) == data_index:
+                    table.selectRow(r)
+                    self.scroll.ensureWidgetVisible(table)
+                    return
+        QTimer.singleShot(0, _do)
+
     def set_section_name(self, name: str):
         self._section_name = name
         self.refresh_summary()

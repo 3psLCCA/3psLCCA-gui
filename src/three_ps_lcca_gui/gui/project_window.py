@@ -90,6 +90,7 @@ SIDEBAR_TREE = {
             "Sub-Structure",
             "Super-Structure",
             "Miscellaneous",
+            "Summary",
         ],
         "Traffic Data": [],
         "Financial Data": [],
