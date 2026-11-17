@@ -314,12 +314,6 @@ class StructureManagerWidget(QWidget):
         group = QGroupBox()
         g_layout = QVBoxLayout(group)
 
-        # Component name as a title row inside the frame (not the groupbox legend)
-        title_lbl = QLabel(name)
-        title_lbl.setObjectName("componentTitle")
-        title_lbl.setTextFormat(Qt.PlainText)
-        g_layout.addWidget(title_lbl)
-
         table = StructureTableWidget(self, name)
         self.sections[name] = table
 

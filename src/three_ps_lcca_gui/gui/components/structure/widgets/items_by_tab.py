@@ -127,16 +127,14 @@ class ItemsByTabView(QWidget):
                 continue
             tab_name = TAB_NAMES.get(chunk_id, chunk_id)
 
-            # Title, then the table (it has its own border)
+            # The table carries its own heading row (title, count, total)
             group = QWidget()
             g_layout = QVBoxLayout(group)
             g_layout.setContentsMargins(0, 0, 0, 12)
-            title = QLabel(self.TITLE.format(tab=tab_name))
-            title.setObjectName("componentTitle")
-            g_layout.addWidget(title)
 
             scope = _RowScope(self, chunk_id)
-            table = StructureTableWidget(scope, tab_name, show_component=True, **self.TABLE_OPTIONS)
+            table = StructureTableWidget(scope, tab_name, show_component=True,
+                                         title=self.TITLE.format(tab=tab_name), **self.TABLE_OPTIONS)
             self._setup_table(table)
             for comp_name, idx, item in rows:
                 table.add_row(item, len(scope.rows), comp_name)

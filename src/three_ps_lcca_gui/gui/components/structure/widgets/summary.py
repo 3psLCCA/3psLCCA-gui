@@ -5,14 +5,12 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QLabel,
     QPushButton,
-    QTableWidgetItem,
-    QStyledItemDelegate,
     QMenu,
     QWidgetAction,
     QToolTip,
 )
 from PySide6.QtCore import Qt, Signal, QPoint, QRectF, QSize
-from PySide6.QtGui import QColor, QFont, QPainter, QPen
+from PySide6.QtGui import QColor, QPainter, QPen
 from three_ps_lcca_gui.gui.themes import get_token
 from three_ps_lcca_gui.gui.styles import font
 from three_ps_lcca_gui.gui.theme import (
@@ -46,20 +44,6 @@ TAB_COLORS = {
 def _rgba(color, alpha):
     c = QColor(color)
     return f"rgba({c.red()}, {c.green()}, {c.blue()}, {alpha})"
-
-
-class _TotalRowDelegate(QStyledItemDelegate):
-    """Fills the cell background before the normal paint. The app stylesheet
-    styles QTableView::item, which makes Qt ignore an item's own background."""
-
-    def __init__(self, color, parent):
-        super().__init__(parent)
-        self._color = color
-
-    def paint(self, painter, option, index):
-        painter.fillRect(option.rect, self._color)
-        super().paint(painter, option, index)
-
 
 
 class _ShareBar(QWidget):
@@ -375,29 +359,6 @@ class StructureSummaryWidget(ItemsByTabView):
             except (ValueError, TypeError):
                 pass
         return total
-
-    def _table_filled(self, table, rows):
-        """Append a bold, non-selectable Total row. It has no col 6 data,
-        so double-click ignores it."""
-        row = table.rowCount()
-        table.insertRow(row)
-        table.setRowHeight(row, table.rowHeight(0))
-        bold = QFont(table.font())
-        bold.setBold(True)
-        bg = QColor(get_token("surface_mid"))
-        table.setItemDelegateForRow(row, _TotalRowDelegate(bg, table))
-        # label in Component (col 7, shown first), amount in Total (col 5)
-        cells = {7: "Total", 5: fmt_comma(self._sum(rows))}
-        for col in range(table.columnCount()):
-            if col == 6:  # hidden data column: left empty so double-click skips the row
-                continue
-            item = QTableWidgetItem(cells.get(col, ""))
-            item.setFlags(Qt.ItemIsEnabled)
-            item.setFont(bold)
-            if col == 5:
-                item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
-            table.setItem(row, col, item)
-        table.update_height()
 
     def _refreshed(self, rows_by_chunk):
         totals = {c: self._sum(rows) for c, rows in rows_by_chunk.items()}
