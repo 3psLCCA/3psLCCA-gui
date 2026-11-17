@@ -14,8 +14,8 @@ from PySide6.QtGui import QColor, QPainter, QPen
 from three_ps_lcca_gui.gui.themes import get_token
 from three_ps_lcca_gui.gui.styles import font
 from three_ps_lcca_gui.gui.theme import (
-    FS_DISP, FS_MD, FS_SM, FW_BOLD, FW_MEDIUM, FW_SEMIBOLD,
-    BTN_SM, RADIUS_LG, RADIUS_SM, SP1, SP2, SP3, SP4,
+    FS_DISP, FS_MD, FS_SM, FW_BOLD, FW_SEMIBOLD,
+    BTN_MD, RADIUS_LG, RADIUS_SM, SP1, SP2, SP4, SP5, SP6,
 )
 from ...utils.display_format import fmt_comma, fmt_pct
 from ...utils.icons import make_icon
@@ -98,7 +98,7 @@ class _ShareBar(QWidget):
 
 
 class _FormatRow(QFrame):
-    """One row of the export menu: badge, title and hint, tick when current."""
+    """One row of the export menu: badge and title (hint as tooltip), tick when current."""
 
     def __init__(self, badge, color, title, hint, on_click):
         super().__init__()
@@ -116,21 +116,15 @@ class _FormatRow(QFrame):
             f"color: {color}; background-color: {_rgba(color, 45)}; border-radius: {RADIUS_SM}px;"
         )
         b.setFont(font(FS_SM, FW_BOLD))
-        texts = QVBoxLayout()
-        texts.setSpacing(1)
         t = QLabel(title)
         t.setFont(font(FS_MD, FW_SEMIBOLD))
         t.setStyleSheet(f"color: {get_token('text')};")
-        h = QLabel(hint)
-        h.setFont(font(FS_SM))
-        h.setStyleSheet(f"color: {get_token('text_secondary')};")
-        texts.addWidget(t)
-        texts.addWidget(h)
+        self.setToolTip(hint)
         self.tick = QLabel("✓")
         self.tick.setFont(font(FS_MD, FW_BOLD))
         self.tick.setStyleSheet(f"color: {get_token('success')};")
         row.addWidget(b)
-        row.addLayout(texts, 1)
+        row.addWidget(t, 1)
         row.addWidget(self.tick)
 
     def set_current(self, on):
@@ -191,7 +185,7 @@ class StructureSummaryWidget(ItemsByTabView):
         total_col.addWidget(caption)
         total_col.addWidget(self.total_lbl)
         top.addLayout(total_col, 1)
-        top.addLayout(self._build_export_button(), 0)
+        top.addLayout(self._build_export_button(), 0)  # centred on caption + total
         card_col.addLayout(top)
         card_col.addSpacing(14)
 
@@ -215,7 +209,8 @@ class StructureSummaryWidget(ItemsByTabView):
             green = green.darker(135)
         btn_css = (
             f"QPushButton {{ background-color: {green.name()}; color: {base}; border: none;"
-            f" border-radius: 0px; }}"
+            f" border-radius: 0px; padding: 0px;"
+            f" min-height: {BTN_MD}px; max-height: {BTN_MD}px; }}"  # QSS overrides setFixedHeight
             f"QPushButton:hover {{ background-color: {green.lighter(112).name()}; }}"
             f"QPushButton:disabled {{ background-color: {get_token('success', 'disabled')}; }}"
         )
@@ -227,25 +222,26 @@ class StructureSummaryWidget(ItemsByTabView):
             btn_css + f"QPushButton {{ border-top-left-radius: {RADIUS_LG}px; border-bottom-left-radius: {RADIUS_LG}px; }}"
         )
         inner = QHBoxLayout(self.export_btn)
-        inner.setContentsMargins(SP4, 0, SP3, 0)
+        inner.setContentsMargins(SP5, 0, SP4, 0)
         inner.setSpacing(SP2)
         icon = QLabel()
-        icon.setPixmap(make_icon("download", color=base).pixmap(14, 14))
+        # at the screen's scale, so it stays sharp on 125% / 150% displays
+        icon.setPixmap(make_icon("download", color=base).pixmap(QSize(16, 16), self.devicePixelRatioF()))
         label = QLabel("Export BOQ")
-        label.setFont(font(FS_MD, FW_MEDIUM))
+        label.setFont(font(FS_MD, FW_SEMIBOLD))
         label.setStyleSheet(f"color: {base};")
         self.fmt_badge = QLabel()
         self.fmt_badge.setAlignment(Qt.AlignCenter)
-        self.fmt_badge.setFixedHeight(SP4)
+        self.fmt_badge.setFixedHeight(SP6)
         self.fmt_badge.setStyleSheet(
-            f"color: {base}; background-color: rgba(0, 0, 0, 60); border-radius: {RADIUS_SM}px;"
+            f"color: {green.name()}; background-color: {base}; border-radius: {RADIUS_SM}px;"
             f" padding: 0px {SP2}px;"
         )
-        self.fmt_badge.setFont(font(FS_SM, FW_MEDIUM))
+        self.fmt_badge.setFont(font(FS_SM, FW_BOLD))
         for w in (icon, label, self.fmt_badge):
             w.setAttribute(Qt.WA_TransparentForMouseEvents)
             inner.addWidget(w, 0, Qt.AlignVCenter)
-        self.export_btn.setFixedHeight(BTN_SM)
+        self.export_btn.setFixedHeight(BTN_MD)
         self.export_btn.clicked.connect(lambda: self.export_requested.emit(self._fmt))
 
         self._chevrons = {n: make_icon(n, color=base) for n in ("expand-more", "expand-less")}
@@ -254,7 +250,7 @@ class StructureSummaryWidget(ItemsByTabView):
         self.fmt_btn.setIconSize(QSize(18, 18))
         self.fmt_btn.setCursor(Qt.PointingHandCursor)
         self.fmt_btn.setToolTip("Choose the export format")
-        self.fmt_btn.setFixedSize(BTN_SM + SP1, BTN_SM)
+        self.fmt_btn.setFixedSize(BTN_MD + SP1, BTN_MD)
         self.fmt_btn.setStyleSheet(
             btn_css + f"QPushButton {{ border-top-right-radius: {RADIUS_LG}px; border-bottom-right-radius: {RADIUS_LG}px;"
             f" border-left: 1px solid {green.darker(125).name()}; }}"
