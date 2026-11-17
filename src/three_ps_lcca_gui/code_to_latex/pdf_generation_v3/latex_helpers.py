@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from pylatex import Command, NoEscape
+from pylatex import Command, NoEscape, Package
 from pylatex.utils import escape_latex
 
 from ..SETTINGS import LATEX_FONT_SIZE, REQUIRED_LATEX_PACKAGES, LATEX_TABLE_COLUMN_BG_ENABLED, LATEX_TABLE_COLUMN_BG_COLORS
@@ -26,14 +26,21 @@ def controller_chunk(controller, name: str) -> dict:
                 pass
     return {}
 
+def cmd(name: str, *arguments, options=None) -> str:
+    """One LaTeX command via pylatex. Arguments and options are trusted
+    LaTeX (not escaped); "" gives an empty {} argument."""
+    return Command(
+        name,
+        [NoEscape(str(a)) for a in arguments] or None,
+        options=NoEscape(options) if options else None,
+    ).dumps()
+
+
 def _generate_package_imports() -> list[str]:
-    lines = []
-    for pkg, options in REQUIRED_LATEX_PACKAGES.items():
-        if options:
-            lines.append(rf"\usepackage[{','.join(options)}]{{{pkg}}}")
-        else:
-            lines.append(rf"\usepackage{{{pkg}}}")
-    return lines
+    return [
+        Package(pkg, options=options or None).dumps()
+        for pkg, options in REQUIRED_LATEX_PACKAGES.items()
+    ]
 
 
 def _footer(with_total: bool) -> str:
@@ -41,74 +48,87 @@ def _footer(with_total: bool) -> str:
     text = r"\small Page~\thepage"
     if with_total:
         text += r"~of~\pageref*{LastPage}"
-    return Command("fancyfoot", NoEscape(text), options="C").dumps()
+    return cmd("fancyfoot", text, options="C")
+
+
+def _header_logo() -> str:
+    """Right header: the report logo, or "3PS LCCA" when the file is missing."""
+    logo = cmd("includegraphics", r"\ReportHeaderLogo", options="height=0.65cm")
+    return cmd("IfFileExists", r"\ReportHeaderLogo", logo, r"\small 3PS LCCA")
+
+
+_CAPTION_SETUP = "font=small, labelfont=bf, labelsep=period, skip=4pt"
+
+
+def _heading_format(level: str, size: str) -> str:
+    return cmd("titleformat", "\\" + level, size + r"\bfseries\color{blue!55!black}",
+               r"\the" + level, "0.75em", "")
 
 
 V3_PREAMBLE = [
-    r"\documentclass[12pt,a4paper]{article}",
+    cmd("documentclass", "article", options="12pt,a4paper"),
     "",
     *(_generate_package_imports()),
-    r"\usetikzlibrary{calc}",
+    cmd("usetikzlibrary", "calc"),
     "",
     # ── Captions setup ────────────────────────────────────────────────────────
-    r"\captionsetup{font=small, labelfont=bf, labelsep=period, skip=4pt}",
-    
+    cmd("captionsetup", _CAPTION_SETUP),
+
     # ── List setup ────────────────────────────────────────────────────────────
-    r"\setlist{noitemsep, topsep=4pt, partopsep=0pt}",
+    cmd("setlist", "noitemsep, topsep=4pt, partopsep=0pt"),
 
     # ── Core layout overrides ─────────────────────────────────────────────────
-    r"\setstretch{1.15}",              # comfortable reading spacing
-    r"\setlength{\parskip}{6pt}",      # space between paragraphs
-    r"\setlength{\parindent}{0pt}",    # no first-line indent (modern style)
+    cmd("setstretch", "1.15"),                 # comfortable reading spacing
+    cmd("setlength", r"\parskip", "6pt"),      # space between paragraphs
+    cmd("setlength", r"\parindent", "0pt"),    # no first-line indent (modern style)
 
     # ── Captions ──────────────────────────────────────────────────────────────
-    r"\usepackage{caption}",
-    r"\captionsetup{font=small, labelfont=bf, labelsep=period, skip=4pt}",
+    Package("caption").dumps(),
+    cmd("captionsetup", _CAPTION_SETUP),
 
 
     # ── Headers / footers ─────────────────────────────────────────────────────
-    r"\fancyhf{}",
-    r"\providecommand{\ReportHeaderLogo}{}",
+    cmd("fancyhf", ""),
+    cmd("providecommand", r"\ReportHeaderLogo", ""),
     # The 0.65cm header logo plus the text line need about 22.9pt; less makes
     # fancyhdr warn on every page.
-    Command("setlength", [NoEscape(r"\headheight"), "24pt"]).dumps(),
-    r"\renewcommand{\headrulewidth}{0.4pt}",
-    r"\renewcommand{\footrulewidth}{0.4pt}",
-    r"\fancyhead[L]{\small\nouppercase{\leftmark}}",
-    r"\fancyhead[R]{\IfFileExists{\ReportHeaderLogo}{\includegraphics[height=0.65cm]{\ReportHeaderLogo}}{\small 3PS LCCA}}",
+    cmd("setlength", r"\headheight", "24pt"),
+    cmd("renewcommand", r"\headrulewidth", "0.4pt"),
+    cmd("renewcommand", r"\footrulewidth", "0.4pt"),
+    cmd("fancyhead", r"\small\nouppercase{\leftmark}", options="L"),
+    cmd("fancyhead", _header_logo(), options="R"),
     _footer(with_total=True),
-    r"\AtBeginDocument{\pagestyle{fancy}}",
+    cmd("AtBeginDocument", cmd("pagestyle", "fancy")),
 
     # ── Section / ToC styling ─────────────────────────────────────────────────
-    r"\titleformat{\section}{\Large\bfseries\color{blue!55!black}}{\thesection}{0.75em}{}",
-    r"\titleformat{\subsection}{\large\bfseries\color{blue!55!black}}{\thesubsection}{0.75em}{}",
-    r"\titleformat{\subsubsection}{\normalsize\bfseries\color{blue!55!black}}{\thesubsubsection}{0.75em}{}",
-    r"\titlespacing*{\section}{0pt}{18pt}{8pt}",
-    r"\titlespacing*{\subsection}{0pt}{14pt}{6pt}",
-    r"\titlespacing*{\subsubsection}{0pt}{10pt}{4pt}",
-    r"\renewcommand{\contentsname}{Table of Contents}",
-    r"\renewcommand{\listtablename}{List of Tables}",
-    r"\renewcommand{\listfigurename}{List of Figures}",
+    _heading_format("section", r"\Large"),
+    _heading_format("subsection", r"\large"),
+    _heading_format("subsubsection", r"\normalsize"),
+    cmd("titlespacing*", r"\section", "0pt", "18pt", "8pt"),
+    cmd("titlespacing*", r"\subsection", "0pt", "14pt", "6pt"),
+    cmd("titlespacing*", r"\subsubsection", "0pt", "10pt", "4pt"),
+    cmd("renewcommand", r"\contentsname", "Table of Contents"),
+    cmd("renewcommand", r"\listtablename", "List of Tables"),
+    cmd("renewcommand", r"\listfigurename", "List of Figures"),
 
     # ── Unicode shorthands ────────────────────────────────────────────────────
-    r"\DeclareUnicodeCharacter{20B9}{Rs.}",
-    r"\DeclareUnicodeCharacter{2082}{\textsubscript{2}}",
-    r"\DeclareUnicodeCharacter{2013}{--}",
-    r"\DeclareUnicodeCharacter{2014}{--}",
+    cmd("DeclareUnicodeCharacter", "20B9", "Rs."),
+    cmd("DeclareUnicodeCharacter", "2082", r"\textsubscript{2}"),
+    cmd("DeclareUnicodeCharacter", "2013", "--"),
+    cmd("DeclareUnicodeCharacter", "2014", "--"),
 
     # ── Global table defaults ─────────────────────────────────────────────────
-    r"\setlength{\tabcolsep}{4pt}",
-    r"\renewcommand{\arraystretch}{1.18}",
-    r"\setlength{\LTleft}{0pt}",
-    r"\setlength{\LTright}{0pt}",
-    r"\setlength{\LTcapwidth}{\textwidth}",
-    r"\BeforeBeginEnvironment{tabular}{\begin{adjustbox}{max width=\linewidth}}",
-    r"\AfterEndEnvironment{tabular}{\end{adjustbox}}",
-    r"\AtBeginEnvironment{tabular}{\footnotesize}",
-    r"\sloppy",
+    cmd("setlength", r"\tabcolsep", "4pt"),
+    cmd("renewcommand", r"\arraystretch", "1.18"),
+    cmd("setlength", r"\LTleft", "0pt"),
+    cmd("setlength", r"\LTright", "0pt"),
+    cmd("setlength", r"\LTcapwidth", r"\textwidth"),
+    cmd("BeforeBeginEnvironment", "tabular",
+        cmd("begin", "adjustbox", r"max width=\linewidth")),
+    cmd("AfterEndEnvironment", "tabular", cmd("end", "adjustbox")),
+    cmd("AtBeginEnvironment", "tabular", cmd("footnotesize")),
+    cmd("sloppy"),
 ]
-
-
 
 
 def apply_table_column_backgrounds(latex: str) -> str:
@@ -175,34 +195,34 @@ def build_report_v3_document(body: str, logo_path: str = "") -> str:
     logo_path = logo_path or DEFAULT_LOGO.as_posix()
     return "\n".join([
         *V3_PREAMBLE,
-        r"\renewcommand{\ReportHeaderLogo}{" + logo_path + r"}",
-        r"\begin{document}",
+        cmd("renewcommand", r"\ReportHeaderLogo", logo_path),
+        cmd("begin", "document"),
         LATEX_FONT_SIZE,
         body,
-        r"\end{document}",
+        cmd("end", "document"),
     ])
 
 
 def front_matter(figures: bool = True) -> str:
     """TOC, list of tables, and list of figures (left out when *figures* is False)."""
     lof = [
-        r"\addcontentsline{toc}{section}{List of Figures}",
-        r"\listoffigures",
-        r"\clearpage",
+        cmd("addcontentsline", "toc", "section", "List of Figures"),
+        cmd("listoffigures"),
+        clearpage(),
     ] if figures else []
     return "\n".join([
-        r"\clearpage",
-        r"\pagenumbering{roman}",
+        clearpage(),
+        cmd("pagenumbering", "roman"),
         # The page total counts only the arabic-numbered body, so the roman
         # front-matter pages show just their own number.
         _footer(with_total=False),
-        r"\tableofcontents",
-        r"\clearpage",
-        r"\addcontentsline{toc}{section}{List of Tables}",
-        r"\listoftables",
-        r"\clearpage",
+        cmd("tableofcontents"),
+        clearpage(),
+        cmd("addcontentsline", "toc", "section", "List of Tables"),
+        cmd("listoftables"),
+        clearpage(),
         *lof,
-        r"\pagenumbering{arabic}",
+        cmd("pagenumbering", "arabic"),
         _footer(with_total=True),
     ])
 
@@ -229,16 +249,17 @@ def clearpage() -> str:
 
 
 def appendix_counter(letter: str) -> str:
-    section_number = ord(letter.upper()) - ord("A") + 1
+    letter = letter.upper()
+    section_number = ord(letter) - ord("A") + 1
     lines = []
-    if letter.upper() == "A":
-        lines.append(r"\appendix")
+    if letter == "A":
+        lines.append(cmd("appendix"))
     lines.extend([
-        r"\setcounter{section}{" + str(section_number) + r"}",
-        r"\setcounter{table}{0}",
-        r"\setcounter{figure}{0}",
-        r"\renewcommand{\thetable}{" + letter.upper() + r"-\arabic{table}}",
-        r"\renewcommand{\thefigure}{" + letter.upper() + r"-\arabic{figure}}",
+        cmd("setcounter", "section", section_number),
+        cmd("setcounter", "table", 0),
+        cmd("setcounter", "figure", 0),
+        cmd("renewcommand", r"\thetable", letter + "-" + cmd("arabic", "table")),
+        cmd("renewcommand", r"\thefigure", letter + "-" + cmd("arabic", "figure")),
     ])
     return "\n".join(lines)
 
@@ -310,15 +331,15 @@ def wide_block(latex: str, size: str = r"\scriptsize") -> str:
         return ""
     latex = latex.replace(r"\begin{landscape}", "").replace(r"\end{landscape}", "")
     return "\n".join([
-        r"\begingroup",
+        cmd("begingroup"),
         size,
-        r"\centering",
-        r"\setlength{\tabcolsep}{4pt}",
-        r"\setlength{\LTleft}{\fill}",
-        r"\setlength{\LTright}{\fill}",
+        cmd("centering"),
+        cmd("setlength", r"\tabcolsep", "4pt"),
+        cmd("setlength", r"\LTleft", r"\fill"),
+        cmd("setlength", r"\LTright", r"\fill"),
         latex,
-        r"\normalsize",
-        r"\endgroup",
+        cmd("normalsize"),
+        cmd("endgroup"),
     ])
 
 
