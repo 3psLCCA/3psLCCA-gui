@@ -9,6 +9,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from three_ps_lcca_gui.code_to_latex import boq_latex
 from three_ps_lcca_gui.code_to_latex.pdf_generation_v3 import lcca_report_builder as rb
+from three_ps_lcca_gui.code_to_latex.pdf_generation_v3.sections.title_page import official_date
+from three_ps_lcca_gui.gui.components.utils.common_requested_data import set_controller
 from three_ps_lcca_gui.gui.components.utils.definitions import STRUCTURE_CHUNKS
 
 
@@ -45,7 +47,7 @@ def _ctrl(**over):
 @pytest.fixture
 def tex(monkeypatch):
     c = _ctrl()
-    boq_latex.set_controller(c)
+    set_controller(c)
     return boq_latex.boq_to_latex(c)
 
 
@@ -73,21 +75,21 @@ def test_string_numbers_coerced(tex):
 def test_bad_values_become_zero():
     first = STRUCTURE_CHUNKS[0][0]
     c = Ctrl({first: {"X": [_item("A", None, "abc")]}})
-    boq_latex.set_controller(c)
+    set_controller(c)
     out = boq_latex.boq_to_latex(c)
     assert "0.00" in out and "GRAND TOTAL" in out
 
 
 def test_empty_returns_blank():
     c = Ctrl({})
-    boq_latex.set_controller(c)
+    set_controller(c)
     assert boq_latex.boq_to_latex(c) == ""
 
 
 def test_all_trashed_returns_blank():
     first = STRUCTURE_CHUNKS[0][0]
     c = Ctrl({first: {"X": [_item("A", 1, 1, trash=True)]}})
-    boq_latex.set_controller(c)
+    set_controller(c)
     assert boq_latex.boq_to_latex(c) == ""
 
 
@@ -95,7 +97,7 @@ def test_multiple_categories_numbered():
     ch = {STRUCTURE_CHUNKS[0][0]: {"A": [_item("m", 1, 1)]},
           STRUCTURE_CHUNKS[1][0]: {"B": [_item("n", 1, 1)]}}
     c = Ctrl(ch)
-    boq_latex.set_controller(c)
+    set_controller(c)
     out = boq_latex.boq_to_latex(c)
     assert "1.1.1" in out and "2.1.1" in out
     assert out.count("GRAND TOTAL") == 1
@@ -103,7 +105,7 @@ def test_multiple_categories_numbered():
 
 def test_document_wraps_table():
     c = _ctrl()
-    boq_latex.set_controller(c)
+    set_controller(c)
     doc = boq_latex.boq_document(c)
     assert r"\begin{document}" in doc and r"\end{document}" in doc
     assert r"\section{Detailed bill of quantities}" in doc
@@ -119,7 +121,7 @@ def _fake_run(tmp_calls, rc=0, make_pdf=True):
     def run(cmd, cwd=None, capture_output=None, text=None):
         tmp_calls.append(cmd[1:])
         if make_pdf:
-            (Path(cwd) / "boq.pdf").write_bytes(b"%PDF")
+            (Path(cwd) / cmd[-1]).with_suffix(".pdf").write_bytes(b"%PDF")
         return subprocess.CompletedProcess(cmd, rc, "", "")
     return run
 
@@ -130,8 +132,8 @@ def test_build_pdf_two_passes(tmp_path, monkeypatch):
     out = tmp_path / "o.pdf"
     boq_latex.build_boq_pdf(_ctrl(), str(out))
     assert out.read_bytes() == b"%PDF"
-    assert calls == [["-interaction=nonstopmode", "-draftmode", "boq.tex"],
-                     ["-interaction=nonstopmode", "boq.tex"]]
+    assert calls == [["-interaction=nonstopmode", "-draftmode", "o.tex"],
+                     ["-interaction=nonstopmode", "o.tex"]]
 
 
 def test_build_pdf_failure_raises(tmp_path, monkeypatch):
@@ -182,7 +184,7 @@ def test_format_available_pdf(monkeypatch):
 def test_document_includes_bridge_data_before_boq():
     c = _ctrl()
     c.chunks["bridge_data"] = {"bridge_name": "Test Bridge", "span": 30}
-    boq_latex.set_controller(c)
+    set_controller(c)
     doc = boq_latex.boq_document(c)
     assert "tab:bridge_data" in doc
     assert doc.index("tab:bridge_data") < doc.index("tab:boq_str_foundation")
@@ -192,7 +194,7 @@ def test_one_table_per_category_plus_summary():
     ch = {STRUCTURE_CHUNKS[0][0]: {"A": [_item("m", 1, 1)]},
           STRUCTURE_CHUNKS[1][0]: {"B": [_item("n", 2, 3)]}}
     c = Ctrl(ch)
-    boq_latex.set_controller(c)
+    set_controller(c)
     out = boq_latex.boq_to_latex(c)
     assert out.count(r"\begin{longtable}") == 3
     assert f"tab:boq_{STRUCTURE_CHUNKS[0][0]}" in out and "tab:boq_summary" in out
@@ -204,10 +206,11 @@ def test_one_table_per_category_plus_summary():
 def test_document_placement():
     c = _ctrl()
     c.chunks["bridge_data"] = {"bridge_name": "T", "span": 30}
-    boq_latex.set_controller(c)
+    set_controller(c)
     doc = boq_latex.boq_document(c)
     order = [doc.index(k) for k in (
-        r"Bill\hspace{0.25em}of", r"\section{Bridge geometry and description}", "tab:bridge_data",
+        r"Bill\hspace{0.25em}of", r"\section{Input data}",
+        r"\subsection{Bridge geometry and description}", "tab:bridge_data",
         r"\section{Detailed bill of quantities}", "tab:boq_str_foundation",
         "Summary of costs", "GRAND TOTAL")]
     assert order == sorted(order)
@@ -219,9 +222,9 @@ def test_document_placement():
     assert doc.index("Signature") < doc.index(r"\tableofcontents") < doc.index("tab:bridge_data")
 
 
-def test_document_without_bridge_data_skips_input_section():
+def test_document_without_bridge_data_still_has_boq():
     c = _ctrl()
-    boq_latex.set_controller(c)
+    set_controller(c)
     doc = boq_latex.boq_document(c)
     assert r"\section{Detailed bill of quantities}" in doc
 
@@ -229,7 +232,7 @@ def test_document_without_bridge_data_skips_input_section():
 def test_general_info_and_signature_blocks_follow_title():
     c = _ctrl()
     c.info.update({"project_code": "P-7", "contact_person": "A. Rao", "reviewed_by": "B. Sen"})
-    boq_latex.set_controller(c)
+    set_controller(c)
     doc = boq_latex.boq_document(c)
     assert doc.index(r"Bill\hspace{0.25em}of") < doc.index("Project information")
     assert "logo-3psLCCA.png" in doc
@@ -239,5 +242,5 @@ def test_general_info_and_signature_blocks_follow_title():
 
 def test_official_date_format():
     from datetime import date
-    assert boq_latex._official_date(date(2026, 11, 11)) == "11 November 2026"
-    assert boq_latex._official_date(date(2026, 3, 5)) == "5 March 2026"
+    assert official_date(date(2026, 11, 11)) == "11 November 2026"
+    assert official_date(date(2026, 3, 5)) == "5 March 2026"

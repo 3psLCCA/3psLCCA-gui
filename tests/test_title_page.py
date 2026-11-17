@@ -38,7 +38,12 @@ def test_heading_is_escaped():
 def test_no_kicker_by_default_but_can_be_set():
     g = {"project_name": "P"}
     assert "Life Cycle Cost Analysis}" not in title_page(None, "Bill of Quantities", general=g)
-    assert "textsc{Custom" in title_page(None, "X", kicker="Custom", general=g)
+    assert r"\bfseries Custom" in title_page(None, "X", kicker="Custom", general=g)
+
+
+def test_cover_uses_no_small_caps():
+    tex = title_page(None, "X", kicker="K", general={"project_name": "P"})
+    assert r"\textsc" not in tex and r"\textls" not in tex
 
 
 def test_cover_has_footer_and_disclaimer():
