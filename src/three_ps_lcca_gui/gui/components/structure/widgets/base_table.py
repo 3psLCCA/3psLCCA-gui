@@ -35,6 +35,7 @@ def _make_msgbox(parent, icon, title, text):
     )
     return box
 _ROW_H = 50  # row height - 11 px clearance top + bottom around 28 px button
+_READ_ONLY_ROW_H = 34  # no action buttons to fit
 
 
 # ---------------------------------------------------------------------------
@@ -233,12 +234,14 @@ class _FrozenActionTable(QTableWidget):
 class StructureTableWidget(TooltipTableMixin, QTableWidget):
     _GROUPS = []
 
-    def __init__(self, parent_manager, component_name, is_trash_view=False):
+    def __init__(self, parent_manager, component_name, is_trash_view=False, read_only=False,
+                 show_component=False):
         super().__init__()
         self.manager = parent_manager
         self.component_name = component_name
         self.is_trash_view = is_trash_view
         self._frozen = False
+        self._row_h = _READ_ONLY_ROW_H if read_only else _ROW_H
 
         self.setHorizontalHeader(GroupedHeaderView(groups=self._GROUPS, font=_HDR_FONT))
 
@@ -258,7 +261,8 @@ class StructureTableWidget(TooltipTableMixin, QTableWidget):
         ]
         for col, label in enumerate(_headers):
             item = QTableWidgetItem(label)
-            item.setTextAlignment(_L)
+            # numeric columns: align the header with its right-aligned values
+            item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter if col in (1, 3, 5) else _L)
             self.setHorizontalHeaderItem(col, item)
 
         hdr = self.horizontalHeader()
@@ -283,8 +287,8 @@ class StructureTableWidget(TooltipTableMixin, QTableWidget):
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.verticalHeader().setDefaultSectionSize(_ROW_H)
-        self.verticalHeader().setMinimumSectionSize(_ROW_H)
+        self.verticalHeader().setMinimumSectionSize(self._row_h)
+        self.verticalHeader().setDefaultSectionSize(self._row_h)
         self.verticalHeader().setVisible(False)
 
         # Delegate on hidden col 6 (stores original_index, handles clicks)
@@ -300,6 +304,17 @@ class StructureTableWidget(TooltipTableMixin, QTableWidget):
         )
         self._frozen_col.setItemDelegateForColumn(0, self._frozen_action_delegate)
         self._frozen_col.show()
+
+        if read_only:  # no Action column: drop the overlay and the space kept for it
+            self._frozen_col.hide()
+            self.setViewportMargins(0, 0, 0, 0)
+
+        self._show_component = show_component
+        if show_component:  # col 7 holds the component name, shown first
+            self.horizontalHeaderItem(7).setText("Component")
+            hdr.setSectionResizeMode(7, QHeaderView.Interactive)
+            hdr.setSectionResizeMode(5, QHeaderView.Interactive)  # sized in resizeEvent
+            hdr.moveSection(7, 0)
 
         if not self.is_trash_view:
             self.cellDoubleClicked.connect(self._on_cell_double_clicked)
@@ -343,11 +358,11 @@ class StructureTableWidget(TooltipTableMixin, QTableWidget):
     # Row management
     # ------------------------------------------------------------------
 
-    def add_row(self, item_data, original_index):
+    def add_row(self, item_data, original_index, component=""):
         self.blockSignals(True)
         row = self.rowCount()
         self.insertRow(row)
-        self.setRowHeight(row, _ROW_H)
+        self.setRowHeight(row, self._row_h)
 
         v = item_data.get("values", {})
 
@@ -385,8 +400,9 @@ class StructureTableWidget(TooltipTableMixin, QTableWidget):
         action_item.setFlags(Qt.ItemIsEnabled)
         self.setItem(row, 6, action_item)
 
-        # Col 7: empty placeholder - reserves space so Total is never hidden
-        self.setItem(row, 7, QTableWidgetItem())
+        # Col 7: placeholder that reserves space so Total is never hidden,
+        # or the component name when show_component is on
+        self.setItem(row, 7, QTableWidgetItem(component))
 
         # Mirror in frozen overlay
         self._frozen_col.add_row(original_index)
@@ -407,7 +423,7 @@ class StructureTableWidget(TooltipTableMixin, QTableWidget):
 
         self.blockSignals(True)
         self.insertRow(pos)
-        self.setRowHeight(pos, _ROW_H)
+        self.setRowHeight(pos, self._row_h)
 
         v = item_data.get("values", {})
 
@@ -511,6 +527,12 @@ class StructureTableWidget(TooltipTableMixin, QTableWidget):
             5: 0.20,  # Total
         }
         mins = {0: 120, 1: 90, 2: 60, 3: 60, 4: 80, 5: 90}
+        if self._show_component:  # share Work Name's space with the Component column
+            ratios[0], ratios[7], mins[7] = 0.20, 0.16, 100
+            ratios[3], ratios[4] = 0.14, 0.12  # room for the "(INR)" suffix
+            if not self._frozen_col.isHidden():
+                # col 7 no longer pads the right edge, so keep Total clear of the overlay
+                vp_w -= _ACTION_W
 
         col_widths = {c: max(mins[c], int(vp_w * r)) for c, r in ratios.items()}
 
@@ -521,6 +543,9 @@ class StructureTableWidget(TooltipTableMixin, QTableWidget):
             col_widths = {
                 c: max(mins[c], int(w * scale)) for c, w in col_widths.items()
             }
+
+        if self._show_component:  # Total is not Stretch here: give it the rounding leftover
+            col_widths[5] += max(0, vp_w - sum(col_widths.values()))
 
         self.setHorizontalScrollBarPolicy(
             Qt.ScrollBarAsNeeded

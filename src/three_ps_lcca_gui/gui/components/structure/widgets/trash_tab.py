@@ -1,60 +1,29 @@
-import json
-
 from PySide6.QtWidgets import (
     QWidget,
-    QVBoxLayout,
-    QHBoxLayout,
     QLabel,
-    QScrollArea,
-    QGroupBox,
     QMessageBox,
     QPushButton,
 )
 from PySide6.QtCore import QTimer
 from three_ps_lcca_gui.gui.themes import get_token
-from .base_table import StructureTableWidget, _make_msgbox
-
-# Tab name shown in each group title, so components with the same name in
-# different tabs can be told apart.
-_TAB_NAMES = {
-    "str_foundation": "Foundation",
-    "str_sub_structure": "Sub-Structure",
-    "str_super_structure": "Super-Structure",
-    "str_misc": "Miscellaneous",
-}
+from .base_table import _make_msgbox
+from .items_by_tab import ItemsByTabView, TAB_NAMES
 
 
-class _ChunkScope:
-    """Manager for one trash table: sends its Restore/Delete clicks to the
-    tab the rows came from, since a component name can exist in several tabs."""
-
-    def __init__(self, trash, chunk_id):
-        self._trash = trash
-        self._chunk_id = chunk_id
-
-    def toggle_trash_status(self, comp_name, data_index, should_trash):
-        self._trash.toggle_trash_status(self._chunk_id, comp_name, data_index, should_trash)
-
-    def permanent_delete(self, comp_name, data_index):
-        self._trash.permanent_delete(self._chunk_id, comp_name, data_index)
-
-
-class TrashTabWidget(QWidget):
+class TrashTabWidget(ItemsByTabView):
     """
-    Scans all structural chunks for items where state['in_trash'] is True
-    and displays them in categorized tables for restoration.
+    Lists every item whose state['in_trash'] is True, one table per tab,
+    with Restore / Delete actions.
     """
+
+    SHOW_TRASHED = True
+    TITLE = "Deleted from: {tab}"
+    EMPTY_TEXT = "No items in Trash Bin."
+    TABLE_OPTIONS = {"is_trash_view": True}
 
     def __init__(self, controller=None):
-        super().__init__()
-        self.controller = controller
-        # (chunk_id, comp_name) → StructureTableWidget; populated by on_refresh
-        self._trash_tables: dict[tuple, StructureTableWidget] = {}
-        self._built_sig = None  # _trash_signature() of what is currently shown
-        self.layout = QVBoxLayout(self)
+        super().__init__(controller)
 
-        # Header row
-        header_row = QHBoxLayout()
         header = QLabel(
             "<b>Trash Bin</b><br>Items here are excluded from all calculations."
         )
@@ -65,25 +34,8 @@ class TrashTabWidget(QWidget):
             f"QPushButton:disabled {{ background-color: {get_token('danger', 'disabled')}; color: white; }}"
         )
         self.delete_all_btn.clicked.connect(self._delete_all)
-        header_row.addWidget(header, 1)
-        header_row.addWidget(self.delete_all_btn)
-        self.layout.addLayout(header_row)
-
-        # Scroll Area for multiple group boxes
-        self.scroll = QScrollArea()
-        self.scroll.setWidgetResizable(True)
-        self.container = QWidget()
-        self.container_layout = QVBoxLayout(self.container)
-        self.scroll.setWidget(self.container)
-        self.layout.addWidget(self.scroll)
-
-        # Define the chunks to scan
-        self.chunks = [
-            "str_foundation",
-            "str_sub_structure",
-            "str_super_structure",
-            "str_misc",
-        ]
+        self.header_row.addWidget(header, 1)
+        self.header_row.addWidget(self.delete_all_btn)
 
     def _delete_all(self):
         box = _make_msgbox(
@@ -116,80 +68,8 @@ class TrashTabWidget(QWidget):
         if main_view:
             main_view.update_trash_count()
 
-    def _trash_signature(self):
-        """Snapshot of every trashed item, used to skip rebuilding an unchanged view."""
-        if not self.controller or not self.controller.engine:
-            return None
-        sig = []
-        for chunk_id in self.chunks:
-            data = self.controller.engine.fetch_chunk(chunk_id) or {}
-            for comp_name, items in data.items():
-                for idx, item in enumerate(items):
-                    if item.get("state", {}).get("in_trash", False):
-                        sig.append((chunk_id, comp_name, idx,
-                                    json.dumps(item.get("values", {}), sort_keys=True, default=str)))
-        return sig
-
-    def on_refresh(self, force=False):
-        """Clears the view and re-populates based on nested state['in_trash'].
-
-        Building the tables is slow, so the rebuild is skipped when the trashed
-        items are the same as last time, unless force=True.
-        """
-        sig = self._trash_signature()
-        if not force and sig is not None and sig == self._built_sig:
-            return
-        self._built_sig = sig
-        self._trash_tables.clear()
-
-        # Clear existing widgets
-        for i in reversed(range(self.container_layout.count())):
-            widget = self.container_layout.takeAt(i).widget()
-            if widget:
-                widget.deleteLater()
-
-        if not self.controller or not self.controller.engine:
-            return
-
-        has_content = False
-        self.delete_all_btn.setEnabled(False)
-
-        for chunk_id in self.chunks:
-            data = self.controller.engine.fetch_chunk(chunk_id) or {}
-
-            for comp_name, items in data.items():
-                trashed_items = [
-                    (idx, item)
-                    for idx, item in enumerate(items)
-                    if item.get("state", {}).get("in_trash", False)
-                ]
-
-                if trashed_items:
-                    has_content = True
-                    self.delete_all_btn.setEnabled(True)
-                    group = QGroupBox(
-                        f"Deleted from: {_TAB_NAMES.get(chunk_id, chunk_id)} › {comp_name}"
-                    )
-                    g_layout = QVBoxLayout(group)
-
-                    table = StructureTableWidget(
-                        _ChunkScope(self, chunk_id), comp_name, is_trash_view=True
-                    )
-                    self._trash_tables[(chunk_id, comp_name)] = table
-                    g_layout.addWidget(table)
-                    self.container_layout.addWidget(group)
-
-                    for original_idx, item in trashed_items:
-                        table.add_row(item, original_idx)
-
-        if not has_content:
-            empty_lbl = QLabel("No items in Trash Bin.")
-            empty_lbl.setStyleSheet(f"color: {get_token('text_disabled')}; font-style: italic;")
-            self.container_layout.addWidget(empty_lbl)
-
-        # Force items to the top
-        self.container_layout.addStretch()
-        self.container.adjustSize()
+    def _refreshed(self, rows_by_chunk):
+        self.delete_all_btn.setEnabled(any(rows_by_chunk.values()))
 
     def permanent_delete(self, chunk_id, comp_name, data_index):
         """Permanently remove a trashed item of comp_name in chunk_id."""
@@ -201,17 +81,8 @@ class TrashTabWidget(QWidget):
         del items[data_index]
         self.controller.save_chunk_data(chunk_id, data)
 
-        table = self._trash_tables.get((chunk_id, comp_name))
-
-        def _do(t=table, di=data_index):
-            if t:
-                t.remove_row_by_index(di, reindex=True)
-                if t.rowCount() == 0:
-                    self.on_refresh()
-                else:
-                    self._built_sig = self._trash_signature()
-            else:
-                self.on_refresh()
+        def _do():
+            self.on_refresh()  # row keys shift after a delete, so rebuild
             main_view = self.window().findChild(QWidget, "StructureTabView")
             if main_view:
                 main_view.update_trash_count()
@@ -246,7 +117,7 @@ class TrashTabWidget(QWidget):
                     self,
                     "Name Conflict",
                     f'A material named "{item.get("values", {}).get("material_name", "")}" '
-                    f'already exists in "{_TAB_NAMES.get(chunk_id, chunk_id)} › {comp_name}".\n\n'
+                    f'already exists in "{TAB_NAMES.get(chunk_id, chunk_id)} › {comp_name}".\n\n'
                     "Remove or rename the existing material before restoring this one.",
                 )
                 return
@@ -270,18 +141,9 @@ class TrashTabWidget(QWidget):
             except Exception:
                 pass
 
-        table = self._trash_tables.get((chunk_id, comp_name))
-
-        def _do(t=table, ci=chunk_id, cn=comp_name, di=data_index,
+        def _do(ci=chunk_id, cn=comp_name, di=data_index,
                 st=should_trash, d=data, idata=item):
-            if t:
-                t.remove_row_by_index(di)
-                if t.rowCount() == 0:
-                    self.on_refresh()
-                else:
-                    self._built_sig = self._trash_signature()
-            else:
-                self.on_refresh()
+            self.on_refresh()
 
             main_view = self.window().findChild(QWidget, "StructureTabView")
             if main_view:
