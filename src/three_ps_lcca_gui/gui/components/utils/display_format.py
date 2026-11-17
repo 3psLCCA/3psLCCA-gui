@@ -27,6 +27,14 @@ _WESTERN_UNITS = [
 _UNIT_DIVISORS = {name: div for _, div, name, _ in _INDIA_UNITS + _WESTERN_UNITS}
 _UNIT_DIVISORS.update({short.lower(): div for _, div, _, short in _INDIA_UNITS + _WESTERN_UNITS})
 
+def to_number(val) -> float:
+    """float(val), or 0.0 if it is empty or not a number."""
+    try:
+        return float(val)
+    except (TypeError, ValueError):
+        return 0.0
+
+
 # ── Private helpers ───────────────────────────────────────────────────────────
 
 def _to_float(val):

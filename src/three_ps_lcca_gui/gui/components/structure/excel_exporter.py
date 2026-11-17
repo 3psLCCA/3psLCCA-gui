@@ -24,6 +24,8 @@ import shutil
 import datetime as _dt
 import pandas as pd
 
+from ..utils.display_format import to_number
+
 CHUNKS = [
     ("CAT#Foundation",      "str_foundation"),
     ("CAT#Sub-Structure",   "str_sub_structure"),
@@ -231,13 +233,6 @@ _CAT_FILL = "EDEDED"
 _HEAD_FILL = "D9D9D9"
 
 
-def _num(val) -> float:
-    try:
-        return float(val)
-    except (TypeError, ValueError):
-        return 0.0
-
-
 def _build_boq(engine):
     """
     Build the BOQ as a format-neutral grid.
@@ -289,7 +284,7 @@ def _build_boq(engine):
             first, sub = row, 0.0
             for n, item in enumerate(items, 1):
                 v = item.get("values", {})
-                q, r = _num(v.get("quantity")), _num(v.get("rate"))
+                q, r = to_number(v.get("quantity")), to_number(v.get("rate"))
                 cells[(row, 1)] = f"{cat_no}.{comp_no}.{n}"
                 cells[(row, 2)] = v.get("material_name", "")
                 cells[(row, 3)] = v.get("unit", "")
