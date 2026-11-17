@@ -7,9 +7,14 @@ from datetime import date
 from itertools import combinations
 from pathlib import Path
 
-from pylatex.utils import escape_latex
+from pylatex import (
+    MiniPage, MultiColumn, NoEscape, Tabular, TikZ, TikZCoordinate,
+    TikZNode, TikZOptions, TikZPath, UnsafeCommand,
+)
+from pylatex.base_classes import Environment
+from pylatex.utils import bold, escape_latex
 
-from ..latex_helpers import DEFAULT_LOGO, controller_chunk as _chunk
+from ..latex_helpers import DEFAULT_LOGO, cmd as _c, controller_chunk as _chunk
 
 
 
@@ -61,12 +66,24 @@ DISCLAIMER_REPORT = (
     "for any use of the results."
 )
 
-_COLORS = "\n".join([
-    r"\definecolor{band}{HTML}{EEF0F8}\definecolor{hair}{HTML}{D9DCE8}",
-    r"\definecolor{lp}{HTML}{8F8FFF}\definecolor{lg}{HTML}{84D400}\definecolor{lo}{HTML}{FF5A2D}",
-    r"\definecolor{ink}{HTML}{14172B}\definecolor{mute}{HTML}{3F4558}",
-])
 _PERSON_FIELDS = ("Name", "Organization", "Address", "Email", "Phone")
+_COVER_GEOMETRY = "left=2.6cm,right=2.2cm,top={top},bottom=1.4cm"
+
+
+class _TitlePage(Environment):
+    _latex_name = "titlepage"
+
+
+def _colors() -> str:
+    """Cover palette: band, hairline, the three pillar colours, ink and muted text."""
+    palette = {"band": "EEF0F8", "hair": "D9DCE8", "lp": "8F8FFF", "lg": "84D400",
+               "lo": "FF5A2D", "ink": "14172B", "mute": "3F4558"}
+    return "\n".join(_c("definecolor", name, "HTML", hex_) for name, hex_ in palette.items())
+
+
+def _new_command(name: str, body: str, args: int = 0) -> str:
+    return UnsafeCommand("newcommand", "\\" + name, options=args or None,
+                         extra_arguments=NoEscape(body)).dumps()
 
 
 def official_date(today: date | None = None) -> str:
@@ -83,7 +100,7 @@ def fit(value: str, limit: int, chunk: int = 14) -> str:
         value = value[:limit - 3].rstrip() + "..."
     out = []
     for word in value.split(" "):
-        out.append(r"\allowbreak{}".join(escape_latex(word[i:i + chunk]) for i in range(0, len(word), chunk))
+        out.append(_c("allowbreak", "").join(escape_latex(word[i:i + chunk]) for i in range(0, len(word), chunk))
                    if len(word) > chunk else escape_latex(word))
     return " ".join(out)
 
@@ -91,26 +108,42 @@ def fit(value: str, limit: int, chunk: int = 14) -> str:
 # Both cover tables (Project information, Evaluated by / Reviewed by) share one style:
 # a bold heading row, no rules, the same row height and the same label column, so
 # their values line up from one table to the next.
-_ROW_STRETCH = r"\renewcommand{\arraystretch}{1.15}"
-_HEAD = r"\multicolumn{2}{@{}l@{}}"
+_ROW_STRETCH = _c("renewcommand", r"\arraystretch", "1.15")
+_LABEL_WIDTH = "2.2cm"
+
+
+def _head(title: str) -> str:
+    return MultiColumn(2, align=NoEscape("@{}l@{}"), data=NoEscape(title)).dumps()
+
+
+def _sect(title: str) -> str:
+    return _c("sect", escape_latex(title))
 
 
 def _lab(field: str) -> str:
-    return r"\lab{" + escape_latex(field) + "}"
+    return _c("lab", escape_latex(field))
 
 
 def _cell(value, limit: int, chunk: int = 14) -> str:
-    return r"\raggedright\arraybackslash\leavevmode\color{ink}" + fit(value, limit, chunk) + r"\strut"
+    return (_c("raggedright") + _c("arraybackslash") + _c("leavevmode") + _c("color", "ink")
+            + fit(value, limit, chunk) + _c("strut"))
+
+
+def _row(*cells: str) -> NoEscape:
+    return NoEscape(" & ".join(cells) + r" \\")
 
 
 def _project_info(rows: list[tuple[str, str]]) -> str:
     """Project information: label/value rows in the shared cover table style."""
-    body = "".join(_lab(f) + " & " + _cell(v, 80, 24) + r" \\" + "\n" for f, v in rows)
-    return "\n".join([
-        r"\noindent{" + _ROW_STRETCH + "%",
-        r"\begin{tabular}{@{}p{2.2cm}p{\dimexpr\linewidth-2.2cm-2\tabcolsep\relax}@{}}",
-        _HEAD + r"{\sect{Project information}} \\",
-        body + r"\end{tabular}}",
+    value_width = rf"\dimexpr\linewidth-{_LABEL_WIDTH}-2\tabcolsep\relax"
+    table = Tabular(NoEscape(f"@{{}}p{{{_LABEL_WIDTH}}}p{{{value_width}}}@{{}}"))
+    table.append(NoEscape(_head(_sect("Project information")) + r" \\"))
+    for field, value in rows:
+        table.append(_row(_lab(field), _cell(value, 80, 24)))
+    return "%\n".join([
+        _c("noindent") + _c("begingroup") + _ROW_STRETCH,
+        table.dumps(),
+        _c("endgroup"),
     ])
 
 
@@ -118,34 +151,39 @@ def _people(evaluated: tuple, reviewed: tuple) -> str:
     """Evaluated by / Reviewed by as ONE table whose rows run side by side. It is
     measured first: when it does not fit in what is left of the cover it moves, whole,
     to a continuation page."""
-    cell = lambda v: _cell(v, 160, 14)  # noqa: E731
-    lab = _lab
-    gap = r"{\color{hair}\vrule width 0.5pt}"
+    gap = _c("textcolor", "hair", r"\vrule width 0.5pt")
     # Both halves are the same width with the same edges. The 5 mm either side of the
     # divider belongs to the divider column, so neither half's rules run into it.
-    half = _HEAD
-    rows = "".join(
-        lab(f) + " & " + cell(a) + " & " + gap + " & " + lab(f) + " & " + cell(b)
-        + r" \\" + "\n"
-        for f, a, b in zip(_PERSON_FIELDS, evaluated, reviewed))
+    divider = ">" + "{" + _c("hspace", "5mm") + "}c<{" + _c("hspace", "5mm") + "}"
+    half = f"p{{{_LABEL_WIDTH}}}p{{\\vw}}"
+    table = Tabular(NoEscape(f"@{{}}{half}@{{}}{divider}@{{}}{half}@{{}}"))
+    table.append(_row(_head(_sect("Evaluated by")), gap, _head(_sect("Reviewed by"))))
+    for field, a, b in zip(_PERSON_FIELDS, evaluated, reviewed):
+        table.append(_row(_lab(field), _cell(a, 160), gap, _lab(field), _cell(b, 160)))
     # Signature line: full width of its half, same grey and weight as the table rules.
-    sig = (r"\parbox{\dimexpr2.2cm+\vw+2\tabcolsep\relax}{\vspace{1.3cm}"
-           r"{\color{hair}\rule{\linewidth}{\arrayrulewidth}}\\[-1pt]\lab{Signature}}")
+    sig = _c("parbox", rf"\dimexpr{_LABEL_WIDTH}+\vw+2\tabcolsep\relax",
+             _c("vspace", "1.3cm")
+             + _c("textcolor", "hair", _c("rule", r"\linewidth", r"\arrayrulewidth"))
+             + r"\\[-1pt]" + _lab("Signature"))
+    table.append(_row(_head(sig), gap, _head(sig)))
+
+    footer = MiniPage(width=NoEscape(r"\linewidth"), data=NoEscape(_c("covfooter")))
+    fits = (r"\ifdim\dimexpr\ht\peoplebox+\dp\peoplebox+\ht\footbox+\dp\footbox+0.3cm\relax"
+            r">\dimexpr\pagegoal-\pagetotal\relax")
     return "\n".join([
-        r"\newlength{\vw}\setlength{\vw}{\dimexpr(\linewidth-4.4cm-10mm-4\tabcolsep-0.5pt)/2\relax}",
-        r"\newsavebox{\peoplebox}",
-        r"\sbox{\peoplebox}{" + _ROW_STRETCH + "%",
-        r"\begin{tabular}{@{}p{2.2cm}p{\vw}@{}>{\hspace{5mm}}c<{\hspace{5mm}}@{}p{2.2cm}p{\vw}@{}}",
-        half + r"{\sect{Evaluated by}} & " + gap + r" & " + half + r"{\sect{Reviewed by}} \\",
-        rows,
-        half + "{" + sig + r"} & " + gap + r" & " + half + "{" + sig + r"} \\",
-        r"\end{tabular}}",
-        r"\newsavebox{\footbox}\sbox{\footbox}{\begin{minipage}{\linewidth}\covfooter\end{minipage}}",
-        r"\par\penalty0",
-        r"\ifdim\dimexpr\ht\peoplebox+\dp\peoplebox+\ht\footbox+\dp\footbox+0.3cm\relax>\dimexpr\pagegoal-\pagetotal\relax",
-        r"  \vfill\covfooter\newgeometry{left=2.6cm,right=2.2cm,top=2.2cm,bottom=1.4cm}\thispagestyle{empty}",
-        r"\fi",
-        r"\noindent\usebox{\peoplebox}",
+        _c("newlength", r"\vw")
+        + _c("setlength", r"\vw", r"\dimexpr(\linewidth-4.4cm-10mm-4\tabcolsep-0.5pt)/2\relax"),
+        _c("newsavebox", r"\peoplebox"),
+        _c("sbox", r"\peoplebox", _ROW_STRETCH + "%\n" + table.dumps()),
+        _c("newsavebox", r"\footbox") + _c("sbox", r"\footbox", footer.dumps()),
+        _c("par") + _c("penalty") + "0",  # \penalty takes a bare number, not {0}
+        # Not enough room left: finish this page with the footer and continue on a new one.
+        fits,
+        "  " + _c("vfill") + _c("covfooter")
+        + _c("newgeometry", _COVER_GEOMETRY.format(top="2.2cm"))
+        + _c("thispagestyle", "empty"),
+        _c("fi"),
+        _c("noindent") + _c("usebox", r"\peoplebox"),
     ])
 
 
@@ -199,8 +237,68 @@ def heading_lines(heading: str) -> list[str]:
 def _heading_tex(lines: list[str]) -> tuple[str, int]:
     """LaTeX for the title lines and the font size that makes them fill the band."""
     size = int(max(_MIN_PT - 4, _size_for(lines)))
-    words = lambda s: r"\hspace{0.25em}".join(escape_latex(w) for w in s.split(" "))  # noqa: E731
+    space = _c("hspace", "0.25em")
+    words = lambda s: space.join(escape_latex(w) for w in s.split(" "))  # noqa: E731
     return r"\\".join(words(s) for s in lines), size
+
+
+def _cover_footer(disclaimer: str) -> str:
+    """Footer shared by every page of the cover (page 1 and the continuation page)."""
+    credit = MiniPage(width=NoEscape(r"0.40\linewidth"), pos="t", data=NoEscape(
+        _c("small") + " " + bold("3psLCCA") + r"\\ Osdag, IIT Bombay\\ "
+        + _c("href", "https://3pslcca.github.io/", _c("textit", "3pslcca.github.io"))))
+    note = MiniPage(width=NoEscape(r"0.54\linewidth"), pos="t", data=NoEscape(
+        _c("footnotesize") + _c("color", "mute") + _c("raggedright") + " "
+        + escape_latex(disclaimer)))
+    return (_c("par") + _c("noindent") + _c("rule", r"\linewidth", "0.5pt") + _c("par")
+            + _c("vspace", "6pt") + _c("noindent") + credit.dumps() + _c("hfill")
+            + note.dumps() + _c("par"))
+
+
+def _bar(colour: str, x0: float, y0: float, x1: float, y1: float) -> TikZPath:
+    return TikZPath([TikZCoordinate(x0, y0), "rectangle", TikZCoordinate(x1, y1)],
+                    options=TikZOptions("fill=" + colour))
+
+
+def _cover_art(logo: Path, agency: str, kicker: str, title: str, title_size: int,
+               name: str) -> str:
+    """Page overlay: the title band, the pillar-colour edges, both logos and the title."""
+    art = TikZ(options=NoEscape(
+        "remember picture,overlay,shift={(current page.south west)}"))
+    art.append(_bar("band", 0, 17.8, 21, 25.9))
+    art.append(_bar("lp", 0.32, 17.67, 7.213, 17.8))
+    art.append(_bar("lg", 7.213, 17.67, 14.107, 17.8))
+    art.append(_bar("lo", 14.107, 17.67, 21, 17.8))
+    art.append(_bar("lp", 0, 19.8, 0.32, 29.7))
+    art.append(_bar("lg", 0, 9.9, 0.32, 19.8))
+    art.append(_bar("lo", 0, 0, 0.32, 9.9))
+    art.append(TikZNode(
+        options=TikZOptions(NoEscape("anchor=north east, inner sep=0pt")),
+        at=TikZCoordinate(18.8, 28.7),
+        text=NoEscape(_c("includegraphics", logo.as_posix(), options="height=1.8cm"))))
+    if agency:
+        agency_options = "anchor=north west, inner sep=0pt"
+        agency_text = _c("includegraphics", Path(agency).as_posix(),
+                         options="height=1.8cm,width=7cm,keepaspectratio")
+    else:
+        agency_options = ("anchor=north west, draw=mute!60, dashed, rounded corners=2pt, "
+                          "inner sep=9pt, minimum height=1.8cm, text=mute")
+        agency_text = _c("itshape") + " [Agency Logo]"
+    art.append(TikZNode(options=TikZOptions(NoEscape(agency_options)),
+                        at=TikZCoordinate(2.6, 28.7), text=NoEscape(agency_text)))
+    kicker_line = (
+        _c("textcolor", "lg!70!black", _c("large") + _c("bfseries") + " " + escape_latex(kicker))
+        + r"\\[10pt]" if kicker else "")
+    heading = _c("textbf", _c("fontsize", title_size, title_size + 2) + _c("selectfont")
+                 + " " + title)
+    subtitle = _c("textcolor", "mute", _c("Large") + _c("itshape") + " " + fit(name, 80, 22))
+    art.append(TikZNode(
+        options=TikZOptions(NoEscape("anchor=west, text=ink, align=left, text width=16cm")),
+        at=TikZCoordinate(2.6, 21.85),
+        text=NoEscape(kicker_line + heading + r"\\[12pt]"
+                      + _c("rule", "2.5cm", "0.8pt") + r"\\[8pt]" + subtitle)))
+    # \noindent and % keep the overlay from indenting "Project information"
+    return _c("noindent") + art.dumps() + "%"
 
 
 def title_page(controller=None, heading: str = "Bill of Quantities", *,
@@ -224,54 +322,29 @@ def title_page(controller=None, heading: str = "Bill of Quantities", *,
     reviewed = (pick("reviewed_by", "reviewer_name"),
                 pick("reviewer_organization", "review_agency"), pick("reviewer_address"),
                 pick("reviewer_email"), pick("reviewer_phone"))
-    if agency:
-        agency_node = (r"\node[anchor=north west, inner sep=0pt] at (2.6,28.7) "
-                       r"{\includegraphics[height=1.8cm,width=7cm,keepaspectratio]{" + Path(agency).as_posix() + r"}};")
-    else:
-        agency_node = (r"\node[anchor=north west, draw=mute!60, dashed, rounded corners=2pt, inner sep=9pt, "
-                       r"minimum height=1.8cm, text=mute] at (2.6,28.7) {\itshape [Agency Logo]};")
-    return "\n".join([
-        r"\newgeometry{left=2.6cm,right=2.2cm,top=12.4cm,bottom=1.4cm}",
-        r"\begin{titlepage}",
-        r"\thispagestyle{empty}",
-        _COLORS,
+
+    page = _TitlePage()
+    for part in [
+        _c("thispagestyle", "empty"),
+        _colors(),
         # field labels plain grey, section headings bold sentence case (no small caps)
-        r"\newcommand{\lab}[1]{\textcolor{mute}{\small #1}}",
-        r"\newcommand{\sect}[1]{\textcolor{ink}{\bfseries #1}}",
-        # footer shared by every page of the cover (page 1 and the continuation page)
-        r"\newcommand{\covfooter}{\par\noindent\rule{\linewidth}{0.5pt}\par\vspace{6pt}"
-        r"\noindent\begin{minipage}[t]{0.40\linewidth}\small\textbf{3psLCCA}\\ Osdag, IIT Bombay\\ "
-        r"\href{https://3pslcca.github.io/}{\textit{3pslcca.github.io}}\end{minipage}\hfill"
-        r"\begin{minipage}[t]{0.54\linewidth}\footnotesize\color{mute}\raggedright "
-        + escape_latex(disclaimer) + r"\end{minipage}\par}",
-        # \noindent and % keep the overlay from indenting "Project information"
-        r"\noindent\begin{tikzpicture}[remember picture,overlay,shift={(current page.south west)}]%",
-        r"  \fill[band] (0,17.8) rectangle (21,25.9);",
-        r"  \fill[lp] (0.32,17.67) rectangle (7.213,17.8);",
-        r"  \fill[lg] (7.213,17.67) rectangle (14.107,17.8);",
-        r"  \fill[lo] (14.107,17.67) rectangle (21,17.8);",
-        r"  \fill[lp] (0,19.8) rectangle (0.32,29.7);",
-        r"  \fill[lg] (0,9.9) rectangle (0.32,19.8);",
-        r"  \fill[lo] (0,0) rectangle (0.32,9.9);",
-        r"  \node[anchor=north east, inner sep=0pt] at (18.8,28.7) "
-        r"{\includegraphics[height=1.8cm]{" + logo.as_posix() + r"}};",
-        "  " + agency_node,
-        r"  \node[anchor=west, text=ink, align=left, text width=16cm] at (2.6,21.85)",
-        r"    {" + (r"{\color{lg!70!black}\large\bfseries " + escape_latex(kicker) + r"}\\[10pt]"
-                    if kicker else ""),
-        r"     {\bfseries\fontsize{" + str(title_size) + "}{" + str(title_size + 2) + r"}\selectfont " + title + r"}\\[12pt]",
-        r"     \rule{2.5cm}{0.8pt}\\[8pt]",
-        r"     {\color{mute}\Large\itshape " + fit(name, 80, 22) + r"}};",
-        r"\end{tikzpicture}%",
-        r"\color{ink}%",
+        _new_command("lab", _c("textcolor", "mute", _c("small") + " #1"), args=1),
+        _new_command("sect", _c("textcolor", "ink", _c("bfseries") + " #1"), args=1),
+        _new_command("covfooter", _cover_footer(disclaimer)),
+        _cover_art(logo, agency, kicker, title, title_size, name),
+        _c("color", "ink") + "%",
         _project_info([
             ("Project code", pick("project_code")),
             ("Description", pick("project_description", "remarks")),
             ("Date", official_date()),
         ]),
-        r"\par\vspace{0.8cm}",
+        _c("par") + _c("vspace", "0.8cm"),
         _people(evaluated, reviewed),
-        r"\vfill\covfooter",
-        r"\end{titlepage}",
-        r"\restoregeometry",
+        _c("vfill") + _c("covfooter"),
+    ]:
+        page.append(NoEscape(part))
+    return "\n".join([
+        _c("newgeometry", _COVER_GEOMETRY.format(top="12.4cm")),
+        page.dumps(),
+        _c("restoregeometry"),
     ])
