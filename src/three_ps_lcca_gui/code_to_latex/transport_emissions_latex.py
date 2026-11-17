@@ -123,6 +123,10 @@ def _vehicle_table_to_latex(entry: dict, mat_index: dict, table_no: int) -> str:
             "Emissions (kgCO₂e)":  emission,
         })
 
+    if not rows:
+        # No materials on this delivery: it still appears in the summary table.
+        return ""
+
     df = pd.DataFrame(rows)
     vehicle_name = vehicle.get("name", "").strip()
     origin    = route.get("origin", "").strip()

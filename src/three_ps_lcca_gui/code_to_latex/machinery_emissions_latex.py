@@ -34,6 +34,9 @@ def _detailed_to_latex(data: dict) -> str:
             "Emissions (kgCO₂e)":           emission,
         })
 
+    if not rows:
+        return ""
+
     df = pd.DataFrame(rows)
     return ((
         df.style.hide(axis="index")
