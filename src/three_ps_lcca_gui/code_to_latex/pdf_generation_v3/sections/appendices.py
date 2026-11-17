@@ -5,7 +5,7 @@ import re
 from ..lcca_report_builder import KEY_SHOW_APPENDIX_A, KEY_SHOW_APPENDIX_B
 from ..appendix_A_content import APPENDIX_A_LATEX
 from ..appendix_B_content import APPENDIX_B_LATEX
-from ..latex_helpers import appendix_counter
+from ..latex_helpers import appendix_counter, appendix_heading
 
 
 def _strip_v3_incompatible_latex(latex: str) -> str:
@@ -25,19 +25,22 @@ def _strip_v3_incompatible_latex(latex: str) -> str:
     return latex
 
 
+_APPENDIX_HEADINGS = [
+    # (heading as written in the static appendix source, title in this report)
+    ("Appendix A: Assumptions", "Appendix A: Assumptions"),
+    ("Appendix B: Calculation Methodology", "Appendix B: Calculation methodology"),
+]
+
+
 def _clean_headings(latex: str) -> str:
-    latex = latex.replace(
-        r"\section*{\fontsize{14pt}{16pt}\selectfont\bfseries Appendix A: Assumptions}",
-        r"\section*{Appendix A: Assumptions}",
-    )
-    latex = latex.replace(
-        r"\section*{\fontsize{14pt}{16pt}\selectfont\bfseries Appendix B: Calculation Methodology}",
-        r"\section*{Appendix B: Calculation methodology}",
-    )
-    latex = latex.replace(
-        r"\addcontentsline{toc}{section}{Appendix B: Calculation Methodology}",
-        r"\addcontentsline{toc}{section}{Appendix B: Calculation methodology}",
-    )
+    # Swap each hand-sized heading and its contents entry for one built by
+    # appendix_heading(), which also sets the running page header.
+    for source, title in _APPENDIX_HEADINGS:
+        latex = latex.replace(
+            "\\section*{\\fontsize{14pt}{16pt}\\selectfont\\bfseries " + source + "}\n"
+            "\\addcontentsline{toc}{section}{" + source + "}",
+            appendix_heading(title),
+        )
     latex = latex.replace(
         r"{\fontsize{13pt}{15pt}\selectfont\bfseries B.",
         r"{\bfseries B.",

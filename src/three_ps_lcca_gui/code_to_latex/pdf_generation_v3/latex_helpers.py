@@ -1,17 +1,30 @@
 from __future__ import annotations
 
 import re
+from pathlib import Path
 
+from pylatex import Command, NoEscape
 from pylatex.utils import escape_latex
 
-from ..SETTINGS import LATEX_FONT_SIZE, REQUIRED_LATEX_PACKAGES
 from ..SETTINGS import LATEX_FONT_SIZE, REQUIRED_LATEX_PACKAGES, LATEX_TABLE_COLUMN_BG_ENABLED, LATEX_TABLE_COLUMN_BG_COLORS
 
-from datetime import date
 
 
 EMDASH = r"\textemdash"
-generated_date = date.today().strftime("%d-%m-%Y")
+# 3psLCCA icon: page header and cover of every report (LCCA and Bill of Quantities).
+DEFAULT_LOGO = Path(__file__).resolve().parents[2] / "gui" / "assets" / "logo" / "logo-3psLCCA.png"
+
+
+def controller_chunk(controller, name: str) -> dict:
+    """Chunk *name* from *controller* ({} if there is none or it cannot be read)."""
+    for method_name in ("get_fresh_chunk", "get_chunk", "fetch_chunk"):
+        method = getattr(controller, method_name, None)
+        if callable(method):
+            try:
+                return method(name) or {}
+            except Exception:
+                pass
+    return {}
 
 def _generate_package_imports() -> list[str]:
     lines = []
@@ -21,6 +34,15 @@ def _generate_package_imports() -> list[str]:
         else:
             lines.append(rf"\usepackage{{{pkg}}}")
     return lines
+
+
+def _footer(with_total: bool) -> str:
+    """Centre footer: "Page N of M" (M = last body page), or just "Page N"."""
+    text = r"\small Page~\thepage"
+    if with_total:
+        text += r"~of~\pageref*{LastPage}"
+    return Command("fancyfoot", NoEscape(text), options="C").dumps()
+
 
 V3_PREAMBLE = [
     r"\documentclass[12pt,a4paper]{article}",
@@ -47,12 +69,14 @@ V3_PREAMBLE = [
     # ── Headers / footers ─────────────────────────────────────────────────────
     r"\fancyhf{}",
     r"\providecommand{\ReportHeaderLogo}{}",
-    r"\setlength{\headheight}{0.8cm}",
+    # The 0.65cm header logo plus the text line need about 22.9pt; less makes
+    # fancyhdr warn on every page.
+    Command("setlength", [NoEscape(r"\headheight"), "24pt"]).dumps(),
     r"\renewcommand{\headrulewidth}{0.4pt}",
     r"\renewcommand{\footrulewidth}{0.4pt}",
     r"\fancyhead[L]{\small\nouppercase{\leftmark}}",
     r"\fancyhead[R]{\IfFileExists{\ReportHeaderLogo}{\includegraphics[height=0.65cm]{\ReportHeaderLogo}}{\small 3PS LCCA}}",
-    r"\fancyfoot[C]{\small Page~\thepage~of~\pageref*{LastPage}}",
+    _footer(with_total=True),
     r"\AtBeginDocument{\pagestyle{fancy}}",
 
     # ── Section / ToC styling ─────────────────────────────────────────────────
@@ -147,7 +171,8 @@ def apply_table_column_backgrounds(latex: str) -> str:
 
 
 def build_report_v3_document(body: str, logo_path: str = "") -> str:
-    """Wrap report body in the V3 LaTeX document shell."""
+    """Wrap report body in the V3 LaTeX document shell (shared header and footer)."""
+    logo_path = logo_path or DEFAULT_LOGO.as_posix()
     return "\n".join([
         *V3_PREAMBLE,
         r"\renewcommand{\ReportHeaderLogo}{" + logo_path + r"}",
@@ -158,52 +183,27 @@ def build_report_v3_document(body: str, logo_path: str = "") -> str:
     ])
 
 
-def title_page(project_name: str, logo_path: str = "") -> str:
-    safe_project_name = escape_latex(project_name or "Unnamed Project")
-    return "\n".join([
-        r"\begin{titlepage}",
-        r"\begin{flushright}",
-        (
-            r"\IfFileExists{" + logo_path + r"}"
-            r"{\includegraphics[width=0.38\linewidth]{" + logo_path + r"}}{}"
-            if logo_path
-            else ""
-        ),
-        r"\end{flushright}",
-        r"\vspace*{2cm}",
-        r"\noindent{\color{blue!55!black}\rule{\linewidth}{1.2pt}}",
-        r"\vspace{0.8cm}",
-        r"\begin{flushright}",
-        r"{\Huge\bfseries Software Generated Report\par}",
-        r"\vspace{0.45cm}",
-        r"{\LARGE Life Cycle Cost Assessment\par}",
-        r"\vspace{0.8cm}",
-        r"{\Large " + safe_project_name + r"\par}",
-        r"\end{flushright}",
-        r"\vspace{0.8cm}",
-        r"\noindent{\color{blue!55!black}\rule{\linewidth}{0.8pt}}",
-        r"\vfill",
-        r"\begin{flushright}",
-        r"{\small Generated on " + generated_date + r"\par}",
-        r"\end{flushright}",
-        r"\end{titlepage}",
-    ])
-
-
-def front_matter() -> str:
-    """TOC, list of tables, and list of figures."""
+def front_matter(figures: bool = True) -> str:
+    """TOC, list of tables, and list of figures (left out when *figures* is False)."""
+    lof = [
+        r"\addcontentsline{toc}{section}{List of Figures}",
+        r"\listoffigures",
+        r"\clearpage",
+    ] if figures else []
     return "\n".join([
         r"\clearpage",
         r"\pagenumbering{roman}",
+        # The page total counts only the arabic-numbered body, so the roman
+        # front-matter pages show just their own number.
+        _footer(with_total=False),
         r"\tableofcontents",
         r"\clearpage",
         r"\addcontentsline{toc}{section}{List of Tables}",
         r"\listoftables",
         r"\clearpage",
-        r"\addcontentsline{toc}{section}{List of Figures}",
-        r"\listoffigures",
-        r"\clearpage",
+        *lof,
         r"\pagenumbering{arabic}",
+        _footer(with_total=True),
     ])
 
 
@@ -240,6 +240,17 @@ def appendix_counter(letter: str) -> str:
         r"\renewcommand{\thefigure}{" + letter.upper() + r"-\arabic{figure}}",
     ])
     return "\n".join(lines)
+
+
+def appendix_heading(title: str) -> str:
+    """Unnumbered appendix heading: the heading, its contents entry, and the
+    running header mark. Without the mark a starred section leaves the page
+    header showing the last numbered section."""
+    return "\n".join([
+        Command("section*", title).dumps(),
+        Command("addcontentsline", ["toc", "section", title]).dumps(),
+        Command("markboth", [title, title]).dumps(),
+    ])
 
 
 def format_value(value, decimals: int | None = None) -> str:

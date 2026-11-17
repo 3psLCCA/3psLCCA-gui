@@ -20,6 +20,7 @@ try:
 except Exception:
     _PDFLATEX = "pdflatex"
 
+from pylatex import Command, NoEscape
 from pylatex.utils import escape_latex
 from three_ps_lcca_gui.gui._CONFIG import ALLOW_TEX
 from ..SETTINGS import REQUIRED_LATEX_PACKAGES
@@ -82,9 +83,10 @@ from .latex_helpers import (
     section,
     subsection,
     subsubsection,
-    title_page,
     wide_block,
+    controller_chunk as _chunk,
     appendix_counter,
+    appendix_heading,
 )
 
 from .sections.title_page import DISCLAIMER_REPORT, title_page as cover_page
@@ -115,12 +117,12 @@ REPORT_SCHEMA = [
     {
         "title": "Input data",
         "key": None,
-        "render_header": lambda: clearpage() + "\n" + section("Input data"),
+        "render_header": lambda: input_data_heading(),
         "children": [
             {
                 "title": "Bridge geometry and description",
                 "key": KEY_SHOW_BRIDGE_DESC,
-                "render": lambda ctrl, config, paths, logo: subsection("Bridge geometry and description") + "\n" + _part(ctrl, "Bridge Data", bridge_data_to_latex)
+                "render": lambda ctrl, config, paths, logo: bridge_description(ctrl)
             },
             {
                 "title": "Financial inputs",
@@ -301,37 +303,27 @@ def _traffic_mode() -> str:
         return ""
 
 
-def _project_name(controller=None) -> str:
-    for method_name in ("get_fresh_chunk", "get_chunk", "fetch_chunk"):
-        method = getattr(controller, method_name, None)
-        if callable(method):
-            try:
-                data = method("general_info") or {}
-                if data.get("project_name"):
-                    return str(data["project_name"])
-            except Exception:
-                pass
-    return "Unnamed Project"
+def _log(msg: str) -> None:
+    """Print a diagnostic without letting the console's encoding (cp1252 on
+    Windows cannot print e.g. CO₂) turn it into a crash of the export."""
+    try:
+        print(msg)
+    except Exception:
+        try:
+            print(msg.encode("ascii", "backslashreplace").decode("ascii"))
+        except Exception:
+            pass
 
 
 def _call_exporter(controller, exporter: Callable, title: str) -> str:
     try:
         latex = exporter(controller)
     except Exception as exc:
-        print(f"[structured_code_to_latex_report] {title} failed: {exc}")
+        _log(f"[structured_code_to_latex_report] {title} failed: {exc}")
         return ""
     return latex if latex and latex.strip() else ""
 
 
-def _chunk(controller, name: str) -> dict:
-    for method_name in ("get_fresh_chunk", "get_chunk", "fetch_chunk"):
-        method = getattr(controller, method_name, None)
-        if callable(method):
-            try:
-                return method(name) or {}
-            except Exception:
-                pass
-    return {}
 
 
 
@@ -344,6 +336,15 @@ def _part(controller, title: str, exporter: Callable, wide: bool = False, size: 
     if wide:
         latex = wide_block(latex, size=size)
     return apply_table_column_backgrounds(latex)
+
+
+# Pages shared with the Bill of Quantities report (a subset of this report).
+def input_data_heading() -> str:
+    return clearpage() + "\n" + section("Input data")
+
+
+def bridge_description(controller) -> str:
+    return subsection("Bridge geometry and description") + "\n" + _part(controller, "Bridge Data", bridge_data_to_latex)
 
 
 def _subsubsection_with_intro(
@@ -584,12 +585,17 @@ def _appendix_c_wpi(controller) -> str:
         return ""
     latex = latex.replace(r"\begin{landscape}", "").replace(r"\end{landscape}", "")
     latex = latex.replace(r"\begin{table}[h!]", r"\begin{table}[H]")
+    title = "Appendix C: Miscellaneous data"
     return "\n\n".join([
         r"\clearpage",
         r"\begin{landscape}",
+        # A landscape page's header never sees the marks set on it, so name the
+        # appendix in the header directly; the environment's group restores
+        # the normal header afterwards.
+        Command("fancyhead", NoEscape(r"\small " + escape_latex(title)),
+                options="L").dumps(),
         appendix_counter("C"),
-        r"\section*{Appendix C: Miscellaneous data}",
-        r"\addcontentsline{toc}{section}{Appendix C: Miscellaneous data}",
+        appendix_heading(title),
         r"\begingroup",
         r"\scriptsize",
         r"\centering",
@@ -747,31 +753,43 @@ def run_pdflatex(tex_path: Path, work_dir: Path, *extra_args, context: str = "",
         )
 
 
-def compile_lcca_report_pdf(
-    controller=None,
-    output_dir: str | Path | None = None,
-    filename: str = "structured_code_to_latex_report",
+def _require_pdflatex() -> None:
+    if not shutil.which(_PDFLATEX) and not os.path.exists(_PDFLATEX):
+        raise RuntimeError(
+            "pdflatex was not found. To generate PDF reports, please install a TeX distribution:\n"
+            "  • Windows: MiKTeX — https://miktex.org\n"
+            "  • Windows: TeX Live — https://tug.org/texlive\n"
+            "  • macOS:   MacTeX — https://www.tug.org/mactex\n"
+            "  • Linux:   sudo apt install texlive-latex-recommended\n\n"
+            "After installation, restart the application."
+        )
+
+
+def compile_report_pdf(
+    controller,
+    build_tex: Callable[[Path], str],
+    output_dir: str | Path,
+    filename: str,
     keep_artifacts: bool = False,
-    config: dict | None = None,
-) -> tuple[Path | None, Path]:
+) -> tuple[Path, Path]:
+    """Compile any report (LCCA or Bill of Quantities) to <output_dir>/<filename>.pdf.
+
+    *build_tex(work_dir)* returns the full LaTeX document; files it needs (plots)
+    go in *work_dir*. Two pdflatex passes, up to 2 attempts.
+    """
     if _set_controller is not None:
         try:
             _set_controller(controller)
         except Exception:
             pass
 
-    if output_dir is None:
-        output_dir = Path(__file__).resolve().parent / "tests"
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-
     final_tex_path = output_dir / f"{filename}.tex"
     final_pdf_path = output_dir / f"{filename}.pdf"
 
-    # We allow up to 2 attempts for report generation
     max_attempts = 2
     last_error = None
-
     for attempt in range(1, max_attempts + 1):
         cleanup = None
         try:
@@ -783,42 +801,8 @@ def compile_lcca_report_pdf(
 
             tex_path = work_dir / f"{filename}.tex"
             pdf_path = work_dir / f"{filename}.pdf"
-            _copy_static_assets(work_dir)
-
-            plot_paths = {}
-            try:
-                cache = _valid_result_cache(controller)
-                if cache.get("results"):
-                    currency = (
-                        cache.get("currency")
-                        or _chunk(controller, "general_info").get("project_currency")
-                        or "INR"
-                    )
-                    plot_paths = generate_plots(cache["results"], str(work_dir), str(currency))
-            except Exception as exc:
-                print(f"[structured_code_to_latex_report] chart generation failed: {exc}")
-
-            logo_file = Path(__file__).resolve().parents[2] / "gui" / "assets" / "logo" / "3pslcca_header.png"
-            logo_path = logo_file.as_posix()
-            tex_content = build_structured_code_to_latex_report_document(
-                controller,
-                plot_paths,
-                config=config,
-                logo_path=logo_path,
-            )
-            tex_path.write_text(tex_content, encoding="utf-8")
-            if keep_artifacts:
-                final_tex_path.write_text(tex_content, encoding="utf-8")
-
-            if not shutil.which(_PDFLATEX) and not os.path.exists(_PDFLATEX):
-                raise RuntimeError(
-                    "pdflatex was not found. To generate PDF reports, please install a TeX distribution:\n"
-                    "  • Windows: MiKTeX — https://miktex.org\n"
-                    "  • Windows: TeX Live — https://tug.org/texlive\n"
-                    "  • macOS:   MacTeX — https://www.tug.org/mactex\n"
-                    "  • Linux:   sudo apt install texlive-latex-recommended\n\n"
-                    "After installation, restart the application."
-                )
+            tex_path.write_text(build_tex(work_dir), encoding="utf-8")
+            _require_pdflatex()
 
             def _run_pdflatex(*extra_args):
                 run_pdflatex(
@@ -831,25 +815,49 @@ def compile_lcca_report_pdf(
             _run_pdflatex("-draftmode")
             _dedupe_lot_entries(lot_path)
             _run_pdflatex()
-
             _dedupe_lot_entries(lot_path)
 
             if not pdf_path.exists():
                 raise FileNotFoundError(f"PDF was not generated: {pdf_path}")
-
             if pdf_path.resolve() != final_pdf_path.resolve():
                 shutil.copy2(pdf_path, final_pdf_path)
-
             return final_tex_path, final_pdf_path
 
         except Exception as e:
             last_error = e
-            print(f"[structured_code_to_latex_report] Attempt {attempt} failed: {e}")
+            _log(f"[report] Attempt {attempt} failed: {e}")
             if attempt == max_attempts:
-                raise last_error
+                raise
         finally:
             if cleanup is not None:
                 cleanup.cleanup()
-
-    # Should not reach here due to raise in loop
     raise last_error
+
+
+def compile_lcca_report_pdf(
+    controller=None,
+    output_dir: str | Path | None = None,
+    filename: str = "structured_code_to_latex_report",
+    keep_artifacts: bool = False,
+    config: dict | None = None,
+) -> tuple[Path | None, Path]:
+    if output_dir is None:
+        output_dir = Path(__file__).resolve().parent / "tests"
+
+    def _build_tex(work_dir: Path) -> str:
+        _copy_static_assets(work_dir)
+        plot_paths = {}
+        try:
+            cache = _valid_result_cache(controller)
+            if cache.get("results"):
+                currency = (
+                    cache.get("currency")
+                    or _chunk(controller, "general_info").get("project_currency")
+                    or "INR"
+                )
+                plot_paths = generate_plots(cache["results"], str(work_dir), str(currency))
+        except Exception as exc:
+            _log(f"[structured_code_to_latex_report] chart generation failed: {exc}")
+        return build_structured_code_to_latex_report_document(controller, plot_paths, config=config)
+
+    return compile_report_pdf(controller, _build_tex, output_dir, filename, keep_artifacts)
