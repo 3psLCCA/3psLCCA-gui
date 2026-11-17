@@ -1,8 +1,9 @@
 import pandas as pd
-from pylatex.utils import escape_latex
+from pylatex import Command, NoEscape
+from pylatex.utils import bold, escape_latex
 from ...gui.components.traffic_data.main import TRAFFIC_FIELDS, _BY_CODE
 from ...gui.components.utils.common_requested_data import get_currency
-from ..common_code import fields_to_latex
+from ..common_code import entered_value_block, fields_to_latex
 from ..SETTINGS import DECIMAL_PLACES_FOR_LATEX
 
 
@@ -29,8 +30,9 @@ def _global_traffic_fields(data: dict) -> str:
     cost_str = (
         f"{float(cost):,.{DECIMAL_PLACES_FOR_LATEX}f}"
         if cost is not None
-        else r"\textemdash"
+        else Command("textemdash").dumps()
     )
+    cost_cell = bold(NoEscape(cost_str)) + "~" + currency + "/day"
 
     source_sent = (
         rf" This estimate is based on {escape_latex(source)}."
@@ -45,28 +47,17 @@ def _global_traffic_fields(data: dict) -> str:
         rf"For this project, the road user cost incurred during the construction phase "
         rf"has been assessed on a per-day basis. The total road user cost per day, "
         rf"accounting for delays, detours, and associated user inconveniences, is "
-        rf"\textbf{{{cost_str}}}~{currency}/day.{source_sent}{comments_sent}"
+        + cost_cell + "." + source_sent + comments_sent
     )
 
     rows = [
-        ("Road User Cost per Day", rf"\textbf{{{cost_str}}}~{currency}/day"),
+        ("Road User Cost per Day", cost_cell),
         ("Source", escape_latex(source) if source else "Not mentioned"),
     ]
     if comments:
         rows.append(("Comments", escape_latex(comments)))
 
-    detail = "\n".join(
-        rf"  \noindent\textbf{{{escape_latex(label)}:}}\quad {value} \par\smallskip"
-        for label, value in rows
-    )
-
-    return (
-        "\n\\medskip\n"
-        + rf"\noindent {paragraph}"
-        + "\n\n\\medskip\n"
-        + detail
-        + "\n\\medskip\n"
-    )
+    return entered_value_block(paragraph, rows)
 
 
 def _peak_hour_distribution(data: dict) -> str:

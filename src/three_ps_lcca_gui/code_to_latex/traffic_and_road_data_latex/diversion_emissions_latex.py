@@ -1,8 +1,11 @@
 import pandas as pd
+from pylatex import Command
+from pylatex.utils import bold, escape_latex
 from ...gui.components.traffic_data.main import _VEHICLES
 from ..SETTINGS import DECIMAL_PLACES_FOR_LATEX
 from ...gui.components.utils.common_requested_data import get_diversion_emissions_data
 from ..html_to_latex import format_remarks_latex
+from ..common_code import entered_value_block
 
 
 def _diversion_emissions(data: dict) -> str:
@@ -59,7 +62,6 @@ def _diversion_emissions(data: dict) -> str:
         ) or ""
 
     elif mode == "Enter Directly":
-        from pylatex.utils import escape_latex
         direct = em_data.get("direct_entry", {})
         val = float(direct.get("total_direct_emissions", 0.0))
         source = (direct.get("source") or "").strip()
@@ -68,31 +70,23 @@ def _diversion_emissions(data: dict) -> str:
         source_sent = rf" This estimate is based on {escape_latex(source)}." if source else " Source not mentioned."
         comments_sent = rf" {escape_latex(comments)}" if comments else ""
 
+        total_cell = (
+            bold(f"{val:,.{DECIMAL_PLACES_FOR_LATEX}f}")
+            + "~kgCO" + Command("textsubscript", "2").dumps() + "e/day"
+        )
         paragraph = (
-            rf"The total traffic diversion emissions, entered directly, amount to "
-            rf"\textbf{{{val:,.{DECIMAL_PLACES_FOR_LATEX}f}}}~kgCO\textsubscript{{2}}e/day."
-            rf"{source_sent}{comments_sent}"
+            "The total traffic diversion emissions, entered directly, amount to "
+            + total_cell + "." + source_sent + comments_sent
         )
 
         rows = [
-            ("Total Daily Diversion Emissions", rf"\textbf{{{val:,.{DECIMAL_PLACES_FOR_LATEX}f}}}~kgCO\textsubscript{{2}}e/day"),
+            ("Total Daily Diversion Emissions", total_cell),
             ("Source", escape_latex(source) if source else "Not mentioned"),
         ]
         if comments:
             rows.append(("Comments", escape_latex(comments)))
 
-        detail = "\n".join(
-            rf"  \noindent\textbf{{{escape_latex(label)}:}}\quad {value} \par\smallskip"
-            for label, value in rows
-        )
-
-        diversion_latex = (
-            "\n\\medskip\n"
-            + rf"\noindent {paragraph}"
-            + "\n\n\\medskip\n"
-            + detail
-            + "\n\\medskip\n"
-        )
+        diversion_latex = entered_value_block(paragraph, rows)
 
     if not diversion_latex:
         return ""

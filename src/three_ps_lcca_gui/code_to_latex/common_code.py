@@ -2,6 +2,7 @@ from pylatex import Command, Table, Tabular, MultiColumn, NoEscape
 from pylatex.utils import bold, escape_latex
 from ..gui.components.utils.form_builder.form_definitions import Section, FieldDef
 from .html_to_latex import format_remarks_latex
+from .SETTINGS import LATEX_TABLE_LAYOUTS
 
 
 def longtable_head(table, caption: str, label: str, add_head) -> None:
@@ -23,8 +24,24 @@ def longtable_head(table, caption: str, label: str, add_head) -> None:
     table.end_table_header()
 
 
+def entered_value_block(paragraph: str, details: list) -> str:
+    """A summary paragraph followed by one bold "Label: value" line per detail.
+
+    *paragraph* and each value are LaTeX; the labels are escaped.
+    """
+    medskip = Command("medskip").dumps()
+    lines = "\n".join(
+        "  " + Command("noindent").dumps() + bold(label + ":") + Command("quad").dumps()
+        + " " + value + " " + Command("par").dumps() + Command("smallskip").dumps()
+        for label, value in details
+    )
+    return (
+        "\n" + medskip + "\n" + Command("noindent").dumps() + " " + paragraph
+        + "\n\n" + medskip + "\n" + lines + "\n" + medskip + "\n"
+    )
+
+
 def latex_layout(name: str) -> str:
-    from .SETTINGS import LATEX_TABLE_LAYOUTS
     return LATEX_TABLE_LAYOUTS[name]
 
 def fields_to_latex(fields: list, data: dict, caption: str, label: str, unit_overrides: dict = None) -> str:
