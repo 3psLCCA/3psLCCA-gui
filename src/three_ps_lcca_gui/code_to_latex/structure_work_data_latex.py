@@ -6,7 +6,7 @@ from pylatex.utils import bold, italic, escape_latex
 from ..gui.components.utils.common_requested_data import get_chunk, get_currency
 from ..gui.components.utils.definitions import STRUCTURE_CHUNKS, UNIT_DISPLAY
 from .SETTINGS import DECIMAL_PLACES_FOR_LATEX
-from .common_code import latex_layout
+from .common_code import latex_layout, longtable_head
 
 _EMDASH     = NoEscape(r"\textemdash")
 _CENTER_DASH = NoEscape(r"\multicolumn{1}{c}{\textemdash}")
@@ -40,13 +40,12 @@ def longtable_sections(col_spec: str, n_cols: int, caption: str, label: str,
     table = LongTable(col_spec)
     header_row = [NoEscape(r"\textbf{" + str(h) + "}") if isinstance(h, NoEscape) else bold(h) for h in headers]
 
-    table.append(NoEscape(
-        rf"\caption{{{escape_latex(caption)}}} \label{{{label}}} \\"
-    ))
-    table.append(NoEscape(r"\toprule"))
-    table.add_row(header_row)
-    table.append(NoEscape(r"\midrule"))
-    table.append(NoEscape(r"\endhead"))
+    def head(t):
+        t.append(NoEscape(r"\toprule"))
+        t.add_row(header_row)
+        t.append(NoEscape(r"\midrule"))
+
+    longtable_head(table, caption, label, head)
 
     table.append(NoEscape(r"\midrule"))
     table.append(NoEscape(

@@ -1,7 +1,26 @@
-from pylatex import Table, Tabular, MultiColumn, NoEscape
+from pylatex import Command, Table, Tabular, MultiColumn, NoEscape
 from pylatex.utils import bold, escape_latex
 from ..gui.components.utils.form_builder.form_definitions import Section, FieldDef
 from .html_to_latex import format_remarks_latex
+
+
+def longtable_head(table, caption: str, label: str, add_head) -> None:
+    """Caption a pylatex LongTable and give it a head that repeats on every page.
+
+    The caption and label are set once, on the first page. Continuation pages
+    repeat the caption with an empty short title, so it neither adds a second
+    List of Tables entry nor defines the label again. *add_head(table)* appends
+    the column-heading rows (rules included) and is called once per head.
+    """
+    table.append(Command("caption", caption))
+    table.append(Command("label", NoEscape(label)))
+    table.append(NoEscape(r"\\"))
+    add_head(table)
+    table.append(Command("endfirsthead"))
+    table.append(Command("caption", caption, options=NoEscape("")))
+    table.append(NoEscape(r"\\"))
+    add_head(table)
+    table.end_table_header()
 
 
 def latex_layout(name: str) -> str:

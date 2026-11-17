@@ -3,6 +3,7 @@ from pylatex.utils import bold, escape_latex
 from ..gui.components.outputs.lcc_data import _MASTER_ROWS, _CREDIT_KEYS, _get, stage_totals
 from ..gui.components.utils.common_requested_data import get_currency
 from .SETTINGS import DECIMAL_PLACES_FOR_LATEX
+from .common_code import longtable_head
 
 _N_COLS  = 2
 _COL_SPEC = "p{12cm}r"
@@ -87,15 +88,13 @@ def results_to_latex(controller) -> str:
 
     table = LongTable(_COL_SPEC)
 
-    # ── Caption (inside longtable so it repeats on continued pages) ───────────
-    table.append(NoEscape(r"\caption{Life Cycle Cost Analysis Results} "
-                          r"\label{tab:lcca_results} \\"))
+    # ── Caption and header (repeated on continued pages) ──────────────────────
+    def head(t):
+        t.append(NoEscape(r"\toprule"))
+        t.add_row(["Description", f"Present Value ({currency})"])
+        t.append(NoEscape(r"\midrule"))
 
-    # ── Repeating header ──────────────────────────────────────────────────────
-    table.append(NoEscape(r"\toprule"))
-    table.add_row(["Description", f"Present Value ({currency})"])
-    table.append(NoEscape(r"\midrule"))
-    table.append(NoEscape(r"\endhead"))
+    longtable_head(table, "Life Cycle Cost Analysis Results", "tab:lcca_results", head)
 
     # ── Continued footer (every page except last) ─────────────────────────────
     table.append(NoEscape(r"\midrule"))
