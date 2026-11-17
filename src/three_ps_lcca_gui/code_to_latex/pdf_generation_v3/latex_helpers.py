@@ -208,23 +208,24 @@ def front_matter(figures: bool = True) -> str:
 
 
 def section(title: str) -> str:
-    return r"\section{" + escape_latex(title) + r"}"
+    return Command("section", title).dumps()
 
 
 def subsection(title: str) -> str:
-    return r"\subsection{" + escape_latex(title) + r"}"
+    return Command("subsection", title).dumps()
 
 
 def subsubsection(title: str) -> str:
-    return r"\subsubsection{" + escape_latex(title) + r"}"
+    return Command("subsubsection", title).dumps()
 
 
 def paragraph(text: str) -> str:
-    return r"\par\medskip " + escape_latex(text) + r"\par\medskip"
+    gap = Command("par").dumps() + Command("medskip").dumps()
+    return gap + " " + escape_latex(text) + gap
 
 
 def clearpage() -> str:
-    return r"\clearpage"
+    return Command("clearpage").dumps()
 
 
 def appendix_counter(letter: str) -> str:

@@ -1,16 +1,13 @@
+from pylatex import Figure, NoEscape
+
 from ..latex_helpers import paragraph, section
 
 
 def _framework_figure() -> str:
-    image_path = "../pdf_generation_v3/images/image_1.png"
-
-    return "\n".join([
-        r"\begin{figure}[H]",
-        r"\centering",
-        r"\includegraphics[width=0.82\textwidth]{" + image_path + r"}",
-        r"\caption{3PS-LCC framework}",
-        r"\end{figure}",
-    ])
+    figure = Figure(position="H")
+    figure.add_image("../pdf_generation_v3/images/image_1.png", width=NoEscape(r"0.82\textwidth"))
+    figure.add_caption("3PS-LCC framework")
+    return figure.dumps()
 
 
 def introduction_to_latex() -> str:
