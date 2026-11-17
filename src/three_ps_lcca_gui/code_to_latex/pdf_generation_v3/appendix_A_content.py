@@ -1,5 +1,4 @@
 
-from pylatex import NoEscape
 
 APPENDIX_A_LATEX = r"""
 

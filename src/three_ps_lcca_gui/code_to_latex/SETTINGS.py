@@ -1,3 +1,6 @@
+import sys
+from pathlib import Path
+
 DECIMAL_PLACES_FOR_LATEX       = 2
 DECIMAL_PLACES_FOR_LATEX_RATIO = 4
 
@@ -55,8 +58,6 @@ REQUIRED_LATEX_PACKAGES = {
 
 def _find_texmf_latex():
     """Return the texmf-dist/tex/latex Path inside the active env, or None."""
-    import sys
-    from pathlib import Path
     candidates = [
         Path(sys.prefix) / "Library" / "share" / "osdag_latex_env" / "texmf-dist" / "tex" / "latex",
         Path(sys.prefix) / "share"   / "osdag_latex_env" / "texmf-dist" / "tex" / "latex",

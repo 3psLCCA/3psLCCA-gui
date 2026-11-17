@@ -1,5 +1,4 @@
 
-from pylatex import NoEscape
 
 APPENDIX_B_LATEX = r"""
 \newpage

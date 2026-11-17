@@ -10,8 +10,12 @@ from pathlib import Path
 from typing import Callable
 
 try:
-    from three_ps_lcca_gui.gui.components.utils.common_requested_data import set_controller as _set_controller
+    from three_ps_lcca_gui.gui.components.utils.common_requested_data import (
+        get_traffic_and_road_data as _get_traffic_and_road_data,
+        set_controller as _set_controller,
+    )
 except Exception:
+    _get_traffic_and_road_data = None
     _set_controller = None
 
 try:
@@ -22,7 +26,6 @@ except Exception:
 
 from pylatex import Command, NoEscape
 from pylatex.utils import escape_latex
-from three_ps_lcca_gui.gui._CONFIG import ALLOW_TEX
 from ..SETTINGS import REQUIRED_LATEX_PACKAGES
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -297,8 +300,7 @@ REPORT_SCHEMA = [
 
 def _traffic_mode() -> str:
     try:
-        from three_ps_lcca_gui.gui.components.utils.common_requested_data import get_traffic_and_road_data
-        return get_traffic_and_road_data().get("mode", "")
+        return _get_traffic_and_road_data().get("mode", "")
     except Exception:
         return ""
 
