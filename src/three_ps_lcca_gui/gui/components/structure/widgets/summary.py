@@ -15,7 +15,10 @@ from PySide6.QtCore import Qt, Signal, QPoint, QRectF, QSize
 from PySide6.QtGui import QColor, QFont, QPainter, QPen
 from three_ps_lcca_gui.gui.themes import get_token
 from three_ps_lcca_gui.gui.styles import font
-from three_ps_lcca_gui.gui.theme import FS_DISP, FS_MD, FS_SM, FW_BOLD, FW_SEMIBOLD
+from three_ps_lcca_gui.gui.theme import (
+    FS_DISP, FS_MD, FS_SM, FW_BOLD, FW_MEDIUM, FW_SEMIBOLD,
+    BTN_SM, RADIUS_LG, RADIUS_SM, SP1, SP2, SP3, SP4,
+)
 from ...utils.display_format import fmt_comma, fmt_pct
 from ...utils.icons import make_icon
 from .items_by_tab import ItemsByTabView, TAB_NAMES
@@ -126,7 +129,7 @@ class _FormatRow(QFrame):
         b.setAlignment(Qt.AlignCenter)
         b.setFixedSize(38, 20)
         b.setStyleSheet(
-            f"color: {color}; background-color: {_rgba(color, 45)}; border-radius: 4px;"
+            f"color: {color}; background-color: {_rgba(color, 45)}; border-radius: {RADIUS_SM}px;"
         )
         b.setFont(font(FS_SM, FW_BOLD))
         texts = QVBoxLayout()
@@ -237,39 +240,39 @@ class StructureSummaryWidget(ItemsByTabView):
         self.export_btn.setCursor(Qt.PointingHandCursor)
         self.export_btn.setToolTip("Export the Bill of Quantities")
         self.export_btn.setStyleSheet(
-            btn_css + "QPushButton { border-top-left-radius: 8px; border-bottom-left-radius: 8px; }"
+            btn_css + f"QPushButton {{ border-top-left-radius: {RADIUS_LG}px; border-bottom-left-radius: {RADIUS_LG}px; }}"
         )
         inner = QHBoxLayout(self.export_btn)
-        inner.setContentsMargins(18, 0, 12, 0)
-        inner.setSpacing(8)
+        inner.setContentsMargins(SP4, 0, SP3, 0)
+        inner.setSpacing(SP2)
         icon = QLabel()
-        icon.setPixmap(make_icon("download", color=base).pixmap(18, 18))
+        icon.setPixmap(make_icon("download", color=base).pixmap(14, 14))
         label = QLabel("Export BOQ")
-        label.setFont(font(FS_MD, FW_BOLD))
+        label.setFont(font(FS_MD, FW_MEDIUM))
         label.setStyleSheet(f"color: {base};")
         self.fmt_badge = QLabel()
         self.fmt_badge.setAlignment(Qt.AlignCenter)
-        self.fmt_badge.setFixedHeight(20)
+        self.fmt_badge.setFixedHeight(SP4)
         self.fmt_badge.setStyleSheet(
-            f"color: {base}; background-color: rgba(0, 0, 0, 60); border-radius: 4px;"
-            " padding: 0px 6px;"
+            f"color: {base}; background-color: rgba(0, 0, 0, 60); border-radius: {RADIUS_SM}px;"
+            f" padding: 0px {SP2}px;"
         )
-        self.fmt_badge.setFont(font(FS_SM, FW_BOLD))
+        self.fmt_badge.setFont(font(FS_SM, FW_MEDIUM))
         for w in (icon, label, self.fmt_badge):
             w.setAttribute(Qt.WA_TransparentForMouseEvents)
             inner.addWidget(w, 0, Qt.AlignVCenter)
-        self.export_btn.setFixedHeight(40)
+        self.export_btn.setFixedHeight(BTN_SM)
         self.export_btn.clicked.connect(lambda: self.export_requested.emit(self._fmt))
 
         self._chevrons = {n: make_icon(n, color=base) for n in ("expand-more", "expand-less")}
         self.fmt_btn = QPushButton()
         self.fmt_btn.setIcon(self._chevrons["expand-more"])
-        self.fmt_btn.setIconSize(QSize(22, 22))
+        self.fmt_btn.setIconSize(QSize(18, 18))
         self.fmt_btn.setCursor(Qt.PointingHandCursor)
         self.fmt_btn.setToolTip("Choose the export format")
-        self.fmt_btn.setFixedSize(44, 40)
+        self.fmt_btn.setFixedSize(BTN_SM + SP1, BTN_SM)
         self.fmt_btn.setStyleSheet(
-            btn_css + "QPushButton { border-top-right-radius: 8px; border-bottom-right-radius: 8px;"
+            btn_css + f"QPushButton {{ border-top-right-radius: {RADIUS_LG}px; border-bottom-right-radius: {RADIUS_LG}px;"
             f" border-left: 1px solid {green.darker(125).name()}; }}"
         )
         self.fmt_btn.clicked.connect(self._show_menu)
