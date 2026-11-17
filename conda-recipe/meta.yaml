@@ -39,7 +39,7 @@ requirements:
   run:
     - python>=3.10,<3.13
     - pip
-    - pyside6<6.10
+    - pyside6>=6.11,<6.12  # keep in sync with pyproject.toml / requirements.txt
     - psutil
     - Pillow
     - matplotlib

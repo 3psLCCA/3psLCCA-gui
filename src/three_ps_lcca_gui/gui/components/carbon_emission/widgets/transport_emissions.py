@@ -34,9 +34,10 @@ from ...utils.validation_helpers import freeze_widgets
 class _TransportEmissionsTable(TooltipTableMixin, QTableWidget):
     """Transport table with a WordWrapHeaderView installed at construction time.
 
-    Installing it here (instead of relying on the global _TableHeaderWordWrapFilter)
-    means the header is always visible: the filter skips tables that already use
-    WordWrapHeaderView, so no deferred swap occurs and no hidden-header race exists.
+    The global _TableHeaderWordWrapFilter would also install one (deferred), and
+    skips tables that already have it. Note: blank headings in installer builds
+    were NOT caused by that deferred swap; see WordWrapHeaderView.paintSection
+    and devtools/dev_notes_log/3psLCCA_blank_table_headers_fix.md.
     """
 
     # Material, Category, kg Factor, Quantity (kg), Trips, Emission, Warnings

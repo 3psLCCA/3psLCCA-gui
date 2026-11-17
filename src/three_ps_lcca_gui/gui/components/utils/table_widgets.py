@@ -97,9 +97,13 @@ class GroupedHeaderView(QHeaderView):
             opt.textAlignment    = Qt.AlignCenter | Qt.AlignVCenter
             opt.position         = QStyleOptionHeader.Middle
             opt.selectedPosition = QStyleOptionHeader.NotAdjacent
+            # Isolate each style call so painter state (clip, pen, brush) left
+            # behind by QStyleSheetStyle cannot leak into the next group label.
+            painter.save()
             self.style().drawControl(
                 self.style().ControlElement.CE_Header, opt, painter, self
             )
+            painter.restore()
         painter.end()
 
 
@@ -177,7 +181,15 @@ class WordWrapHeaderView(QHeaderView):
             opt.rect = rect
             text = str(self.model().headerData(logical_index, self.orientation(), Qt.DisplayRole) or "")
             opt.text = ""  # blank text so style paints background/frame without drawing single-line text
+            # Isolate the style call: with the app stylesheet active, Qt <= 6.9's
+            # QStyleSheetStyle (CE_Header with border-radius) returns the painter
+            # with an EMPTY clip region, so the drawText below is clipped away and
+            # headings render blank. The installer pins pyside6<6.10, which is why
+            # this only shows up in the installed app (dev venv runs 6.12).
+            painter.save()
             self.style().drawControl(QStyle.CE_Header, opt, painter, self)
+            painter.restore()
+            painter.setClipRect(rect)
             painter.setFont(self._font if self._font else self.font())
             fg = self.model().headerData(logical_index, self.orientation(), Qt.ForegroundRole)
             fg_color = fg.color() if (fg and hasattr(fg, "color")) else QColor(get_token("text_secondary"))
