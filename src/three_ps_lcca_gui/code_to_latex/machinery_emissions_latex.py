@@ -48,13 +48,13 @@ def _detailed_to_latex(data: dict) -> str:
             label="tab:machinery_equipment_emissions",
             hrules=True,
             column_format=(
-                r">{\raggedright\arraybackslash}p{2.8cm}"
-                r">{\raggedright\arraybackslash}p{1.6cm}"
+                r">{\raggedright\arraybackslash}p{2.5cm}"
+                r">{\raggedright\arraybackslash}p{1.5cm}"
                 r">{\raggedleft\arraybackslash}p{1.2cm}"
                 r">{\raggedleft\arraybackslash}p{1.1cm}"
                 r">{\raggedleft\arraybackslash}p{1.1cm}"
-                r">{\raggedleft\arraybackslash}p{1.7cm}"
-                r">{\raggedleft\arraybackslash}p{1.8cm}"
+                r">{\raggedleft\arraybackslash}p{2.15cm}"
+                r">{\raggedleft\arraybackslash}p{2.05cm}"
                 r">{\raggedleft\arraybackslash}p{2.1cm}"
             ),
             environment="longtable",
