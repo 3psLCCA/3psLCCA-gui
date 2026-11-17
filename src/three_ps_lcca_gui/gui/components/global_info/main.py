@@ -23,6 +23,10 @@ from ..utils.validation_helpers import clear_field_styles, freeze_form, freeze_w
 from ..utils.countries_data import CURRENCIES, COUNTRIES
 
 
+# Prefix of custom-database keys (custom_material_db.CUSTOM_PREFIX). Repeated
+# here because that module is imported lazily below.
+_CUSTOM_PREFIX = "custom::"
+
 GENERAL_FIELDS = []
 
 PROJECT_INFO_FIELDS = [
@@ -345,15 +349,48 @@ class GeneralInfo(ScrollableForm):
         cb.blockSignals(True)
         cb.clear()
         for opt in options:
-            cb.addItem(opt["label"], opt["db_key"])
+            cb.addItem(self._sor_display_label(opt), opt["db_key"])
         cb.addItem("- No suggestions -", "")
 
         idx = cb.findData(saved_key) if saved_key else -1
+        if saved_key and idx < 0:
+            # Saved database isn't shipped in this version: show it, keep its
+            # key in the chunk, but don't let the user pick it again.
+            cb.insertItem(0, self._missing_sor_label(saved_key), saved_key)
+            cb.model().item(0).setEnabled(False)
+            idx = 0
         # default → "- No suggestions -"
         cb.setCurrentIndex(idx if idx >= 0 else cb.count() - 1)
 
         cb.setEnabled(bool(options))
         cb.blockSignals(False)
+
+    @staticmethod
+    def _sor_display_label(opt: dict) -> str:
+        """Short label for a database key, any depth.
+
+        Drop the first part (the country: the list is already filtered to the
+        project's country), show '_' as a space, and join the rest with ' – ':
+          'INDIA/Madhya_Pradesh/MPPWD SOR 2025' -> 'Madhya Pradesh – MPPWD SOR 2025'
+          'INDIA/Maharashtra/Nagpur/NMC/2022'   -> 'Maharashtra – Nagpur – NMC – 2022'
+          'INDIA/MumbaiSOR'                     -> 'MumbaiSOR'
+        Display only: the combo item data stays the full db_key. Custom
+        databases keep their own label.
+        """
+        if opt.get("region") == "Custom":
+            return opt["label"]
+        parts = [p.replace("_", " ").strip() for p in opt["db_key"].split("/")[1:]]
+        return " – ".join(p for p in parts if p) or opt["label"]
+
+    @classmethod
+    def _missing_sor_label(cls, db_key: str) -> str:
+        """Label for a saved database key that this version doesn't ship."""
+        if db_key.startswith(_CUSTOM_PREFIX):
+            label = f"{db_key[len(_CUSTOM_PREFIX):]}  (Custom)"
+            opt = {"db_key": db_key, "region": "Custom", "label": label}
+        else:
+            opt = {"db_key": db_key, "region": "", "label": db_key}
+        return f"{cls._sor_display_label(opt)} (not available in this version)"
 
     def get_data_dict(self) -> dict:
         data = super().get_data_dict()
