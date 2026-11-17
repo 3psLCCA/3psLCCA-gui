@@ -12,7 +12,6 @@ them by basename alone (it runs from that same directory).
 """
 
 import concurrent.futures
-import contextlib
 import os
 import tempfile
 
@@ -38,9 +37,9 @@ from ..gui.components.outputs.plots_helper.AggregateChart import (
     _build_pillar_data as _build_agg_pillar_data,
     StageBarPlotter,
     SustainabilityBarPlotter,
-    STAGE_COLORS,
     PILLAR_COLORS,
 )
+from ..gui import themes as _themes
 from ..gui.components.utils.display_format import fmt_currency
 from .constants import (
     KEY_PLOT_PILLAR_DONUT,
@@ -509,8 +508,7 @@ def generate_plots(results: dict, output_dir: str, currency: str = "INR") -> dic
 
     # Temporarily override theme tokens so plotters render with print-safe
     # dark text regardless of whether the app is in dark mode.
-    from ..gui import themes as _themes
-    _PRINT_TOKENS = {"text": "#1a1a1a", "surface_mid": "#cccccc",
+    _PRINT_TOKENS = {"base": _BG, "text": _TC, "surface_mid": _GC,
                      "text_secondary": "#555555", "text_disabled": "#888888"}
     _themes._ensure_tokens()
     _saved = {k: _themes._active_tokens.get(k) for k in _PRINT_TOKENS}
