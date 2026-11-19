@@ -316,8 +316,8 @@ def build_form(
 
         section = QWidget()
         layout = QVBoxLayout(section)
-        layout.setContentsMargins(0, 8, 0, 8)
-        layout.setSpacing(4)
+        layout.setContentsMargins(0, 10, 0, 10)
+        layout.setSpacing(6)
 
         # Title
         if f.required:
@@ -327,10 +327,6 @@ def build_form(
             title_label = QLabel(f.title)
         title_label.setStyleSheet(f"font-weight: {get_token('weight-semibold')};")
         layout.addWidget(title_label)
-
-        if f.explanation:
-            html = f.explanation + (" " + doc_inline(f.doc_slug) if f.doc_slug else "")
-            layout.addWidget(doc_label(html))
 
         # ── text ──────────────────────────────────────────────────────────
         if f.field_type == "text":
@@ -446,6 +442,13 @@ def build_form(
         # upload_img adds its own container widget above; all others add here
         if f.field_type != "upload_img":
             layout.addWidget(widget)
+
+        # Help text sits below the input so inputs in a row line up
+        if f.explanation:
+            html = f.explanation + (" " + doc_inline(f.doc_slug) if f.doc_slug else "")
+            help_label = doc_label(html)
+            help_label.setStyleSheet(f"color: {get_token('text_secondary')};")
+            layout.addWidget(help_label)
 
         # Permanently blocked fields are frozen at build time
         if f.blocked:
