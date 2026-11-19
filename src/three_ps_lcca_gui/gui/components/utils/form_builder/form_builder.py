@@ -225,10 +225,12 @@ _BP_DESKTOP = 1200  # below: 2 columns (tablet); at/above: 3 (desktop)
 
 
 class _ResponsiveGrid(QWidget):
-    """Holds short field sections and reflows them into 1/2/3 columns by width."""
+    """Holds short field sections and reflows them into 1/2/3 columns by width.
+    max_cols caps the column count (e.g. 2 keeps value/source pairs on one row)."""
 
-    def __init__(self):
+    def __init__(self, max_cols: int = 3):
         super().__init__()
+        self._max_cols = max_cols
         self._grid = QGridLayout(self)
         self._grid.setContentsMargins(0, 0, 0, 0)
         self._grid.setHorizontalSpacing(24)
@@ -240,11 +242,10 @@ class _ResponsiveGrid(QWidget):
         self._items.append(w)
         self._reflow(self._cols_for(self.width()) if self._cols else 1)
 
-    @staticmethod
-    def _cols_for(width: int) -> int:
+    def _cols_for(self, width: int) -> int:
         if width < _BP_TABLET:
             return 1
-        return 2 if width < _BP_DESKTOP else 3
+        return min(self._max_cols, 2 if width < _BP_DESKTOP else 3)
 
     def _reflow(self, cols: int) -> None:
         self._cols = cols
@@ -265,6 +266,7 @@ class _ResponsiveGrid(QWidget):
 def build_form(
     host: Any,
     fields: list[Section | FieldDef],
+    max_cols: int = 3,
 ) -> list[str]:
     """
     Iterate *fields* and populate ``host.form`` (a QFormLayout).
@@ -285,6 +287,8 @@ def build_form(
         The form instance being populated.
     fields : list[Section | FieldDef]
         Declarative field definitions (see form_definitions.py).
+    max_cols : int
+        Most columns short fields may use on wide screens (1-3).
 
     Returns
     -------
@@ -461,7 +465,7 @@ def build_form(
         # Short fields share a responsive grid; wide ones take the full row
         if f.field_type in _HALF_WIDTH_TYPES:
             if open_row is None:
-                open_row = _ResponsiveGrid()
+                open_row = _ResponsiveGrid(max_cols)
                 host.form.addRow(open_row)
             open_row.add(section)
         else:

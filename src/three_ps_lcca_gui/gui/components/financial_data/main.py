@@ -93,7 +93,7 @@ class FinancialData(ScrollableForm):
     def __init__(self, controller=None):
         super().__init__(controller=controller, chunk_name="financial_data")
 
-        self.required_keys = build_form(self, FINANCIAL_FIELDS)
+        self.required_keys = build_form(self, FINANCIAL_FIELDS, max_cols=2)  # value + its source per row
 
         # ── Buttons row ───────────────────────────────────────────────────
         btn_row = QWidget()
