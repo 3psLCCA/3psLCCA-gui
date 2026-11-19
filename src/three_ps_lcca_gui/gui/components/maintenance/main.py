@@ -3,17 +3,19 @@ gui/components/maintenance/main.py
 """
 
 from PySide6.QtWidgets import (
+    QComboBox,
     QHBoxLayout,
+    QLineEdit,
     QPushButton,
     QWidget,
     QDoubleSpinBox,
     QSpinBox,
-    QMessageBox,
 )
 
 from ..base_widget import ScrollableForm
 from ..utils.form_builder.form_definitions import FieldDef, Section
 from ..utils.form_builder.form_builder import build_form
+from ..utils.form_builder.percent_or_value import PERCENT, PercentOrValueInput
 from ..utils.validation_helpers import (
     clear_field_styles,
     freeze_form,
@@ -31,12 +33,11 @@ MAINTENANCE_FIELDS = [
         "routine_inspection_cost",
         "Routine Inspection Cost",
         "[Cost incurred due to routine inspection, expressed as a percentage of the initial construction cost.]",
-        "float",
-        options=(0.0, 100.0, 3),
-        unit="(% of initial construction cost)",
+        "per_or_val",
+        options=3,
+        unit="",
+        percent_of="initial_construction_cost",
         required=True,
-        default=0.0,
-        warn=(0.01, 100.0, "Routine Inspection Cost is 0 - cost will not be included"),
         doc_slug=["Maintenance_repair", "Routine_inspection_cost"],
     ),
     FieldDef(
@@ -61,32 +62,22 @@ MAINTENANCE_FIELDS = [
         "periodic_maintenance_cost",
         "Periodic Maintenance Cost",
         "[Cost incurred due to periodic maintenance, expressed as a percentage of the initial construction cost.]",
-        "float",
-        options=(0.0, 100.0, 3),
-        unit="(% of initial construction cost)",
+        "per_or_val",
+        options=3,
+        unit="",
+        percent_of="initial_construction_cost",
         required=True,
-        default=0.0,
-        warn=(
-            0.01,
-            100.0,
-            "Periodic Maintenance Cost is 0 - cost will not be included",
-        ),
         doc_slug=["Maintenance_repair", "Periodic_maintenance_cost"],
     ),
     FieldDef(
         "periodic_maintenance_carbon_cost",
         "Periodic Maintenance Carbon Cost",
         "[Carbon emissions cost incurred due to periodic maintenance, expressed as a percentage of the initial carbon emissions cost.]",
-        "float",
-        options=(0.0, 100.0, 3),
-        unit="(% of initial construction cost)",
+        "per_or_val",
+        options=3,
+        unit="kgCO₂e",
+        percent_of="initial_carbon_emissions",
         required=True,
-        default=0.0,
-        warn=(
-            0.01,
-            100.0,
-            "Periodic Maintenance Carbon Cost is 0 - cost will not be included",
-        ),
         doc_slug=["Maintenance_repair", "Periodic_maintenance_carbon_cost"],
     ),
     FieldDef(
@@ -111,12 +102,11 @@ MAINTENANCE_FIELDS = [
         "major_inspection_cost",
         "Major Inspection Cost",
         "[Cost incurred due to major inspection, expressed as a percentage of the initial construction cost.]",
-        "float",
-        options=(0.0, 100.0, 3),
-        unit="(% of initial construction cost)",
+        "per_or_val",
+        options=3,
+        unit="",
+        percent_of="initial_construction_cost",
         required=True,
-        default=0.0,
-        warn=(0.01, 100.0, "Major Inspection Cost is 0 - cost will not be included"),
         doc_slug=["Maintenance_repair", "Major_inspection_cost"],
     ),
     FieldDef(
@@ -140,24 +130,22 @@ MAINTENANCE_FIELDS = [
         "major_repair_cost",
         "Major Repair Cost",
         "[Cost incurred due to major repairs, expressed as a percentage of the initial construction cost.]",
-        "float",
-        options=(0.0, 100.0, 3),
-        unit="(% of initial construction cost)",
+        "per_or_val",
+        options=3,
+        unit="",
+        percent_of="initial_construction_cost",
         required=True,
-        default=0.0,
-        warn=(0.01, 100.0, "Major Repair Cost is 0 - cost will not be included"),
         doc_slug=["Maintenance_repair", "Major_repair_cost"],
     ),
     FieldDef(
         "major_repair_carbon_cost",
         "Major Repair Carbon Cost",
         "[Carbon emissions cost incurred due to major repairs, expressed as a percentage of the initial carbon emissions cost.]",
-        "float",
-        options=(0.0, 100.0, 3),
-        unit="(% of initial construction cost)",
+        "per_or_val",
+        options=3,
+        unit="kgCO₂e",
+        percent_of="initial_carbon_emissions",
         required=True,
-        default=0.0,
-        warn=(0.01, 100.0, "Major Repair Carbon Cost is 0 - cost will not be included"),
         doc_slug=["Maintenance_repair", "Major_repair_carbon_cost"],
     ),
     FieldDef(
@@ -198,16 +186,11 @@ MAINTENANCE_FIELDS = [
         "bearing_exp_joint_cost",
         "Bearing & Expansion Joint Replacement Cost",
         "[Cost incurred due to replacement of bearing and expansion joint, expressed as a percentage of the superstructure cost.]",
-        "float",
-        options=(0.0, 100.0, 3),
-        unit="(% of initial construction cost)",
+        "per_or_val",
+        options=3,
+        unit="",
+        percent_of="superstructure_cost",
         required=True,
-        default=0.0,
-        warn=(
-            0.01,
-            100.0,
-            "Bearing & Expansion Joint Cost is 0 - cost will not be included",
-        ),
         doc_slug=["Maintenance_repair", "Bearing_expansion_joint_replacement_cost"],
     ),
     FieldDef(
@@ -302,6 +285,10 @@ class Maintenance(ScrollableForm):
             widget = getattr(self, key, None)
             if widget is None:
                 continue
+            if isinstance(widget, PercentOrValueInput):
+                widget.set_value({"type": PERCENT, "value": val})
+                widget.line.setStyleSheet("")
+                continue
             if isinstance(widget, (QDoubleSpinBox, QSpinBox)):
                 widget.setValue(val)
             elif isinstance(widget, QComboBox):
@@ -327,6 +314,10 @@ class Maintenance(ScrollableForm):
                 continue
             widget = getattr(self, entry.key, None)
             if widget is None:
+                continue
+            if isinstance(widget, PercentOrValueInput):
+                widget.set_value(None)
+                widget.line.setStyleSheet("")
                 continue
             if isinstance(widget, QLineEdit):
                 widget.clear()
