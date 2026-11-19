@@ -441,6 +441,10 @@ class ProjectWindow(QMainWindow):
         self.status_bar = QStatusBar()
         self.setStatusBar(self.status_bar)
 
+        # Save state stays visible; showMessage() only covers it briefly
+        self.save_lbl = QLabel()
+        self.status_bar.addWidget(self.save_lbl)
+
         # Add version to the right of the status bar
         self.version_lbl = QLabel(VERSION)
         self.version_lbl.setStyleSheet(
@@ -454,13 +458,8 @@ class ProjectWindow(QMainWindow):
         # ── Controller signals ────────────────────────────────────────────
         self.controller.fault_occurred.connect(self._on_fault)
         self.controller.project_loaded.connect(self._on_project_loaded)
-        self.controller.sync_completed.connect(
-            lambda: self.status_bar.showMessage("All changes saved.", 3000)
-        )
-        self.controller.dirty_changed.connect(
-            lambda d: self.status_bar.showMessage(
-                "Unsaved changes...") if d else None
-        )
+        self.controller.sync_completed.connect(self._on_saved)
+        self.controller.dirty_changed.connect(self._on_dirty_changed)
 
         theme_manager().theme_changed.connect(self._refresh_lock_btn)
 
@@ -1187,7 +1186,7 @@ class ProjectWindow(QMainWindow):
         self._needs_initial_landing = True
         display = self.controller.active_display_name or self.project_id
         self.setWindowTitle(f"3psLCCA - {display}")
-        self.status_bar.showMessage(f"Project: {display}")
+        self._on_saved()
 
         # Apply project's unit system to the unit dropdowns
         try:
@@ -1196,6 +1195,12 @@ class ProjectWindow(QMainWindow):
             set_active_unit_system(unit_system)
         except Exception:
             pass
+
+    def _on_saved(self):
+        self.save_lbl.setText("All changes saved")
+
+    def _on_dirty_changed(self, dirty: bool):
+        self.save_lbl.setText("Unsaved changes…" if dirty else "All changes saved")
 
     def _on_fault(self, error_message: str):
         QMessageBox.critical(

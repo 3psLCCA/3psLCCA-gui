@@ -57,9 +57,8 @@ def flush_project_window(window: "ProjectWindow"):
     if ctrl is not None:
         _disconnect(ctrl.fault_occurred, getattr(window, "_on_fault", None))
         _disconnect(ctrl.project_loaded, getattr(window, "_on_project_loaded", None))
-        # Lambda-connected — disconnect all
-        _disconnect(ctrl.sync_completed)
-        _disconnect(ctrl.dirty_changed)
+        _disconnect(ctrl.sync_completed, getattr(window, "_on_saved", None))
+        _disconnect(ctrl.dirty_changed, getattr(window, "_on_dirty_changed", None))
 
     # 2. Disconnect SaveStatusBar → controller signals (all lambdas)
     ssb = getattr(window, "save_status_bar", None)
