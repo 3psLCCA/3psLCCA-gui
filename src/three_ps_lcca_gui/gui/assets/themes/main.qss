@@ -38,7 +38,7 @@ QPlainTextEdit {
     background-color: $base;
     border: 1px solid $border;
     border-radius: 8px;
-    padding: 4px 10px;
+    padding: 6px 10px;
     min-height: 24px;
     color: $text;
     selection-background-color: $primary;
@@ -54,7 +54,7 @@ QLineEdit:focus,
 QTextEdit:focus,
 QPlainTextEdit:focus {
     border: 2px solid $primary;
-    padding: 4px 11px;
+    padding: 6px 11px;
 }
 
 QLineEdit:read-only,
@@ -83,7 +83,7 @@ QDoubleSpinBox {
     background-color: $base;
     border: 1px solid $border;
     border-radius: 8px;
-    padding: 4px 10px;
+    padding: 6px 10px;
     min-height: 24px;
     color: $text;
 }
@@ -96,7 +96,7 @@ QDoubleSpinBox:hover {
 QSpinBox:focus,
 QDoubleSpinBox:focus {
     border: 2px solid $primary;
-    padding: 4px 11px;
+    padding: 6px 11px;
 }
 
 QSpinBox:disabled,
@@ -269,7 +269,7 @@ QComboBox {
     background-color: $base;
     border: 1px solid $border;
     border-radius: 8px;
-    padding: 4px 36px 4px 10px;
+    padding: 6px 36px 6px 10px;
     min-height: 24px;
     color: $text;
     combobox-popup: 0;
@@ -281,7 +281,7 @@ QComboBox:hover {
 
 QComboBox:focus {
     border: 2px solid $primary;
-    padding: 4px 37px 4px 11px;
+    padding: 6px 37px 6px 11px;
 }
 
 QComboBox:disabled {
