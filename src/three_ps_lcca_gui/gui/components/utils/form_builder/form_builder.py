@@ -42,6 +42,7 @@ from PySide6.QtWidgets import (
 from three_ps_lcca_gui.gui.themes import get_token
 from .form_definitions import FieldDef, Section
 from .image_utils import compress_image, resolve_img_settings
+from .percent_or_value import PercentOrValueInput
 from ..validation_helpers import confirm_clear_all
 from ..doc_link import doc_inline, doc_label
 
@@ -367,6 +368,17 @@ def build_form(
             widget.currentIndexChanged.connect(
                 lambda _, w=widget: w.setStyleSheet(""))
 
+        # ── per_or_val ────────────────────────────────────────────────────
+        elif f.field_type == "per_or_val":
+            widget = PercentOrValueInput(
+                unit=f.unit, percent_of=f.percent_of,
+                decimals=f.options if isinstance(f.options, int) else 2,
+                min_pct=f.min_pct, max_pct=f.max_pct,
+                min_val=f.min_val, max_val=f.max_val,
+            )
+            setattr(host, f.key, host.field(f.key, widget))
+            widget.changed.connect(lambda w=widget: w.line.setStyleSheet(""))
+
         # ── upload_img ────────────────────────────────────────────────────
         elif f.field_type == "upload_img":
             container, preview, logo_input, btn_row = _make_upload_img_widget(
@@ -380,7 +392,7 @@ def build_form(
         else:
             raise ValueError(
                 f"Unknown field_type {f.field_type!r} for key '{f.key}'. "
-                f"Expected one of: text, textarea, int, float, combo, upload_img."
+                f"Expected one of: text, textarea, int, float, combo, upload_img, per_or_val."
             )
 
         # upload_img adds its own container widget above; all others add here

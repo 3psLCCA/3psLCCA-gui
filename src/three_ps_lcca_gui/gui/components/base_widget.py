@@ -136,7 +136,9 @@ class BaseDataWidget(QWidget):
         """Extracts current widget values into a plain dict for saving."""
         data = {}
         for key, widget in self._field_map.items():
-            if isinstance(widget, QLineEdit):
+            if hasattr(widget, "get_value"):  # composite inputs, e.g. per_or_val
+                data[key] = widget.get_value()
+            elif isinstance(widget, QLineEdit):
                 data[key] = widget.text()
             elif isinstance(widget, QTextEdit):
                 data[key] = widget.toPlainText()
@@ -168,7 +170,9 @@ class BaseDataWidget(QWidget):
     # ── INTERNALS ─────────────────────────────────────────────────────────────
 
     def _connect_widget(self, widget: QWidget):
-        if isinstance(widget, QLineEdit):
+        if hasattr(widget, "changed"):
+            widget.changed.connect(self._on_field_changed)
+        elif isinstance(widget, QLineEdit):
             widget.textChanged.connect(self._on_field_changed)
         elif isinstance(widget, (QDoubleSpinBox, QSpinBox)):
             widget.valueChanged.connect(self._on_field_changed)
@@ -193,7 +197,9 @@ class BaseDataWidget(QWidget):
     def _apply_value(widget: QWidget, val):
         """Write a value to any supported widget type."""
         try:
-            if isinstance(widget, QLineEdit):
+            if hasattr(widget, "set_value"):
+                widget.set_value(val)
+            elif isinstance(widget, QLineEdit):
                 widget.setText(str(val))
             elif isinstance(widget, QTextEdit):
                 widget.setPlainText(str(val))

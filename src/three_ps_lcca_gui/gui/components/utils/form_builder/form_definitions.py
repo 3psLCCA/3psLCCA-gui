@@ -26,6 +26,8 @@ Field types
     "float"      - QDoubleSpinBox; options = (min, max, decimals)
     "combo"      - QComboBox;      options = [str, ...]
     "upload_img" - image picker;   options = preset string or dict
+    "per_or_val" - % or value;     options = decimals (default 2)
+                   stored as {"type": "percent" | "value", "value": float | None}
                    (see gui.utils.image_utils.resolve_img_settings)
 """
 
@@ -96,5 +98,11 @@ class FieldDef:
     blocked: bool = False  # permanently read-only regardless of project lock state
     placeholder_text: str = ""  # hint shown when the field is empty (text / textarea only)
     combo_placeholder: str | None = None  # None → "-- select --"  |  "" → no placeholder  |  "text" → that text
+    # per_or_val only
+    percent_of: str = ""  # key the percent is taken of, e.g. "initial_construction_cost"
+    min_pct: float | None = 0
+    max_pct: float | None = 100
+    min_val: float | None = 0
+    max_val: float | None = None
 
 

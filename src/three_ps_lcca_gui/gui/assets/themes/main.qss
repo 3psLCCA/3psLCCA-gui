@@ -759,3 +759,39 @@ QPushButton#fabButton[collapsed="true"] { font-size: 20px; padding: 0 0 2px 0; t
 QPushButton#fabButton:hover   { background-color: $warning; border-color: $text-on-primary; }
 QPushButton#fabButton:pressed { background-color: $warning; border-color: $text-on-primary; }
 QPushButton#fabButton:disabled { background-color: $border-subtle; color: $text_disabled; }
+
+/* ── per_or_val: [ % | INR ] toggle beside the number box ── */
+QPushButton#povSeg {
+    background-color: $base;
+    color: $text;
+    border: 1px solid $border;
+    border-radius: 0px;
+    padding: 6px 14px;
+    min-height: 36px;
+    min-width: 28px;
+}
+QPushButton#povSeg[seg="left"] {
+    border-top-left-radius: 8px;
+    border-bottom-left-radius: 8px;
+    border-right: none;
+}
+QPushButton#povSeg[seg="right"] {
+    border-top-right-radius: 8px;
+    border-bottom-right-radius: 8px;
+}
+QPushButton#povSeg:hover:!checked {
+    background-color: $surface;
+}
+QPushButton#povSeg:checked {
+    background-color: $primary;
+    border-color: $primary;
+    color: $text-on-primary;
+    font-weight: $weight-semibold;
+}
+QPushButton#povSeg:disabled {
+    color: $text_disabled;
+}
+QPushButton#povSeg:checked:disabled {
+    background-color: $surface_mid;
+    border-color: $surface_mid;
+}

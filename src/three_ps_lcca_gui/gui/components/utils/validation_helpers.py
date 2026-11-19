@@ -76,6 +76,7 @@ def _apply_border_style(widget, color: str):
     All other widgets: a bare ``border:`` inline rule only overrides the border
     property and leaves the rest of the app QSS intact.
     """
+    widget = getattr(widget, "line", widget)  # per_or_val: style its number box
     state = ""
     if color == get_token("danger"):
         state = "error"
@@ -92,6 +93,7 @@ def _apply_border_style(widget, color: str):
 
 def _clear_border_style(widget):
     """Clear a validation border set by ``_apply_border_style``."""
+    widget = getattr(widget, "line", widget)
     if isinstance(widget, (QComboBox, QAbstractSpinBox)):
         widget.setProperty("validationState", "")
         widget.style().unpolish(widget)
@@ -179,7 +181,12 @@ def validate_form(
             errors.append(f"'{f.title}' is required but the input field was not found")
             error_keys.add(f.key)
             continue
-        if isinstance(widget, QLineEdit) and not widget.text().strip():
+        if hasattr(widget, "get_value"):
+            if widget.number() is None:
+                _apply_border_style(widget, get_token("danger"))
+                errors.append(f"'{f.title}' is required - the field cannot be left empty")
+                error_keys.add(f.key)
+        elif isinstance(widget, QLineEdit) and not widget.text().strip():
             _apply_border_style(widget, get_token("danger"))
             errors.append(f"'{f.title}' is required - the field cannot be left empty")
             error_keys.add(f.key)
@@ -199,6 +206,18 @@ def validate_form(
                 error_keys.add(f.key)
         # QSpinBox/QDoubleSpinBox without default: 0 is a valid value - use warn_rules
         # QComboBox: always has a selection - no check needed
+
+    # per_or_val min/max are hard limits: out of range is an error
+    for f in fields:
+        if (not isinstance(f, FieldDef) or f.field_type != "per_or_val"
+                or f.key in skip or f.key in error_keys):
+            continue
+        widget = getattr(widget_owner, f.key, None)
+        msg = widget.range_error(f.title) if widget is not None else None
+        if msg:
+            _apply_border_style(widget, get_token("danger"))
+            errors.append(msg)
+            error_keys.add(f.key)
 
     # ── Step 3: Range/warn checks ─────────────────────────────────────────────
     # Behaviour by case:
@@ -371,19 +390,21 @@ def freeze_form(
         widget = getattr(widget_owner, f.key, None)
         if widget is None:
             continue
-        if frozen:
-            widget.setToolTip(LOCK_TOOLTIP)
-            widget.installEventFilter(_lock_filter)
-            widget.setProperty("frozen", "true")
-            widget.style().unpolish(widget)
-            widget.style().polish(widget)
-        else:
-            widget.removeEventFilter(_lock_filter)
-            widget.setToolTip("")
-            widget.setProperty("frozen", "")
-            widget.style().unpolish(widget)
-            widget.style().polish(widget)
-        if isinstance(widget, (QLineEdit, QTextEdit)):
+        # composite inputs (per_or_val): events land on the children
+        for w in widget.parts() if hasattr(widget, "parts") else (widget,):
+            if frozen:
+                w.setToolTip(LOCK_TOOLTIP)
+                w.installEventFilter(_lock_filter)
+                w.setProperty("frozen", "true")
+            else:
+                w.removeEventFilter(_lock_filter)
+                w.setToolTip("")
+                w.setProperty("frozen", "")
+            w.style().unpolish(w)
+            w.style().polish(w)
+        if hasattr(widget, "parts"):
+            widget.setReadOnly(frozen)
+        elif isinstance(widget, (QLineEdit, QTextEdit)):
             widget.setReadOnly(frozen)
         elif isinstance(widget, QAbstractSpinBox):
             widget.setReadOnly(frozen)
