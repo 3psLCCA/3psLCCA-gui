@@ -126,7 +126,7 @@ class _EmissionsTable(TooltipTableMixin, QTableWidget):
             item = QTableWidgetItem(label)
             item.setTextAlignment(align)
             self.setHorizontalHeaderItem(col, item)
-        self.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.verticalHeader().setVisible(False)
         self.verticalHeader().setDefaultSectionSize(36)
         self.setEditTriggers(QTableWidget.NoEditTriggers)
@@ -179,14 +179,6 @@ class _EmissionsTable(TooltipTableMixin, QTableWidget):
 
     def minimumSizeHint(self):
         return self.sizeHint()
-
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        w = self.viewport().width()
-        self.setColumnWidth(_COL_VEHICLE, int(w * 0.28))
-        self.setColumnWidth(_COL_VEH_DAY, int(w * 0.18))
-        self.setColumnWidth(_COL_FACTOR, int(w * 0.27))
-        self.setColumnWidth(_COL_EMISSIONS, int(w * 0.27))
 
     def _on_factor_changed(self):
         self._recalculate()

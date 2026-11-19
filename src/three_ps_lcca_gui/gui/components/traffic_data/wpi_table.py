@@ -127,7 +127,6 @@ class _WPITable(QTableWidget):
         self._spinboxes: dict[tuple[int, int], QDoubleSpinBox] = {}
         self._checkboxes: dict[int, QCheckBox] = {}
         self._loading: bool = False
-        self._resizing: bool = False
 
         self._setup_table()
         self.verticalHeader().sectionResized.connect(lambda: QTimer.singleShot(0, self.updateGeometry))
@@ -155,7 +154,7 @@ class _WPITable(QTableWidget):
 
         # Hide Qt's built-in column header - we use row 0 and 1 instead
         self.horizontalHeader().setVisible(False)
-        self.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.horizontalHeader().setMinimumSectionSize(90)
 
         self.verticalHeader().setVisible(True)
@@ -256,21 +255,6 @@ class _WPITable(QTableWidget):
                 )
                 self.setCellWidget(row, col, sb)
                 self._spinboxes[(row, col)] = sb
-
-    # ── Size ──────────────────────────────────────────────────────────────────
-
-    def resizeEvent(self, event):
-        if self._resizing:
-            return
-        self._resizing = True
-        super().resizeEvent(event)
-        w = self.viewport().width()
-        col_w = max(90, w // _N_COLS)
-        for c in range(_N_COLS):
-            self.setColumnWidth(c, col_w)
-        # Notify the parent layout that our sizeHint (AdjustToContents) may have changed
-        self.updateGeometry()
-        self._resizing = False
 
     def viewportEvent(self, event):
         """Show item tooltips for all columns (no action-column skip)."""

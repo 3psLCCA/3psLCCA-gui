@@ -366,7 +366,7 @@ class _VehicleTrafficTable(TooltipTableMixin, QTableWidget):
         self.setHorizontalHeaderLabels(
             ["Vehicle Type", "Vehicles / Day", "Accident (% of vehicles)", "Power to weight ratio (PWR)"]
         )
-        self.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.verticalHeader().setVisible(False)
         self.verticalHeader().setDefaultSectionSize(36)
         self.setEditTriggers(QTableWidget.NoEditTriggers)
@@ -435,14 +435,6 @@ class _VehicleTrafficTable(TooltipTableMixin, QTableWidget):
     def update_height(self):
         self.updateGeometry()
 
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        w = self.viewport().width()
-        self.setColumnWidth(0, int(w * 0.35))
-        self.setColumnWidth(1, int(w * 0.25))
-        self.setColumnWidth(2, int(w * 0.20))
-        self.setColumnWidth(3, int(w * 0.20))
-
     def collect_to_dict(self) -> dict:
         return {
             key: {
@@ -471,7 +463,7 @@ class _PeakHoursTable(TooltipTableMixin, QTableWidget):
     def __init__(self, on_change, parent=None):
         super().__init__(0, 2, parent)
         self.setHorizontalHeaderLabels(["Hour Category", "Traffic Proportion (%)"])
-        self.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.verticalHeader().setVisible(False)
         self.verticalHeader().setDefaultSectionSize(36)
         self.setEditTriggers(QTableWidget.NoEditTriggers)
@@ -483,12 +475,6 @@ class _PeakHoursTable(TooltipTableMixin, QTableWidget):
         self._spinboxes = []
         self._other_label = None
         self._rebuilding = False
-
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        w = self.viewport().width()
-        self.setColumnWidth(0, int(w * 0.60))
-        self.setColumnWidth(1, int(w * 0.40))
 
     def rebuild(self, n: int):
         self._rebuilding = True

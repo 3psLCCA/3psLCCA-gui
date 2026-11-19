@@ -480,16 +480,9 @@ class _DetailedTable(QWidget):
             item.setTextAlignment(align)
             self._table.setHorizontalHeaderItem(col, item)
         hh = self._table.horizontalHeader()
-        hh.setSectionResizeMode(QHeaderView.Interactive)
+        hh.setSectionResizeMode(QHeaderView.Stretch)
         hh.setStretchLastSection(False)
         hh.setMinimumSectionSize(60)
-        # Equipment Name absorbs all remaining width automatically (same
-        # pattern as material_emissions.py's "Material" column) so the row of
-        # real columns always fills exactly 100% of the viewport - manual
-        # ratio math elsewhere can under-fill by a few px from int() rounding,
-        # leaving a gap short of the frozen action-column overlay instead of
-        # extending fully underneath it.
-        hh.setSectionResizeMode(0, QHeaderView.Stretch)
         hh.setSectionResizeMode(8, QHeaderView.Fixed)
         self._table.setColumnWidth(8, 0)
         self._table.setColumnHidden(8, True)
@@ -572,29 +565,6 @@ class _DetailedTable(QWidget):
         super().resizeEvent(event)
         if not hasattr(self, "_frozen_col"):
             return
-        vp_w = self._table.viewport().width()
-        if vp_w <= 0:
-            return
-        # Cols 1-7 share the viewport minus the col-9 placeholder (_ACTION_W);
-        # col 0 (Equipment Name) is QHeaderView.Stretch and absorbs whatever's
-        # left automatically, so the row always fills exactly 100% of the
-        # viewport - it's excluded here rather than folded into a ratio that
-        # would have to sum to 1.0 (fragile under per-column int() rounding).
-        # Col 9 is a fixed placeholder that reserves space for the frozen overlay.
-        avail = max(1, vp_w - _ACTION_W)
-        ratios = {1: 0.14, 2: 0.12, 3: 0.10, 4: 0.10, 5: 0.12, 6: 0.10, 7: 0.16}
-        mins   = {1: 120,  2: 110,  3: 90,   4: 90,   5: 140,  6: 100,  7: 100}
-        col_widths = {c: max(mins[c], int(avail * r)) for c, r in ratios.items()}
-        used = sum(col_widths.values())
-        if used > avail:
-            # Scale down proportionally so columns never overflow
-            scale = avail / used
-            col_widths = {c: max(mins[c], int(w * scale)) for c, w in col_widths.items()}
-        hh = self._table.horizontalHeader()
-        hh.blockSignals(True)
-        for col, width in col_widths.items():
-            self._table.setColumnWidth(col, width)
-        hh.blockSignals(False)
         self._frozen_col.reposition()
         self._frozen_col.sync_row_heights()
 

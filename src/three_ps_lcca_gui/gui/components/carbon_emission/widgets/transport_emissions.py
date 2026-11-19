@@ -40,21 +40,11 @@ class _TransportEmissionsTable(TooltipTableMixin, QTableWidget):
     and devtools/dev_notes_log/3psLCCA_blank_table_headers_fix.md.
     """
 
-    # Material, Category, kg Factor, Quantity (kg), Trips, Emission, Warnings
-    _COL_RATIOS = [0.20, 0.12, 0.09, 0.11, 0.07, 0.16, 0.25]
-    _COL_MINS   = [80,   60,   55,   70,   45,   100,  80]
-
     def __init__(self, parent=None):
         super().__init__(parent)
         hdr = WordWrapHeaderView(Qt.Horizontal, parent=self)
         self.setHorizontalHeader(hdr)
         hdr.show()
-
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        w = self.viewport().width()
-        for col, (ratio, min_w) in enumerate(zip(self._COL_RATIOS, self._COL_MINS)):
-            self.setColumnWidth(col, max(min_w, int(w * ratio)))
 
     def _content_height(self) -> int:
         hh = self.horizontalHeader()
@@ -336,7 +326,7 @@ class VehicleCard(QGroupBox):
             table.setHorizontalHeaderItem(col, item)
         h = table.horizontalHeader()
         h.setStretchLastSection(False)
-        h.setSectionResizeMode(QHeaderView.Interactive)
+        h.setSectionResizeMode(QHeaderView.Stretch)
         table.setEditTriggers(QTableWidget.NoEditTriggers)
         table.setSelectionMode(QTableWidget.NoSelection)
         table.verticalHeader().setVisible(False)

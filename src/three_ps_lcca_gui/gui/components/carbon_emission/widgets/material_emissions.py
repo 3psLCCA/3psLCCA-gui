@@ -338,7 +338,7 @@ class CarbonTable(TooltipTableMixin, QTableWidget):
             item = QTableWidgetItem(label)
             item.setTextAlignment(align)
             self.setHorizontalHeaderItem(col, item)
-        self.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.horizontalHeader().setStretchLastSection(False)
         self.horizontalHeader().setMinimumSectionSize(60)
         self.setEditTriggers(QTableWidget.NoEditTriggers)
@@ -361,10 +361,6 @@ class CarbonTable(TooltipTableMixin, QTableWidget):
         self.horizontalHeader().setSectionResizeMode(placeholder_col, QHeaderView.Fixed)
         self.setColumnWidth(placeholder_col, _ACTION_W)
 
-        # Material column stretches to fill remaining space
-        if is_included:
-            self.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
-
         # Reserve right margin so scrollable content never enters the overlay zone
         self.setViewportMargins(0, 0, _ACTION_W, 0)
 
@@ -386,38 +382,6 @@ class CarbonTable(TooltipTableMixin, QTableWidget):
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        # viewport() is already _ACTION_W narrower due to setViewportMargins
-        rest = max(1, self.viewport().width())
-
-        # Sub-columns in each group are EQUAL width so the spanning label is centred.
-        qty_sub = max(45, int(rest * 0.06))
-        em_sub = max(80, int(rest * 0.09))
-
-        if self.is_included:
-            widths = {
-                0: max(120, int(rest * 0.09)),  # Category
-                # col 1 Material is QHeaderView.Stretch - Qt fills remaining width
-                2: qty_sub,                     # Quantity › Value
-                3: qty_sub,                     # Quantity › Unit
-                4: max(120, int(rest * 0.09)),  # Conv. Factor
-                5: em_sub,                      # Emission › Value
-                6: em_sub,                      # Emission › Unit
-                7: max(70, int(rest * 0.09)),   # Total kgCO₂e
-            }
-        else:
-            widths = {
-                0: max(120, int(rest * 0.10)),  # Category
-                1: max(100, int(rest * 0.22)),  # Material
-                2: qty_sub,  # Quantity › Value
-                3: qty_sub,  # Quantity › Unit
-                4: max(120, int(rest * 0.09)),  # Conv. Factor
-                5: em_sub,  # Emission › Value
-                6: em_sub,  # Emission › Unit
-                7: max(100, int(rest * 0.29)),  # Reason
-            }
-
-        for col, width in widths.items():
-            self.setColumnWidth(col, width)
         self.resizeRowsToContents()
 
         self._frozen_overlay.reposition()

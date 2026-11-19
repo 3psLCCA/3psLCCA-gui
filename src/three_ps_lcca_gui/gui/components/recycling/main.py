@@ -294,7 +294,7 @@ class RecyclingTable(TooltipTableMixin, QTableWidget):
             self.setHorizontalHeaderItem(col, item)
 
         h = self.horizontalHeader()
-        h.setSectionResizeMode(QHeaderView.Interactive)
+        h.setSectionResizeMode(QHeaderView.Stretch)
         h.setStretchLastSection(False)
         h.setMinimumSectionSize(60)
 
@@ -337,34 +337,6 @@ class RecyclingTable(TooltipTableMixin, QTableWidget):
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        rest = max(1, self.viewport().width())
-        qty_sub = max(40, int(rest * 0.06))
-
-        if self.is_included:
-            widths = {
-                0: max(120, int(rest * 0.09)),  # Category
-                1: max(100, int(rest * 0.21)),  # Material
-                2: qty_sub,  # Quantity › Value
-                3: qty_sub,  # Quantity › Unit
-                4: max(55, int(rest * 0.08)),  # Recyclability %
-                5: max(70, int(rest * 0.11)),  # Recyclable Quantity
-                6: max(55, int(rest * 0.08)),  # Scrap Rate
-                7: max(80, int(rest * 0.12)),  # Recovered Value
-                8: max(80, int(rest * 0.19)),  # Warning
-            }
-        else:
-            widths = {
-                0: max(120, int(rest * 0.10)),  # Category
-                1: max(100, int(rest * 0.22)),  # Material
-                2: qty_sub,  # Quantity › Value
-                3: qty_sub,  # Quantity › Unit
-                4: max(55, int(rest * 0.08)),  # Recyclability %
-                5: max(55, int(rest * 0.08)),  # Scrap Rate
-                6: max(100, int(rest * 0.40)),  # Reason
-            }
-
-        for col, width in widths.items():
-            self.setColumnWidth(col, width)
         self.resizeRowsToContents()
 
         self._frozen_overlay.reposition()
