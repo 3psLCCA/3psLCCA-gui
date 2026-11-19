@@ -12,6 +12,7 @@ from PySide6.QtCore import Qt, Signal
 from ..base_widget import ScrollableForm
 from ..utils.form_builder.form_definitions import FieldDef, Section
 from ..utils.form_builder.form_builder import build_form
+from ..utils.form_builder.percent_or_value import PERCENT, PercentOrValueInput
 from ..utils.validation_helpers import clear_field_styles, freeze_form, freeze_widgets, validate_form, confirm_clear_all
 
 
@@ -25,24 +26,24 @@ DEMOLITION_FIELDS = [
     Section("End of Life"),
     FieldDef(
         "demolition_cost_pct",
-        "Demolition & Disposal Costs (%)",
+        "Demolition & Disposal Costs",
         "Costs of demoilition expressed as percentage of initial construction cost.",
-        "float",
-        (0.0, 100.0, 1),
-        unit="(%)",
+        "per_or_val",
+        options=3,
+        unit="",
+        percent_of="initial_construction_cost",
         required=True,
-        default=0.0,
         doc_slug=["Demolition", "Demolition_disposal_cost"],
     ),
     FieldDef(
         "demolition_carbon_cost_pct",
-        "Demolition & Disposal Carbon Cost (%)",
+        "Demolition & Disposal Carbon Cost",
         "Carbon emission cost of demolition expressed as a percentage of inital carbon emission cost.",
-        "float",
-        (0.0, 100.0, 1),
-        unit="(%)",
+        "per_or_val",
+        options=3,
+        unit="kgCO₂e",
+        percent_of="initial_carbon_emissions",
         required=True,
-        default=0.0,
         doc_slug=["Demolition", "Demolition_disposal_carbon_cost"],
     ),
     FieldDef(
@@ -60,12 +61,6 @@ DEMOLITION_FIELDS = [
 
 
 DEMOLITION_WARN_RULES = {
-    "demolition_cost_pct": (0.1, 50.0,
-                            "Demolition & Disposal Cost is 0% - if end-of-life demolition costs apply, enter a percentage of the initial construction cost",
-                            "Demolition & Disposal Cost exceeds 50% of construction cost - this is unusually high; confirm the value is correct"),
-    "demolition_carbon_cost_pct": (0.1, 50.0,
-                                   "Demolition & Disposal Carbon Cost is 0% - if carbon costs apply at end of life, enter a percentage of the initial carbon emission cost",
-                                   "Demolition & Disposal Carbon Cost exceeds 50% - this is unusually high; confirm this is the correct proportion of the initial carbon cost"),
     "demolition_duration": (1, 24,
                             "Demolition & Disposal Duration is 0 months - enter the expected time to complete demolition and disposal work",
                             "Demolition & Disposal Duration exceeds 24 months - this is a long demolition period; confirm the value is in months, not years"),
@@ -105,7 +100,10 @@ class Demolition(ScrollableForm):
     def load_suggested_values(self):
         for key, val in SUGGESTED_VALUES.items():
             widget = getattr(self, key, None)
-            if widget:
+            if isinstance(widget, PercentOrValueInput):
+                widget.set_value({"type": PERCENT, "value": val})
+                widget.line.setStyleSheet("")
+            elif widget:
                 widget.setValue(val)
                 widget.setStyleSheet("")
         self._on_field_changed()
@@ -119,6 +117,10 @@ class Demolition(ScrollableForm):
                 continue
             widget = getattr(self, entry.key, None)
             if not widget:
+                continue
+            if isinstance(widget, PercentOrValueInput):
+                widget.set_value(None)
+                widget.line.setStyleSheet("")
                 continue
             if isinstance(widget, (QDoubleSpinBox, QSpinBox)):
                 widget.setValue(widget.minimum())
