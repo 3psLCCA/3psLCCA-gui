@@ -34,7 +34,8 @@ QLabel {
 /* ── Form controls - inputs ─────────────────────────────────────────────── */
 QLineEdit,
 QTextEdit,
-QPlainTextEdit {
+QPlainTextEdit,
+QPushButton#povSeg {
     background-color: $base;
     border: 1px solid $border;
     border-radius: 8px;
@@ -760,14 +761,12 @@ QPushButton#fabButton:hover   { background-color: $warning; border-color: $text-
 QPushButton#fabButton:pressed { background-color: $warning; border-color: $text-on-primary; }
 QPushButton#fabButton:disabled { background-color: $border-subtle; color: $text_disabled; }
 
-/* ── per_or_val: [ % | INR ] toggle beside the number box ── */
+/* ── per_or_val: [ % | INR ] toggle beside the number box ──
+   Height comes from the shared input rule at the top. */
 QPushButton#povSeg {
-    background-color: $base;
-    color: $text;
-    border: 1px solid $border;
     border-radius: 0px;
-    padding: 6px 14px;
-    min-height: 36px;
+    padding-left: 14px;
+    padding-right: 14px;
     min-width: 28px;
 }
 QPushButton#povSeg[seg="left"] {
