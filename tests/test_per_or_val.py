@@ -2,8 +2,8 @@
 
 The widget lets the user enter an amount either as a percentage of some base
 (e.g. initial construction cost) or as an absolute value. It stores
-{"type": "percent"|"value", "value": float|None}; resolve_per_or_val turns
-that into an absolute amount.
+{"type": "percent"|"value", "value": float|None}; resolve_per_or_val gives
+its % and absolute amount.
 """
 import math
 
@@ -437,7 +437,18 @@ def test_set_value_works_while_read_only(w):
     ({"type": VALUE, "value": 7}, None, 7.0),
 ])
 def test_resolve(data, base, expected):
-    assert resolve_per_or_val(data, base) == pytest.approx(expected)
+    assert resolve_per_or_val(data, base).amount == pytest.approx(expected)
+
+
+@pytest.mark.parametrize("data, base, expected", [
+    ({"type": PERCENT, "value": 12.5}, None, 12.5),
+    ({"type": VALUE, "value": 500.0}, 10000, 5.0),
+    ({"type": VALUE, "value": 500.0}, 0, None),
+    ({"type": VALUE, "value": 500.0}, None, None),
+])
+def test_resolve_percent(data, base, expected):
+    pct = resolve_per_or_val(data, base).percent
+    assert pct == (pytest.approx(expected) if expected is not None else None)
 
 
 @pytest.mark.parametrize("data, base", [
@@ -455,7 +466,7 @@ def test_resolve(data, base, expected):
     ({"type": PERCENT, "value": 10}, "abc"),
 ])
 def test_resolve_returns_none(data, base):
-    assert resolve_per_or_val(data, base) is None
+    assert resolve_per_or_val(data, base).amount is None
 
 
 def test_resolve_does_not_mutate_input():
@@ -465,20 +476,20 @@ def test_resolve_does_not_mutate_input():
 
 
 def test_resolve_numeric_string_base():
-    r = resolve_per_or_val({"type": PERCENT, "value": 10}, "1000")
+    r = resolve_per_or_val({"type": PERCENT, "value": 10}, "1000").amount
     assert r is None or r == pytest.approx(100.0)
 
 
 def test_resolve_nan_value():
-    r = resolve_per_or_val({"type": VALUE, "value": float("nan")}, None)
+    r = resolve_per_or_val({"type": VALUE, "value": float("nan")}, None).amount
     assert r is None or not math.isnan(r), "NaN should resolve to None, not propagate"
 
 
 def test_resolve_round_trips_widget_output(w):
     w.set_value({"type": PERCENT, "value": 5.0})
-    assert resolve_per_or_val(w.get_value(), 2000) == pytest.approx(100.0)
+    assert resolve_per_or_val(w.get_value(), 2000).amount == pytest.approx(100.0)
     w.set_value({"type": VALUE, "value": 300.0})
-    assert resolve_per_or_val(w.get_value(), 2000) == pytest.approx(300.0)
+    assert resolve_per_or_val(w.get_value(), 2000).amount == pytest.approx(300.0)
 
 
 # ── form integration ────────────────────────────────────────────────────────

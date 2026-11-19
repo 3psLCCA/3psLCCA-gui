@@ -5,6 +5,7 @@ None means blank. Switching the mode blanks the number.
 """
 
 import math
+from typing import NamedTuple
 
 from PySide6.QtCore import QRegularExpression, Qt, Signal
 from PySide6.QtGui import QRegularExpressionValidator
@@ -20,20 +21,32 @@ def _num(v):
     return float(v) if math.isfinite(v) else None
 
 
-def resolve_per_or_val(data, base):
-    """Absolute amount for a stored dict: value as is, or percent of base.
-    None when blank, malformed, or a percent with no usable base."""
+class Resolved(NamedTuple):
+    percent: float | None
+    amount: float | None
+
+
+def resolve_per_or_val(data, base) -> Resolved:
+    """Both sides of a stored {type, value}, given the base the % is of.
+
+    percent entered -> (v, base * v / 100)
+    value entered   -> (v / base * 100, v)
+    A side is None when it can't be worked out: blank or malformed data,
+    or a base that is missing (or 0, when turning a value into a %).
+    """
     if not isinstance(data, dict) or data.get("type") not in (PERCENT, VALUE):
-        return None
+        return Resolved(None, None)
     v = _num(data.get("value"))
-    if v is None or data["type"] == VALUE:
-        return v
+    if v is None:
+        return Resolved(None, None)
     b = _num(base)
-    return None if b is None else b * v / 100
+    if data["type"] == PERCENT:
+        return Resolved(v, None if b is None else b * v / 100)
+    return Resolved(v / b * 100 if b else None, v)
 
 
 class _Segmented(QWidget):
-    """[ % | INR ] toggle with the QComboBox calls this module uses.
+    """[ % | unit ] toggle with the QComboBox calls this module uses.
     Styled in main.qss (QPushButton#povSeg)."""
 
     currentIndexChanged = Signal(int)
