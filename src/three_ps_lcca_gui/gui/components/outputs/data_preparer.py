@@ -63,14 +63,14 @@ class DataPreparer:
         )
 
     @staticmethod
-    def _maintenance_pct(maintenance_data: dict, key: str, base_of) -> float:
-        """A maintenance cost as the % the engine expects.
+    def _per_or_val_pct(chunk: dict, key: str, base_of) -> float:
+        """A cost field as the % the engine expects.
 
         per_or_val fields save {"type": "percent"|"value", "value": x}.
         A value is turned into a % of its base; base_of() returns that base
         and is only called when needed. A plain number is already a %.
         """
-        raw = maintenance_data.get(key)
+        raw = chunk.get(key)
         if not isinstance(raw, dict):
             return float(raw)
         if raw.get("value") is None:
@@ -79,7 +79,7 @@ class DataPreparer:
         pct = resolve_per_or_val(raw, base).percent
         if pct is None:
             raise ValueError(
-                f"Maintenance '{key}' is entered as an amount, but its base "
+                f"'{key}' is entered as an amount, but its base "
                 f"for the percentage is 0.\nEnter it as a % or fill in the base data."
             )
         return pct
@@ -233,8 +233,8 @@ class DataPreparer:
         def superstructure():
             return float(data.get("construction_work_data").get("Super-Structure").get("total"))
 
-        def pct(key, base_of):
-            return DataPreparer._maintenance_pct(_maintenance_data, key, base_of)
+        def pct(key, base_of, chunk=_maintenance_data):
+            return DataPreparer._per_or_val_pct(chunk, key, base_of)
 
         routine_inspection_picc_per_year = pct("routine_inspection_cost", construction)
         routine_inspection_interval_in_years = int(
@@ -260,8 +260,8 @@ class DataPreparer:
         replace_bne_joint_duration_in_days = int(
             _maintenance_data.get("bearing_exp_joint_duration")
         )
-        eol_picc = float(_demolition_data.get("demolition_cost_pct"))
-        eol_picec = float(_demolition_data.get("demolition_carbon_cost_pct"))
+        eol_picc = pct("demolition_cost_pct", construction, _demolition_data)
+        eol_picec = pct("demolition_carbon_cost_pct", carbon_kg, _demolition_data)
         eol_dd_in_months = int(_demolition_data.get("demolition_duration"))
 
         maintenance_and_stage_parameters = MaintenanceAndStageParameters(
