@@ -28,6 +28,7 @@ from PySide6.QtWidgets import (
     QComboBox,
     QDoubleSpinBox,
     QFileDialog,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -216,6 +217,51 @@ def freeze_img_uploads(host, fields: list, frozen: bool) -> None:
                     freeze_widgets(frozen, btn)
 
 
+_HALF_WIDTH_TYPES = {"text", "phone", "int", "float", "combo", "per_or_val"}
+
+# Width breakpoints (px) -> column count, like CSS media queries
+_BP_TABLET = 700    # below: 1 column (mobile)
+_BP_DESKTOP = 1200  # below: 2 columns (tablet); at/above: 3 (desktop)
+
+
+class _ResponsiveGrid(QWidget):
+    """Holds short field sections and reflows them into 1/2/3 columns by width."""
+
+    def __init__(self):
+        super().__init__()
+        self._grid = QGridLayout(self)
+        self._grid.setContentsMargins(0, 0, 0, 0)
+        self._grid.setHorizontalSpacing(24)
+        self._grid.setVerticalSpacing(12)
+        self._items: list[QWidget] = []
+        self._cols = 0
+
+    def add(self, w: QWidget) -> None:
+        self._items.append(w)
+        self._reflow(self._cols_for(self.width()) if self._cols else 1)
+
+    @staticmethod
+    def _cols_for(width: int) -> int:
+        if width < _BP_TABLET:
+            return 1
+        return 2 if width < _BP_DESKTOP else 3
+
+    def _reflow(self, cols: int) -> None:
+        self._cols = cols
+        for w in self._items:
+            self._grid.removeWidget(w)
+        for i, w in enumerate(self._items):
+            self._grid.addWidget(w, i // cols, i % cols, Qt.AlignTop)
+        for c in range(3):
+            self._grid.setColumnStretch(c, 1 if c < cols else 0)
+
+    def resizeEvent(self, event):
+        cols = self._cols_for(event.size().width())
+        if cols != self._cols:
+            self._reflow(cols)
+        super().resizeEvent(event)
+
+
 def build_form(
     host: Any,
     fields: list[Section | FieldDef],
@@ -254,11 +300,13 @@ def build_form(
     img_previews: dict[str, QLabel] = getattr(host, _IMG_PREVIEWS_ATTR)
     img_btn_rows: dict[str, QWidget] = getattr(host, _IMG_BTN_ROWS_ATTR)
     required_keys: list[str] = []
+    open_row: _ResponsiveGrid | None = None  # current group of short fields
 
     for entry in fields:
 
         # ── Section header ────────────────────────────────────────────────
         if isinstance(entry, Section):
+            open_row = None
             for widget in _make_section_header(entry.title):
                 host.form.addRow(widget)
             continue
@@ -407,7 +455,15 @@ def build_form(
         if f.required:
             required_keys.append(f.key)
 
-        host.form.addRow(section)
+        # Short fields share a responsive grid; wide ones take the full row
+        if f.field_type in _HALF_WIDTH_TYPES:
+            if open_row is None:
+                open_row = _ResponsiveGrid()
+                host.form.addRow(open_row)
+            open_row.add(section)
+        else:
+            open_row = None
+            host.form.addRow(section)
 
     # ── Patch load_data_dict to restore image previews on project load ───────
     #
