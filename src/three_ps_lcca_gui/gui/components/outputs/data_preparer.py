@@ -6,6 +6,7 @@ Helper class to map raw UI data dictionaries to Core LCCA objects.
 import datetime
 
 from three_ps_lcca_gui.gui._CONFIG import DEV_MODE
+from three_ps_lcca_gui.gui.components.utils.form_builder.percent_or_value import VALUE, resolve_per_or_val
 from three_ps_lcca_core.inputs.input import (
     InputMetaData,
     GeneralParameters,
@@ -53,6 +54,37 @@ def _check(value, field: str, section: str = "") -> None:
 
 class DataPreparer:
     @staticmethod
+    def _total_kgco2e(carbon_emissions: dict) -> float:
+        """Initial construction emissions: material + transport + machinery."""
+        return sum(
+            float(carbon_emissions.get(k).get("total_kgCO2e"))
+            for k in ("material_emissions_data", "transport_emissions_data",
+                      "machinery_emissions_data")
+        )
+
+    @staticmethod
+    def _maintenance_pct(maintenance_data: dict, key: str, base_of) -> float:
+        """A maintenance cost as the % the engine expects.
+
+        per_or_val fields save {"type": "percent"|"value", "value": x}.
+        A value is turned into a % of its base; base_of() returns that base
+        and is only called when needed. A plain number is already a %.
+        """
+        raw = maintenance_data.get(key)
+        if not isinstance(raw, dict):
+            return float(raw)
+        if raw.get("value") is None:
+            return float(raw.get("value"))  # blank: fail as a plain blank would
+        base = base_of() if raw.get("type") == VALUE else None
+        pct = resolve_per_or_val(raw, base).percent
+        if pct is None:
+            raise ValueError(
+                f"Maintenance '{key}' is entered as an amount, but its base "
+                f"for the percentage is 0.\nEnter it as a % or fill in the base data."
+            )
+        return pct
+
+    @staticmethod
     def prepare_life_cycle_construction_cost(data: dict):
         """
         Creates the life cycle construction cost breakdown dict.
@@ -71,16 +103,7 @@ class DataPreparer:
             .get("cost_of_carbon_local")
         )
 
-        mat_co2 = float(
-            carbon_emissions.get("material_emissions_data").get("total_kgCO2e")
-        )
-        trans_co2 = float(
-            carbon_emissions.get("transport_emissions_data").get("total_kgCO2e")
-        )
-        mach_co2 = float(
-            carbon_emissions.get("machinery_emissions_data").get("total_kgCO2e")
-        )
-        total_kgCO2e = mat_co2 + trans_co2 + mach_co2
+        total_kgCO2e = DataPreparer._total_kgco2e(carbon_emissions)
 
         construction_work_data = data.get("construction_work_data")
         grand_total = float(construction_work_data.get("grand_total"))
@@ -200,30 +223,37 @@ class DataPreparer:
             for _df in ("demolition_cost_pct", "demolition_carbon_cost_pct", "demolition_duration"):
                 _check(_demolition_data.get(_df), _df, "demolition_data")
 
-        routine_inspection_picc_per_year = float(
-            _maintenance_data.get("routine_inspection_cost")
-        )
+        # Bases for amounts entered in INR / kgCO2e (engine only takes %)
+        def construction():
+            return float(data.get("construction_work_data").get("grand_total"))
+
+        def carbon_kg():
+            return DataPreparer._total_kgco2e(data.get("carbon_emission_data"))
+
+        def superstructure():
+            return float(data.get("construction_work_data").get("Super-Structure").get("total"))
+
+        def pct(key, base_of):
+            return DataPreparer._maintenance_pct(_maintenance_data, key, base_of)
+
+        routine_inspection_picc_per_year = pct("routine_inspection_cost", construction)
         routine_inspection_interval_in_years = int(
             _maintenance_data.get("routine_inspection_freq")
         )
-        routine_maintenance_picc_per_year = float(
-            _maintenance_data.get("periodic_maintenance_cost")
-        )
-        routine_maintenance_picec = float(
-            _maintenance_data.get("periodic_maintenance_carbon_cost")
-        )
+        routine_maintenance_picc_per_year = pct("periodic_maintenance_cost", construction)
+        routine_maintenance_picec = pct("periodic_maintenance_carbon_cost", carbon_kg)
         routine_maintenance_interval_in_years = int(
             _maintenance_data.get("periodic_maintenance_freq")
         )
-        major_inspection_picc = float(_maintenance_data.get("major_inspection_cost"))
+        major_inspection_picc = pct("major_inspection_cost", construction)
         major_inspection_interval_in_years = int(
             _maintenance_data.get("major_inspection_freq")
         )
-        major_repair_picc = float(_maintenance_data.get("major_repair_cost"))
-        major_repair_picec = float(_maintenance_data.get("major_repair_carbon_cost"))
+        major_repair_picc = pct("major_repair_cost", construction)
+        major_repair_picec = pct("major_repair_carbon_cost", carbon_kg)
         major_repair_interval_in_years = int(_maintenance_data.get("major_repair_freq"))
         major_repair_duration_months = int(_maintenance_data.get("major_repair_duration"))
-        replace_bne_joint_pssc = float(_maintenance_data.get("bearing_exp_joint_cost"))
+        replace_bne_joint_pssc = pct("bearing_exp_joint_cost", superstructure)
         replace_bne_joint_interval_in_years = int(
             _maintenance_data.get("bearing_exp_joint_freq")
         )
