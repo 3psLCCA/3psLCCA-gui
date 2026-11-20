@@ -37,6 +37,7 @@ REQUIRED_TOKENS = {
     "log-error", "log-info",
 
     # Table
+    "border-faint",
     "cell-editable-bg", "cell-warn-row-bg", "cell-disabled-bg",
     "cell-invalid-bg", "cell-warn-bg", "cell-warn-fg",
 

@@ -232,6 +232,7 @@ def _derive_compat_tokens(raw: dict[str, str], state: dict[str, float]) -> dict[
         "primary-active":      _alpha("primary", "pressed"),
         "border":              raw.get("text_disabled", ""),
         "border-subtle":       raw.get("surface_mid", ""),
+        "border-faint":        _alpha("surface_mid", "hover"),  # table lines, barely there
         
         # Chart / Pillar colors
         "eco":                 LCC.get("eco_color", "#9e9eff"),

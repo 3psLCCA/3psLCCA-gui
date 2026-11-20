@@ -11,6 +11,7 @@
    $text_secondary  muted / secondary text
    $border          standard border (visible)
    $border-subtle   subtle divider / gridline
+   $border-faint    table gridlines and card edges (barely visible)
    $text_disabled   disabled / placeholder
    $surface         neutral hover background
    $surface_pressed neutral pressed background
@@ -436,6 +437,7 @@ QTreeView::branch {
    rounded corners; none at the bottom so a footer row can follow */
 QTableView {
     border: none;
+    gridline-color: $border-faint;  /* lines between cells, barely there */
     margin: $radius-lg $radius-lg 0px;
 }
 
@@ -454,6 +456,10 @@ QTableView#columnStylePinned {
 
 QHeaderView::section {
     padding: 4px 8px;
+    background-color: $window;
+    border: none;
+    border-right: 1px solid $border-faint;
+    border-bottom: 1px solid $border-faint;
 }
 
 QTableView::item {
@@ -494,7 +500,7 @@ QTableView QLineEdit[rowSelected="true"] {
 /* heading row (title · count, total, ••• menu), the table, "+ Add" row */
 QFrame#tableCard {
     background-color: $base;
-    border: 1px solid $surface_mid;
+    border: 1px solid $border-faint;
     border-radius: $radius-lg;
 }
 
