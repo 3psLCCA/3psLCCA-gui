@@ -633,10 +633,8 @@ class MaterialEmissions(QWidget):
             )
             t.setItem(row, 7, QTableWidgetItem(reason))
 
+            # no row colour: being in the Excluded table and the Reason column say it
             if reason in [REASON_INCOMPLETE, REASON_SUSPICIOUS]:
-                t.set_row_style(
-                    row, BG_INVALID if reason == REASON_INCOMPLETE else BG_SUSPICIOUS
-                )
                 btn_keys = ["edit"]
             else:
                 btn_keys = ["edit", "include"]
