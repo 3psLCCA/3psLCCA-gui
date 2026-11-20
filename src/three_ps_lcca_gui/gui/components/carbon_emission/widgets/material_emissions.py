@@ -9,13 +9,12 @@ from PySide6.QtWidgets import (
     QLabel,
     QTableWidget,
     QTableWidgetItem,
-    QHeaderView,
     QFrame,
     QScrollArea,
     QToolTip,
+    QStyleOptionViewItem,
 )
-from PySide6.QtCore import Qt, QTimer, QRect, QEvent
-from PySide6.QtGui import QColor
+from PySide6.QtCore import Qt, QTimer, QRect, QEvent, QModelIndex
 import datetime
 
 from ...utils.unit_resolver import analyze_conversion_sympy
@@ -27,8 +26,13 @@ from ...utils.table_widgets import (
     BaseActionDelegate,
     TooltipTableMixin,
     TableCard,
-    FrozenActionColumn,
     fit_to_contents,
+)
+from three_ps_lcca_gui.gui.assets.themes.column_style import (
+    apply_column_style,
+    pin_last_column,
+    pinned_view,
+    refit,
 )
 
 
@@ -69,12 +73,6 @@ CHUNKS = [
     ("str_super_structure", "Super-Structure"),
     ("str_misc", "Misc"),
 ]
-
-# Row background states - sourced from active theme; fallback keeps original colour
-BG_INVALID    = get_token("danger")
-BG_SUSPICIOUS = get_token("warning")
-BG_DISABLED   = get_token("surface")
-TEXT_DARK     = get_token("text")
 
 REASON_INCOMPLETE  = "Incomplete Data"
 REASON_SUSPICIOUS  = "Suspicious Data"
@@ -168,7 +166,7 @@ class _CarbonActionDelegate(BaseActionDelegate):
         }
 
     def _raw_row_data(self, row) -> dict | None:
-        item = self._table.item(row, 0)
+        item = self._table.item(row, self._action_col())
         return item.data(Qt.UserRole) if item else None
 
     def _get_btns_for_row(self, row) -> list[tuple]:
@@ -205,24 +203,6 @@ class _CarbonActionDelegate(BaseActionDelegate):
 
 
 # ---------------------------------------------------------------------------
-# Frozen Action overlay - single-column widget pinned to the right edge
-# ---------------------------------------------------------------------------
-
-
-class _FrozenActionTable(FrozenActionColumn):
-    """Shared floating Action column, plus a per-row tint for invalid rows."""
-
-    def __init__(self, parent_table):
-        super().__init__(parent_table)
-
-    def set_row_style(self, row: int, color_hex: str):
-        bg = QColor(color_hex)
-        it = self.item(row, 0)
-        if it:
-            it.setBackground(bg)
-
-
-# ---------------------------------------------------------------------------
 # Carbon Table Widget
 # ---------------------------------------------------------------------------
 
@@ -245,9 +225,7 @@ class CarbonTable(TooltipTableMixin, QTableWidget):
         ("Value", _C),  # 5  ┐ Emission group (sub-col → center)
         ("Unit", _C),  # 6  ┘
         ("Total Emissions\n(kgCO₂e)", _R),  # 7
-        # ("Warning", _L),  # 8
-        ("Action", _C),  # 9
-        ("", _C),  # 10 placeholder - reserves space for frozen overlay
+        ("Action", _C),  # 8  buttons, pinned to the right edge
     ]
     EXCLUDED_HEADERS = [
         ("Category", _L),  # 0
@@ -258,11 +236,10 @@ class CarbonTable(TooltipTableMixin, QTableWidget):
         ("Value", _C),  # 5  ┐ Emission group (sub-col → center)
         ("Unit", _C),  # 6  ┘
         ("Reason", _L),  # 7
-        ("Action", _C),  # 8
-        ("", _C),  # 9 placeholder - reserves space for frozen overlay
+        ("Action", _C),  # 8  buttons, pinned to the right edge
     ]
 
-    def __init__(self, is_included: bool, parent=None):
+    def __init__(self, is_included: bool, handler, parent=None):
         super().__init__(parent)
         self.is_included = is_included
 
@@ -275,43 +252,24 @@ class CarbonTable(TooltipTableMixin, QTableWidget):
             item = QTableWidgetItem(label)
             item.setTextAlignment(align)
             self.setHorizontalHeaderItem(col, item)
-        # Text columns share the spare width; number columns fit their contents
-        self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
-        for col, (label, align) in enumerate(headers):
-            if align == self._L:
-                self.horizontalHeader().setSectionResizeMode(col, QHeaderView.Stretch)
-        self.horizontalHeader().setStretchLastSection(False)
         self.setEditTriggers(QTableWidget.NoEditTriggers)
         self.setSelectionMode(QTableWidget.NoSelection)
-        self.setWordWrap(True)
         self.setTextElideMode(Qt.ElideNone)
         self.verticalHeader().setVisible(False)
-        fit_to_contents(self)
+        fit_to_contents(self)  # every row shows; the page scrolls down
 
-        # Hide the real action col - frozen overlay renders it
-        action_col = len(headers) - 2  # second-to-last (last is placeholder)
-        self.horizontalHeader().setSectionResizeMode(action_col, QHeaderView.Fixed)
-        self.setColumnWidth(action_col, 0)
-        self.setColumnHidden(action_col, True)
+        # Action buttons: paint and handle clicks in the last column
+        self.action_delegate = _CarbonActionDelegate(self, handler)
+        self.setItemDelegateForColumn(len(headers) - 1, self.action_delegate)
+        btn_h = self.action_delegate.sizeHint(QStyleOptionViewItem(), QModelIndex()).height()
+        self.verticalHeader().setMinimumSectionSize(btn_h)  # rows fit the buttons
 
-        # Placeholder col keeps the overlay's width (_reserve_action_width)
-        placeholder_col = len(headers) - 1
-        self.horizontalHeader().setSectionResizeMode(placeholder_col, QHeaderView.Fixed)
-
-        # Frozen overlay
-        self._frozen_overlay = _FrozenActionTable(self)
-        self._frozen_overlay.widthChanged.connect(self._reserve_action_width)
-        self._frozen_overlay.show()
-
-    def _reserve_action_width(self, w: int):
-        # placeholder col and right margin keep content out of the overlay zone
-        self.setColumnWidth(self.columnCount() - 1, w)
-        self.setViewportMargins(0, 0, w, 0)
-
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        self._frozen_overlay.reposition()
-        self._frozen_overlay.sync_row_heights()
+        # widths from the header labels (assets/themes/column_style.py); the
+        # sub-columns are both labelled "Value"/"Unit", so say which is which.
+        # The table scrolls sideways itself, with Action pinned to its right edge.
+        apply_column_style(self, {2: "quantity", 5: "carbon", 6: "carbon_unit"})
+        pin_last_column(self)
+        self.action_delegate.track(pinned_view(self))
 
     def viewportEvent(self, event):
         if event.type() == QEvent.ToolTip:
@@ -326,35 +284,12 @@ class CarbonTable(TooltipTableMixin, QTableWidget):
         return super().viewportEvent(event)
 
     def update_height(self):
+        """Re-fit columns, rows and the pinned Action column to the rows now."""
+        refit(self)
         self.updateGeometry()
-        if hasattr(self, "_frozen_overlay"):
-            self._frozen_overlay.reposition()
-            self._frozen_overlay.sync_row_heights()
-
-    def set_row_style(self, row: int, color_hex: str):
-        bg = QColor(color_hex)
-        is_highlighted = color_hex in [BG_INVALID, BG_SUSPICIOUS, BG_DISABLED]
-        fg = QColor(TEXT_DARK if is_highlighted else "black")
-
-        for col in range(self.columnCount()):
-            it = self.item(row, col)
-            if it:
-                it.setBackground(bg)
-                it.setForeground(fg)
-            w = self.cellWidget(row, col)
-            if w:
-                w.setStyleSheet(
-                    f"background-color: {color_hex}; color: {TEXT_DARK if is_highlighted else 'black'};"
-                )
-        self._frozen_overlay.set_row_style(row, color_hex)
-
-    def showEvent(self, event):
-        super().showEvent(event)
-        self._frozen_overlay.reposition()
 
     def clear_rows(self):
         self.setRowCount(0)
-        self._frozen_overlay.clear_rows()
         self.update_height()
 
 
@@ -423,26 +358,16 @@ class MaterialEmissions(QWidget):
         main_layout.addWidget(self._hline())
 
         # ── Included Section ─────────────────────────────────────────────
-        self.included_table = CarbonTable(is_included=True)
-        self._included_action = _CarbonActionDelegate(
-            self.included_table._frozen_overlay, self
-        )
-        self.included_table._frozen_overlay.setItemDelegateForColumn(
-            0, self._included_action
-        )
+        self.included_table = CarbonTable(is_included=True, handler=self)
+        self._included_action = self.included_table.action_delegate
         # card: title and row count above the table
         included_card = TableCard(self.included_table, "Included in Carbon Emissions Calculation")
         included_card.count_rows()
         main_layout.addWidget(included_card)
 
         # ── Excluded Section ─────────────────────────────────────────────
-        self.excluded_table = CarbonTable(is_included=False)
-        self._excluded_action = _CarbonActionDelegate(
-            self.excluded_table._frozen_overlay, self
-        )
-        self.excluded_table._frozen_overlay.setItemDelegateForColumn(
-            0, self._excluded_action
-        )
+        self.excluded_table = CarbonTable(is_included=False, handler=self)
+        self._excluded_action = self.excluded_table.action_delegate
         # card: title and row count above the table
         excluded_card = TableCard(self.excluded_table, "Excluded from Carbon Emissions Calculation")
         excluded_card.count_rows()
@@ -571,15 +496,6 @@ class MaterialEmissions(QWidget):
             carbon_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
             t.setItem(row, 7, carbon_item)
 
-            # Persistent Warnings: Check for zero qty or if the confirmed factor is still suspicious
-            warnings = []
-            if float(v.get("quantity", 0) or 0) == 0:
-                warnings.append("Zero Quantity")
-            if analysis["is_suspicious"]:
-                warnings.append("⚠️ Conversion Factor seems incorrect.")
-
-            t.setItem(row, 8, QTableWidgetItem(", ".join(warnings)))
-
             action_item = QTableWidgetItem()
             action_item.setData(
                 Qt.UserRole,
@@ -592,17 +508,7 @@ class MaterialEmissions(QWidget):
                 },
             )
             action_item.setFlags(Qt.ItemIsEnabled)
-            t.setItem(row, 9, action_item)
-            t.setItem(row, 10, QTableWidgetItem())  # placeholder
-            t._frozen_overlay.add_row(
-                {
-                    "btns": ["edit", "exclude"],
-                    "chunk_id": chunk_id,
-                    "comp_name": comp_name,
-                    "idx": idx,
-                    "item": item,
-                }
-            )
+            t.setItem(row, 8, action_item)
 
         t.update_height()
         t.setUpdatesEnabled(True)
@@ -652,16 +558,6 @@ class MaterialEmissions(QWidget):
             )
             action_item.setFlags(Qt.ItemIsEnabled)
             t.setItem(row, 8, action_item)
-            t.setItem(row, 9, QTableWidgetItem())  # placeholder
-            t._frozen_overlay.add_row(
-                {
-                    "btns": btn_keys,
-                    "chunk_id": chunk_id,
-                    "comp_name": comp_name,
-                    "idx": idx,
-                    "item": item,
-                }
-            )
         t.update_height()
         t.setUpdatesEnabled(True)
 
@@ -681,9 +577,11 @@ class MaterialEmissions(QWidget):
         )
         self.misc_lbl.setText(f"Misc: {fmt_comma(cat_totals.get('Misc', 0))}")
 
-    def _find_row_in_overlay(self, overlay, chunk_id, comp_name, idx) -> int:
-        for row in range(overlay.rowCount()):
-            cell = overlay.item(row, 0)
+    def _find_row(self, table, chunk_id, comp_name, idx) -> int:
+        """Row whose Action cell holds this item, or -1."""
+        action_col = table.columnCount() - 1
+        for row in range(table.rowCount()):
+            cell = table.item(row, action_col)
             if cell:
                 d = cell.data(Qt.UserRole)
                 if (d and d.get("chunk_id") == chunk_id
@@ -712,7 +610,6 @@ class MaterialEmissions(QWidget):
 
         src = self.excluded_table if include else self.included_table
         src.removeRow(src_row)
-        src._frozen_overlay.removeRow(src_row)
         src.update_height()
 
         v = item_data.get("values", {})
@@ -754,20 +651,12 @@ class MaterialEmissions(QWidget):
             carbon_item = QTableWidgetItem(fmt(carbon))
             carbon_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
             t.setItem(row, 7, carbon_item)
-            warnings = []
-            if float(v.get("quantity", 0) or 0) == 0:
-                warnings.append("Zero Quantity")
-            if analysis["is_suspicious"]:
-                warnings.append("⚠️ Conversion Factor seems incorrect.")
-            t.setItem(row, 8, QTableWidgetItem(", ".join(warnings)))
             row_data = {"btns": ["edit", "exclude"], "chunk_id": chunk_id,
                         "comp_name": comp_name, "idx": idx, "item": item_data}
             action_item = QTableWidgetItem()
             action_item.setData(Qt.UserRole, row_data)
             action_item.setFlags(Qt.ItemIsEnabled)
-            t.setItem(row, 9, action_item)
-            t.setItem(row, 10, QTableWidgetItem())
-            t._frozen_overlay.add_row(row_data)
+            t.setItem(row, 8, action_item)
         else:
             # Write reason when moving to excluded
             live_data = self.controller.engine.fetch_chunk(chunk_id) or {}
@@ -792,8 +681,6 @@ class MaterialEmissions(QWidget):
             action_item.setData(Qt.UserRole, row_data)
             action_item.setFlags(Qt.ItemIsEnabled)
             t.setItem(row, 8, action_item)
-            t.setItem(row, 9, QTableWidgetItem())
-            t._frozen_overlay.add_row(row_data)
 
         t.update_height()
         self._refresh_summary_only()
@@ -809,19 +696,14 @@ class MaterialEmissions(QWidget):
             self.controller.engine.stage_update(chunk_name=chunk_id, data=data)
             self._mark_dirty()
 
-            src_overlay = (
-                self.included_table._frozen_overlay if not include
-                else self.excluded_table._frozen_overlay
-            )
-            src_row = self._find_row_in_overlay(
-                src_overlay, chunk_id, comp_name, data_index
-            )
+            src_main = self.included_table if not include else self.excluded_table
+            src_row = self._find_row(src_main, chunk_id, comp_name, data_index)
 
             if src_row >= 0:
-                src_main = self.included_table if not include else self.excluded_table
                 category = (src_main.item(src_row, 0).text()
                             if src_main.item(src_row, 0) else "")
-                item_snap = src_overlay.item(src_row, 0).data(Qt.UserRole)["item"]
+                action_col = src_main.columnCount() - 1
+                item_snap = src_main.item(src_row, action_col).data(Qt.UserRole)["item"]
 
                 def _do(r=src_row, inc=include, idata=item_snap, cat=category,
                         ci=chunk_id, cn=comp_name, di=data_index):
