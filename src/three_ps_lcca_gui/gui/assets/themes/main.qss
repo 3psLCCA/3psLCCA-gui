@@ -441,8 +441,15 @@ QTableView {
 
 /* the frozen Action column sits inside its table's margin already,
    so it must not add its own */
-QTableView#actionColumn {
+QTableView#actionColumn,
+QTableView#columnStylePinned {
     margin: 0px;
+}
+
+/* the pinned Action column (column_style.pin_last_column) floats over the
+   columns scrolling under it, so it must be opaque */
+QTableView#columnStylePinned {
+    background-color: $base;
 }
 
 QHeaderView::section {

@@ -2,11 +2,11 @@ from three_ps_lcca_gui.gui.themes import get_token
 from PySide6.QtWidgets import (
     QTableWidget,
     QTableWidgetItem,
-    QHeaderView,
     QMessageBox,
     QStyledItemDelegate,
+    QStyleOptionViewItem,
 )
-from PySide6.QtCore import Qt, QEvent, QTimer
+from PySide6.QtCore import Qt, QEvent, QModelIndex, QTimer
 from ...utils.definitions import UNIT_DISPLAY
 from ...utils.display_format import fmt, fmt_comma
 from ...utils.icons import make_icon
@@ -14,11 +14,15 @@ from ...utils.table_widgets import (
     GroupedHeaderView,
     BaseActionDelegate,
     TooltipTableMixin,
-    FrozenActionColumn,
     TableCard,
     fit_to_contents,
 )
-from three_ps_lcca_gui.gui.assets.themes.table_style import ColumnMinWidthMixin, apply_column_style
+from three_ps_lcca_gui.gui.assets.themes.column_style import (
+    apply_column_style,
+    pin_last_column,
+    pinned_view,
+    refit,
+)
 
 
 
@@ -85,6 +89,9 @@ class _ActionDelegate(BaseActionDelegate):
                 ),
             ]
 
+    def _action_col(self) -> int:
+        return 6  # col 7 (Component) comes after it in the model
+
     def _get_btns_for_row(self, row) -> list[tuple]:
         return [
             (icon, hover_rgb, tooltip) for icon, hover_rgb, _, tooltip in self._btns
@@ -123,42 +130,11 @@ class _ActionDelegate(BaseActionDelegate):
 
 
 # ---------------------------------------------------------------------------
-# Frozen Action overlay - single-column widget pinned to the right edge
-# ---------------------------------------------------------------------------
-
-
-class _FrozenActionTable(FrozenActionColumn):
-    """
-    Shared floating Action column for StructureTableWidget.
-    The table keeps its width free on the right (col 7, or a viewport
-    margin in show_component mode), so no value sits under it.
-    Only the placement differs: the height follows the summed rows.
-    """
-
-    def __init__(self, parent_table: "StructureTableWidget"):
-        super().__init__(parent_table)
-
-    def reposition(self):
-        """Sit on the right edge, header level with the column titles."""
-        w = self.update_width()
-        p = self._parent_table
-        main_hdr_h = p.horizontalHeader().height()
-        self.horizontalHeader().setFixedHeight(main_hdr_h)  # match the main titles
-
-        # a floating child sits outside any layout, so it is placed by hand;
-        # summed rows, as the viewport lags a layout pass behind a grown row
-        rows_h = sum(p.rowHeight(r) for r in range(p.rowCount()))
-        self.setGeometry(p.width() - p.frameWidth() - w,  # inside the card border
-                         p.viewport().y() - main_hdr_h,
-                         w, rows_h + main_hdr_h)
-
-
-# ---------------------------------------------------------------------------
 # Structure table
 # ---------------------------------------------------------------------------
 
 
-class StructureTableWidget(ColumnMinWidthMixin, TooltipTableMixin, QTableWidget):
+class StructureTableWidget(TooltipTableMixin, QTableWidget):
     _GROUPS = []
 
     def __init__(self, parent_manager, component_name, is_trash_view=False, read_only=False,
@@ -175,10 +151,10 @@ class StructureTableWidget(ColumnMinWidthMixin, TooltipTableMixin, QTableWidget)
         self.setHorizontalHeader(GroupedHeaderView(groups=self._GROUPS))
         self.setItemDelegate(_CellDelegate(self))
         self.currency = ""
-        self._layout_pending = False
 
-        # cols 0-5 visible (2 hidden, painted inside 1), col 6 hidden (data/delegate
-        # only), col 7 blank space under the Action overlay or the Component name.
+        # cols 0-5 values (2 hidden, painted inside 1), col 6 Action (buttons;
+        # also stores the item's index), col 7 Component (Summary/Trash only,
+        # shown first).
         self.setColumnCount(8)
         _L = Qt.AlignLeft | Qt.AlignVCenter
         _headers = [
@@ -188,8 +164,8 @@ class StructureTableWidget(ColumnMinWidthMixin, TooltipTableMixin, QTableWidget)
             "Rate",        # 3
             "Source",      # 4
             "Amount",      # 5
-            "Action",      # 6  hidden - data/delegate only
-            "",            # 7  blank under the Action overlay, or Component
+            "Action",      # 6  buttons, pinned to the right edge
+            "Component",   # 7  hidden unless show_component
         ]
         for col, label in enumerate(_headers):
             item = QTableWidgetItem(label)
@@ -197,38 +173,34 @@ class StructureTableWidget(ColumnMinWidthMixin, TooltipTableMixin, QTableWidget)
             item.setTextAlignment(_L if col == 0 else Qt.AlignCenter)
             self.setHorizontalHeaderItem(col, item)
 
-        hdr = self.horizontalHeader()
-        hdr.setStretchLastSection(False)
         self.setColumnHidden(2, True)
-        hdr.setSectionResizeMode(6, QHeaderView.Fixed)
-        self.setColumnWidth(6, 0)
-        self.setColumnHidden(6, True)
-        hdr.setSectionResizeMode(7, QHeaderView.Fixed)  # width: _reserve_action_width
-        # widths from the header labels: assets/themes/table_style.py
-        apply_column_style(self)
+        self.setColumnHidden(6, read_only)  # read-only: no buttons
+        self.setColumnHidden(7, not show_component)
+        if show_component:
+            self.horizontalHeader().moveSection(7, 0)
 
         self.setSelectionBehavior(QTableWidget.SelectRows)
         self.setSelectionMode(QTableWidget.SingleSelection)
         self.setEditTriggers(QTableWidget.NoEditTriggers)
         self.verticalHeader().setVisible(False)
-        fit_to_contents(self)  # narrow screens scroll sideways (as needed)
+        fit_to_contents(self)  # every row shows; the page scrolls down
 
-        # Delegate on hidden col 6 (stores original_index, handles clicks)
+        # Action buttons: paint and handle clicks in col 6
         self._action_delegate = _ActionDelegate(
             self, parent_manager, component_name, is_trash_view
         )
         self.setItemDelegateForColumn(6, self._action_delegate)
+        if not read_only:  # rows fit the buttons
+            btn_h = self._action_delegate.sizeHint(QStyleOptionViewItem(), QModelIndex()).height()
+            self.verticalHeader().setMinimumSectionSize(btn_h)
 
-        # Frozen overlay
-        self._frozen_col = _FrozenActionTable(self)
-        self._frozen_col.widthChanged.connect(self._reserve_action_width)
-        self._frozen_action_delegate = _ActionDelegate(
-            self._frozen_col, parent_manager, component_name, is_trash_view
-        )
-        self._frozen_col.setItemDelegateForColumn(0, self._frozen_action_delegate)
-        if read_only:  # no buttons shown, so rows need not fit them
-            self.verticalHeader().setMinimumSectionSize(-1)
-        self._frozen_col.show()
+        # widths from the header labels (assets/themes/column_style.py); the
+        # table scrolls sideways itself, with Action pinned to its right edge.
+        # break_long_words off: _CellDelegate paints the Work name column.
+        apply_column_style(self, break_long_words=False)
+        if not read_only:
+            pin_last_column(self)
+            self._action_delegate.track(pinned_view(self))
 
         # heading row (title, count, total) lives in a TableCard - see card()
         self._card = None
@@ -237,14 +209,6 @@ class StructureTableWidget(ColumnMinWidthMixin, TooltipTableMixin, QTableWidget)
             sig.connect(self._schedule_card)
         # the hidden unit cell is painted inside Quantity - repaint on any change
         self.model().dataChanged.connect(self.viewport().update)
-
-        self._show_component = show_component
-        if show_component:  # col 7 holds the component name, shown first
-            self.horizontalHeaderItem(7).setText("Component")
-            apply_column_style(self)
-            hdr.moveSection(7, 0)
-            if not read_only:  # col 7 no longer pads the right edge
-                self._reserve_action_width(self._frozen_col.update_width())
 
         if not self.is_trash_view:
             self.cellDoubleClicked.connect(self._on_cell_double_clicked)
@@ -307,19 +271,13 @@ class StructureTableWidget(ColumnMinWidthMixin, TooltipTableMixin, QTableWidget)
                 item.setText(base + suffix)
 
     def update_height(self):
-        """Re-fit the overlay to the current rows, right now."""
-        self._layout_columns()
+        """Re-fit columns, rows and the pinned Action column to the rows now."""
+        refit(self)
+        self.updateGeometry()
 
     def _schedule_layout(self):
-        """Re-fit once after a batch of row changes, not once per row."""
+        """Grow to the rows; column_style re-fits the columns on its own."""
         self.updateGeometry()
-        if not self._layout_pending:
-            self._layout_pending = True
-            QTimer.singleShot(0, self, self._run_pending_layout)
-
-    def _run_pending_layout(self):
-        if self._layout_pending:
-            self._layout_columns()
 
     # ------------------------------------------------------------------
     # Row management
@@ -360,17 +318,14 @@ class StructureTableWidget(ColumnMinWidthMixin, TooltipTableMixin, QTableWidget)
         total_item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
         self.setItem(row, 5, total_item)
 
-        # Col 6: hidden, stores original_index for delegate click handling
+        # Col 6: Action buttons; stores original_index for the clicks
         action_item = QTableWidgetItem()
         action_item.setData(Qt.UserRole, original_index)
         action_item.setFlags(Qt.ItemIsEnabled)
         self.setItem(row, 6, action_item)
 
-        # Col 7: blank under the Action overlay, or the component name
+        # Col 7: the component name (shown in Summary / Trash only)
         self.setItem(row, 7, QTableWidgetItem(component))
-
-        # Mirror in frozen overlay
-        self._frozen_col.add_row(original_index)
 
         self.blockSignals(False)
         self._schedule_layout()
@@ -427,14 +382,6 @@ class StructureTableWidget(ColumnMinWidthMixin, TooltipTableMixin, QTableWidget)
         self.setItem(pos, 7, QTableWidgetItem())
 
         self.blockSignals(False)
-
-        frozen_item = QTableWidgetItem()
-        frozen_item.setData(Qt.UserRole, original_index)
-        frozen_item.setFlags(Qt.ItemIsEnabled)
-        self._frozen_col.insertRow(pos)
-        self._frozen_col.setRowHeight(pos, self.rowHeight(pos))
-        self._frozen_col.setItem(pos, 0, frozen_item)
-
         self._schedule_layout()
 
     def remove_row_by_index(self, original_index: int, reindex: bool = False):
@@ -452,15 +399,13 @@ class StructureTableWidget(ColumnMinWidthMixin, TooltipTableMixin, QTableWidget)
         if found is None:
             return
         self.removeRow(found)
-        self._frozen_col.removeRow(found)
         if reindex:
             for row in range(self.rowCount()):
-                for tbl, col in ((self, 6), (self._frozen_col, 0)):
-                    cell = tbl.item(row, col)
-                    if cell:
-                        idx = cell.data(Qt.UserRole)
-                        if isinstance(idx, int) and idx > original_index:
-                            cell.setData(Qt.UserRole, idx - 1)
+                cell = self.item(row, 6)
+                if cell:
+                    idx = cell.data(Qt.UserRole)
+                    if isinstance(idx, int) and idx > original_index:
+                        cell.setData(Qt.UserRole, idx - 1)
         self._schedule_layout()
 
     # ------------------------------------------------------------------
@@ -470,37 +415,3 @@ class StructureTableWidget(ColumnMinWidthMixin, TooltipTableMixin, QTableWidget)
     def freeze(self, frozen: bool = True):
         self._frozen = frozen
         self._action_delegate.set_frozen(frozen)
-        self._frozen_action_delegate.set_frozen(frozen)
-
-    # ------------------------------------------------------------------
-    # Layout / resize
-    # ------------------------------------------------------------------
-
-    def _reserve_action_width(self, w: int):
-        """Keep the overlay's width free: col 7, or a right margin once col 7
-        shows the component name."""
-        if getattr(self, "_show_component", False):
-            if not self._read_only:
-                self.setViewportMargins(0, 0, w, 0)
-        else:
-            self.setColumnWidth(7, w)
-
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        self._layout_columns()
-
-    def _layout_columns(self):
-        """Columns and rows size themselves (Qt resize modes); this only
-        shows/places the overlay."""
-        self._layout_pending = False
-        empty = self.rowCount() == 0
-        self._frozen_col.setVisible(not (empty or self._read_only))
-        self.updateGeometry()
-        self._frozen_col.reposition()
-        self._frozen_col.sync_row_heights()
-
-    def showEvent(self, event):
-        super().showEvent(event)
-        self._frozen_col.reposition()
-
-

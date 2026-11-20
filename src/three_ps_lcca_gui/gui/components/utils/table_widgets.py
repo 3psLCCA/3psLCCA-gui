@@ -220,8 +220,17 @@ class BaseActionDelegate(QStyledItemDelegate):
         self._frozen    = False
         self._hovered   = (-1, -1)   # (row, btn_index)
         self._icon_size = int(self.BTN_SIZE * 0.8)
-        table.viewport().setMouseTracking(True)
-        table.viewport().installEventFilter(self)
+        self._views     = []         # views painting with this delegate (hover)
+        self.track(table)
+
+    def track(self, view):
+        """Also follow the mouse over another view that paints these buttons,
+        e.g. the pinned copy of the column (column_style.pinned_view)."""
+        if view is None or view in self._views:
+            return
+        self._views.append(view)
+        view.viewport().setMouseTracking(True)
+        view.viewport().installEventFilter(self)
 
     # ------------------------------------------------------------------
     # Subclass contract
@@ -312,20 +321,20 @@ class BaseActionDelegate(QStyledItemDelegate):
 
     def eventFilter(self, obj, event):
         try:
-            vp = self._table.viewport()
+            view = next((v for v in self._views if v.viewport() is obj), None)
         except RuntimeError:
             return False
-        if obj is not vp:
+        if view is None:
             return False
 
         action_col = self._action_col()
         if event.type() == QEvent.MouseMove:
             pos   = event.pos()
-            index = self._table.indexAt(pos)
+            index = view.indexAt(pos)
             if index.isValid() and index.column() == action_col:
                 btns = self._get_btns_for_row(index.row())
                 for i, br in enumerate(
-                    self._btn_rects(self._table.visualRect(index), len(btns))
+                    self._btn_rects(view.visualRect(index), len(btns))
                 ):
                     if br.contains(pos):
                         self._set_hovered(index.row(), i)
@@ -348,17 +357,21 @@ class BaseActionDelegate(QStyledItemDelegate):
         if self._hovered == new:
             return
         old, self._hovered = self._hovered, new
-        vp         = self._table.viewport()
         action_col = self._action_col()
-        for r, _ in (old, new):
-            if r >= 0:
-                vp.update(self._table.visualRect(
-                    self._table.model().index(r, action_col)
-                ))
+        for view in self._views:
+            try:
+                for r, _ in (old, new):
+                    if r >= 0:
+                        view.viewport().update(view.visualRect(
+                            view.model().index(r, action_col)
+                        ))
+            except RuntimeError:  # view already deleted
+                pass
 
     def set_frozen(self, frozen: bool):
         self._frozen = frozen
-        self._table.viewport().update()
+        for view in self._views:
+            view.viewport().update()
 
 
 # ---------------------------------------------------------------------------
@@ -588,6 +601,9 @@ class TableCard(QFrame):
     def __init__(self, table, title="", parent=None):
         super().__init__(parent)
         self.setObjectName("tableCard")
+        # height = its contents' (sizeHint): a scroll area gives a widget only
+        # its minimum, which squeezed the "+ Add" row down to its padding
+        self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
         self.table = table
         self.menu_btn = None
         self.footer = None
