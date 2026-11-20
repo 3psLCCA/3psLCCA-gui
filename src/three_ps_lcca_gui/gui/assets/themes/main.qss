@@ -23,10 +23,6 @@
     outline: none;
 }
 
-QWidget {
-    background-color: $window;
-}
-
 QLabel {
     background-color: transparent;
 }
@@ -155,116 +151,6 @@ QDoubleSpinBox::down-arrow:disabled {
     image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpolygon points='12,16 6,8 18,8' fill='$text_disabled-url'/%3E%3C/svg%3E");
 }
 
-/* ── Table-cell spin boxes (transparent, borderless - cell border highlights on focus) ── */
-TableSpinBox,
-TableDoubleSpinBox {
-    background-color: transparent;
-    border: none;
-    border-radius: 0;
-    padding: 0 4px;
-    margin: 0;
-    min-height: 0;
-    color: $text;
-}
-
-TableSpinBox[frozen="true"],
-TableDoubleSpinBox[frozen="true"],
-TableSpinBox[isZero="true"],
-TableDoubleSpinBox[isZero="true"] {
-    color: $text_disabled;
-}
-
-TableSpinBox[invalid="true"],
-TableDoubleSpinBox[invalid="true"] {
-    background-color: $cell-warn-bg;
-    color: $warning;
-}
-
-TableSpinBox:hover,
-TableDoubleSpinBox:hover {
-    background-color: transparent;
-    border: none;
-    margin: 0;
-}
-
-TableSpinBox:focus,
-TableDoubleSpinBox:focus {
-    background-color: transparent;
-    border: none;
-    padding: 0 4px;
-    margin: 0;
-}
-
-TableSpinBox:disabled,
-TableDoubleSpinBox:disabled {
-    background-color: transparent;
-    color: $text_disabled;
-    border: none;
-}
-
-TableSpinBox::up-button,
-TableSpinBox::down-button,
-TableDoubleSpinBox::up-button,
-TableDoubleSpinBox::down-button {
-    width: 0;
-    border: none;
-    background: transparent;
-}
-
-/* Force the inner editor of table-cell spin boxes to be compact and visible
-   (otherwise it picks up the generic QLineEdit padding/min-height rules). */
-TableSpinBox QLineEdit,
-TableDoubleSpinBox QLineEdit {
-    background-color: transparent;
-    border: none;
-    border-radius: 0;
-    padding: 0;
-    margin: 0;
-    min-height: 0;
-    color: $text;
-    font-size: $font-size-md;
-    selection-background-color: $primary;
-    selection-color: $text-on-primary;
-}
-
-TableSpinBox[frozen="true"] QLineEdit,
-TableDoubleSpinBox[frozen="true"] QLineEdit,
-TableSpinBox[isZero="true"] QLineEdit,
-TableDoubleSpinBox[isZero="true"] QLineEdit {
-    color: $text_disabled;
-}
-
-/* ── Table-cell line edit (transparent, borderless - cell border on focus) ── */
-TableLineEdit {
-    background-color: transparent;
-    border: none;
-    border-radius: 0;
-    padding: 0 4px;
-    margin: 0;
-    min-height: 0;
-    color: $text;
-    selection-background-color: $primary;
-    selection-color: $text-on-primary;
-}
-
-TableLineEdit:hover {
-    background-color: transparent;
-    border: none;
-    margin: 0;
-}
-
-TableLineEdit:focus {
-    background-color: transparent;
-    border: none;
-    padding: 0 4px;
-    margin: 0;
-}
-
-TableLineEdit:disabled {
-    background-color: transparent;
-    color: $text_disabled;
-    border: none;
-}
 /* ── Form controls - combo box ──────────────────────────────────────────── */
 QComboBox {
     background-color: $base;
@@ -499,7 +385,7 @@ QPushButton:disabled {
 
 /* ── Tab bar ────────────────────────────────────────────────────────────── */
 QTabWidget::pane {
-    background-color: $base;
+    background-color: $window;
     border: none;
     border-top: 1px solid $border-subtle;
 }
@@ -542,86 +428,58 @@ QTreeView::branch {
     background: transparent;
 }
 
-/* ── Table view ─────────────────────────────────────────────────────────── */
+/* ── Tables ─────────────────────────────────────────────────────────────── */
+/* Qt adds this padding when it sizes columns and rows, so columns fitted to
+   their contents keep space between neighbours */
+/* no outer border: a table sits in a card or on the page, which frames it.
+   The margin (the card radius) keeps the square table clear of the card's
+   rounded corners; none at the bottom so a footer row can follow */
 QTableView {
-    background-color: $base;
-    alternate-background-color: $window;
-    gridline-color: $border-subtle;
-    border: 1px solid $border;
-    border-radius: 8px;
-}
-
-QTableView[validationState="error"] {
-    border: 1px solid $danger;
-}
-
-QTableView[validationState="warning"] {
-    border: 1px solid $warning;
-}
-
-QTableView::item {
-    padding: 8px 12px;
     border: none;
-    color: $text;
+    margin: $radius-lg $radius-lg 0px;
 }
 
-QTableView::item:hover {
-    background-color: $surface;
-    color: $text;
-}
-
-QTableView::item:selected {
-    background-color: $surface_pressed;
-    color: $text;
-}
-
-QTableView::item:selected:active {
-    background-color: $surface_pressed;
-    color: $text;
-}
-
-/* All widgets placed inside any table cell are transparent by default */
-QTableView QWidget {
-    background-color: transparent;
-}
-
-QHeaderView {
-    background-color: $window;
-    border: none;
-    font-weight: bold;
-    qproperty-defaultAlignment: AlignCenter;
+/* the frozen Action column sits inside its table's margin already,
+   so it must not add its own */
+QTableView#actionColumn {
+    margin: 0px;
 }
 
 QHeaderView::section {
-    background-color: $surface;
-    color: $text;
+    padding: 4px 8px;
+}
+
+QTableView::item {
+    padding: 0px 8px;
+}
+
+/* ── Table card (TableCard in table_widgets.py) ─────────────────────────── */
+/* heading row (title · count, total, ••• menu), the table, "+ Add" row */
+QFrame#tableCard {
+    background-color: $base;
+    border: 1px solid $surface_mid;
+    border-radius: $radius-lg;
+}
+
+QLabel#cardCount {
+    color: $text_secondary;
+}
+
+QPushButton#cardFooter {
+    background-color: transparent;
     border: none;
-    border-bottom: 2px solid $border-subtle;
-    border-right: 1px solid $border-subtle;
-    padding: 8px 12px;
-    font-size: $font-size-sm;
+    border-radius: 0px;
+    border-bottom-left-radius: $radius-lg;
+    border-bottom-right-radius: $radius-lg;
+    padding: 12px;
+    min-height: 0px;
+    color: $primary;
+    font-weight: $weight-semibold;
 }
 
-QHeaderView::section:first {
-    border-top-left-radius: 7px;
-}
-
-QHeaderView::section:last {
-    border-right: none;
-    border-top-right-radius: 7px;
-}
-
-QHeaderView::section:only-one {
-    border-top-left-radius: 7px;
-    border-top-right-radius: 7px;
-}
-
-QTableView QTableCornerButton::section {
-    background-color: $window;
-    border: none;
-    border-bottom: 2px solid $border-subtle;
-    border-right: 1px solid $border-subtle;
-}
+QPushButton#cardFooter:hover   { background-color: $primary-hover; }
+QPushButton#cardFooter:pressed { background-color: $primary-active; }
+QPushButton#cardFooter:disabled { color: $text_disabled; }
 
 /* ── Scrollbar ──────────────────────────────────────────────────────────── */
 QScrollBar {

@@ -25,7 +25,6 @@ from PySide6.QtGui import QFont, QColor
 from three_ps_lcca_gui.gui.themes import get_token
 from three_ps_lcca_gui.gui.theme import FS_SECTION, FW_BOLD
 from three_ps_lcca_gui.gui.styles import font as _f
-from three_ps_lcca_gui.gui.components.utils.table_widgets import round_table_viewport
 
 
 class BlobManagerDialog(QDialog):
@@ -69,7 +68,6 @@ class BlobManagerDialog(QDialog):
 
         # Table
         self.table = QTableWidget()
-        round_table_viewport(self.table)
         self.table.setColumnCount(3)
         self.table.setHorizontalHeaderLabels(["Name", "Size", "Saved At"])
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
@@ -78,7 +76,6 @@ class BlobManagerDialog(QDialog):
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SingleSelection)
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        self.table.setAlternatingRowColors(True)
         self.table.verticalHeader().setVisible(False)
         self.table.selectionModel().selectionChanged.connect(self._on_selection_changed)
         layout.addWidget(self.table)

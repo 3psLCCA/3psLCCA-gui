@@ -13,7 +13,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from PySide6.QtCore import Qt, Signal, QEvent, QTimer
-from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
     QCheckBox,
     QHeaderView,
@@ -25,8 +24,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QAbstractScrollArea,
 )
-from ..utils.table_widgets import TableDoubleSpinBox, TABLE_SPINBOX_BASE_QSS, round_table_viewport
-from three_ps_lcca_gui.gui.theme import FS_SM
+from ..utils.table_widgets import TableDoubleSpinBox
 
 # ── Vehicles ──────────────────────────────────────────────────────────────────
 
@@ -41,7 +39,7 @@ _VEHICLES = [
     ("mcv", "MCV"),
 ]
 from ..utils.wpi_manager import WPIManager, WPIProfile, empty_data
-from three_ps_lcca_gui.gui.themes import theme_manager, get_token
+from three_ps_lcca_gui.gui.themes import theme_manager
 
 # ── Column definitions ────────────────────────────────────────────────────────
 
@@ -121,7 +119,6 @@ class _WPITable(QTableWidget):
 
     def __init__(self, parent=None, strict_read_only: bool = False):
         super().__init__(_N_ROWS, _N_COLS, parent)
-        round_table_viewport(self)
         self._strict_read_only = strict_read_only
         self._editable: bool = False
         self._spinboxes: dict[tuple[int, int], QDoubleSpinBox] = {}
@@ -155,17 +152,13 @@ class _WPITable(QTableWidget):
         # Hide Qt's built-in column header - we use row 0 and 1 instead
         self.horizontalHeader().setVisible(False)
         self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        self.horizontalHeader().setMinimumSectionSize(90)
 
         self.verticalHeader().setVisible(True)
-        self.verticalHeader().setMinimumSectionSize(42)
         self.verticalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
         self.verticalHeader().setTextElideMode(Qt.ElideNone)
 
     def _build_group_row(self):
         """Row 0 - group labels with colspan (setSpan) per group."""
-        bold = QFont()
-        bold.setBold(True)
 
         group_spans: dict[str, list] = {}
         for col, cdef in enumerate(_COLUMNS):
@@ -179,7 +172,6 @@ class _WPITable(QTableWidget):
                 first_col, span = group_spans[cdef.group]
                 item = QTableWidgetItem(cdef.group)
                 item.setFlags(Qt.ItemIsEnabled)
-                item.setFont(bold)
                 item.setTextAlignment(Qt.AlignCenter | Qt.TextWordWrap)
                 item.setToolTip(cdef.group)
                 self.setItem(_ROW_GROUP, col, item)
@@ -191,13 +183,9 @@ class _WPITable(QTableWidget):
 
     def _build_label_row(self):
         """Row 1 - individual column labels."""
-        small_bold = QFont()
-        small_bold.setBold(True)
-        small_bold.setPointSize(FS_SM)
         for col, cdef in enumerate(_COLUMNS):
             item = QTableWidgetItem(cdef.label)
             item.setFlags(Qt.ItemIsEnabled)
-            item.setFont(small_bold)
             item.setTextAlignment(Qt.AlignCenter | Qt.TextWordWrap)
             item.setToolTip(f"{cdef.group} - {cdef.label}")
             self.setItem(_ROW_LABEL, col, item)
@@ -342,17 +330,10 @@ class _WPITable(QTableWidget):
         self.data_changed.emit()
 
     def _apply_spinbox_opacity(self, sb: QDoubleSpinBox, active: bool):
-        """
-        Set spinbox text colour using theme tokens.
-        active=True  → full opacity (palette default)
-        active=False → text_disabled token (read-only)
-        """
-        if active:
-            sb.setStyleSheet("")
-        else:
-            sb.setStyleSheet(
-                f"TableDoubleSpinBox {{ {TABLE_SPINBOX_BASE_QSS} color: {get_token('text_disabled')}; }}"
-            )
+        """Grey out read-only values via main.qss [frozen="true"]."""
+        sb.setProperty("frozen", not active)
+        sb.style().unpolish(sb)
+        sb.style().polish(sb)
 
     def _apply_common_style(self, col: int, is_common: bool):
         for row_idx in range(1, len(_VEHICLES)):

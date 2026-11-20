@@ -21,7 +21,7 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
     QWidget,
 )
-from PySide6.QtCore import Qt, QSize, QTimer
+from PySide6.QtCore import Qt, QTimer
 from three_ps_lcca_gui.gui.themes import get_token, theme_manager
 from ..utils.common_requested_data import get_currency
 
@@ -33,7 +33,7 @@ from ..utils.remarks_editor import RemarksEditor
 from ..utils.wpi_manager import WPIManager, WPIProfile
 from .wpi_table import _WPITable
 from .wpi_selector import _WPISelector
-from ..utils.table_widgets import TableDoubleSpinBox, TableSpinBox, TABLE_SPINBOX_BASE_QSS, mark_editable_column, TooltipTableMixin
+from ..utils.table_widgets import TableDoubleSpinBox, TableSpinBox, TooltipTableMixin, fit_to_contents
 from three_ps_lcca_gui.gui.themes import get_token
 
 # ── Dev mode ──────────────────────────────────────────────────────────────────
@@ -364,18 +364,15 @@ class _VehicleTrafficTable(TooltipTableMixin, QTableWidget):
         super().__init__(len(_VEHICLES), 4, parent)
         self.on_change = on_change
         self.setHorizontalHeaderLabels(
-            ["Vehicle Type", "Vehicles / Day", "Accident (% of vehicles)", "Power to weight ratio (PWR)"]
+            ["Vehicle Type", "Vehicles / Day", "Accident\n(% of vehicles)", "Power to weight\nratio (PWR)"]
         )
-        self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        # Vehicle names share the spare width; number columns fit contents
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        self.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
         self.verticalHeader().setVisible(False)
-        self.verticalHeader().setDefaultSectionSize(36)
         self.setEditTriggers(QTableWidget.NoEditTriggers)
         self.setSelectionMode(QTableWidget.NoSelection)
-        self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        mark_editable_column(self, 1)
-        mark_editable_column(self, 2)
-        mark_editable_column(self, 3)
+        fit_to_contents(self)
 
         self._vpd, self._acc, self._pwr = {}, {}, {}
         for row, (key, label) in enumerate(_VEHICLES):
@@ -424,14 +421,6 @@ class _VehicleTrafficTable(TooltipTableMixin, QTableWidget):
         self.style().polish(self)
         self.viewport().update()
 
-    def sizeHint(self):
-        header_h = self.horizontalHeader().height() or 35
-        rows_h = self.rowCount() * self.verticalHeader().defaultSectionSize()
-        return QSize(super().sizeHint().width(), header_h + rows_h + 10)
-
-    def minimumSizeHint(self):
-        return self.sizeHint()
-
     def update_height(self):
         self.updateGeometry()
 
@@ -462,14 +451,11 @@ class _VehicleTrafficTable(TooltipTableMixin, QTableWidget):
 class _PeakHoursTable(TooltipTableMixin, QTableWidget):
     def __init__(self, on_change, parent=None):
         super().__init__(0, 2, parent)
-        self.setHorizontalHeaderLabels(["Hour Category", "Traffic Proportion (%)"])
+        self.setHorizontalHeaderLabels(["Hour Category", "Traffic Proportion\n(%)"])
         self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.verticalHeader().setVisible(False)
-        self.verticalHeader().setDefaultSectionSize(36)
         self.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        mark_editable_column(self, 1)
+        fit_to_contents(self)
 
         self._on_change = on_change
         self._spinboxes = []
@@ -504,14 +490,6 @@ class _PeakHoursTable(TooltipTableMixin, QTableWidget):
         self._rebuilding = False
         self._recalculate()
         self.update_height()
-
-    def sizeHint(self):
-        header_h = self.horizontalHeader().height() or 35
-        rows_h = self.rowCount() * self.verticalHeader().defaultSectionSize()
-        return QSize(super().sizeHint().width(), header_h + rows_h + 10)
-
-    def minimumSizeHint(self):
-        return self.sizeHint()
 
     def update_height(self):
         self.updateGeometry()
@@ -881,10 +859,8 @@ class TrafficData(ScrollableForm):
         self._shrink_stack_to_current()
 
     def _shrink_stack_to_current(self):
-        """
-        Hide all panels except current so the stack shrinks to fit.
-        This works inside QScrollArea unlike setFixedHeight.
-        """
+        """Size the stack to the current panel only: hidden panels are
+        Ignored, so their height doesn't count."""
         if not self._stack.currentWidget():
             return
 
@@ -894,26 +870,7 @@ class TrafficData(ScrollableForm):
                 w.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
             else:
                 w.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
-
-        # Use a zero-timer to ensure child layouts (like the WPI table) 
-        # have finished their size calculation before we snap the stack height.
-        QTimer.singleShot(0, self._perform_shrink)
-
-    def _perform_shrink(self):
-        current = self._stack.currentWidget()
-        if not current:
-            return
-        
-        # Trigger layout recalculation on the container
-        current.adjustSize()
-        h = current.sizeHint().height()
-        self._stack.setMaximumHeight(h)
         self._stack.updateGeometry()
-        
-        # Finally, tell the scroll area content to grow/shrink
-        if hasattr(self, "_content"):
-            self._content.adjustSize()
-            self._content.updateGeometry()
 
     # ── WPI slot handlers ─────────────────────────────────────────────────────
 

@@ -89,4 +89,62 @@ QSS_FONTS = {
     "font-size-sm":      f"{FS_SM}pt",
 }
 
+# Centralized radius tokens for QSS substitution
+QSS_RADII = {
+    "radius-sm": f"{RADIUS_SM}px",
+    "radius-md": f"{RADIUS_MD}px",
+    "radius-lg": f"{RADIUS_LG}px",
+    "radius-xl": f"{RADIUS_XL}px",
+}
+
+# ── Table column minimum widths ────────────────────────────────────────────
+# Each column type gets its own floor, because a rate, a unit and a material
+# name need very different widths. Each floor is a character count times
+# CHAR_W_AVG, in px; it is the content width, COL_PAD_X goes on each side.
+#
+# Samples come from a pass over all five bundled SORs (3,512 items):
+# Bihar RCD 2025, Karnataka KPWD 2023-24, MP PWD 2025, Maharashtra PWD SSR
+# 2022-23, Rajasthan RUIDP ISOR 2023. Lengths are in characters.
+#
+#   field               avg   median  p90   max   longest word p90 / max
+#   name                54.5   54      79   178   14 / 27
+#   component           14.8   14      21    35   14 / 19
+#   unit                 2.7    3       4    18    4 / 10
+#   src_id               8.1    6      14    20   14 / 20
+#   rate_src            22.4   23      25    27   11 / 11
+#   carbon_emission      4.0    4       4     6    -
+#   carbon unit (den)    8.0    8       8    12    -
+#   conversion_factor    4.3    4       6     9    -
+#   carbon source        3.6    3       3    19    3 / 18
+#
+#   rate value: min 0.67, median 6,036, avg 23,171, p90 60,714,
+#               p99 3,03,022, max 16,00,000
+#
+# Text wraps between words, so a text floor only has to fit a few words, not
+# the whole value. Numbers never wrap, so a number floor fits the largest
+# value shown with Indian grouping and 2 decimals. Column titles can still
+# widen a column past its floor.
+COL_PAD_X  = SP3  # left / right space inside a cell
+# Average character width of Ubuntu at FS_MD, measured on real SOR text:
+# "Cement Concrete M25 Grade" 168px / 25 ch, "Super Structure" 91 / 15,
+# "16,00,000.00" 72 / 12 - all 6-7 px per character.
+CHAR_W_AVG = 7  # px
+
+COL_W_NAME        = 25 * CHAR_W_AVG   # median name wraps to ~2 lines
+COL_W_COMPONENT   = 15 * CHAR_W_AVG   # p90 longest word; the longest sheet name
+COL_W_UNIT        =  9 * CHAR_W_AVG   # p90 is 4; long units wrap
+COL_W_SRC_ID      = 12 * CHAR_W_AVG   # near p90 (14); longer ids are rare
+COL_W_RATE_SRC    = 13 * CHAR_W_AVG   # wraps by word; longest word 11
+COL_W_RATE        = 12 * CHAR_W_AVG   # "16,00,000.00", the largest rate in any SOR
+COL_W_CARBON      =  6 * CHAR_W_AVG   # max length of an emission factor
+COL_W_CARBON_UNIT = 12 * CHAR_W_AVG   # "kgCO2e/m2-mm", the longest carbon unit
+COL_W_FACTOR      =  9 * CHAR_W_AVG   # the longest conversion factor
+COL_W_CARBON_SRC  = 11 * CHAR_W_AVG   # wraps by word; most are 3 ("ICE")
+# Not in the SORs: quantity x rate totals reach crores, "12,34,56,789.00"
+COL_W_AMOUNT      = 15 * CHAR_W_AVG
+COL_W_QUANTITY    = 12 * CHAR_W_AVG   # the other half of quantity x rate
+COL_W_PERCENT     =  6 * CHAR_W_AVG   # "100.00"
+COL_W_NOTE        = 15 * CHAR_W_AVG   # wraps by word, like a component
+COL_W_DATETIME    = 16 * CHAR_W_AVG   # "20-11-2026 14:30"
+
 

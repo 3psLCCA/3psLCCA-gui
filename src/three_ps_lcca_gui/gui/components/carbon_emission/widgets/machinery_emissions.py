@@ -37,7 +37,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from PySide6.QtCore import Qt, QEvent, QRect, QSize
+from PySide6.QtCore import Qt, QEvent, QRect
 from PySide6.QtGui import QFont
 
 from ...base_widget import ScrollableForm
@@ -46,11 +46,16 @@ from ...utils.form_builder.form_builder import build_form
 from ...utils.remarks_editor import RemarksEditor
 from ...utils.display_format import fmt, fmt_comma, DECIMAL_PLACES
 from ...utils.icons import make_icon
-from ...utils.table_widgets import BaseActionDelegate, TooltipTableMixin
+from ...utils.table_widgets import (
+    BaseActionDelegate,
+    FrozenActionColumn,
+    TooltipTableMixin,
+    WordWrapHeaderView,
+    fit_to_contents,
+)
 from ...utils.validation_helpers import freeze_widgets, confirm_clear_all
 
 CHUNK = "machinery_emissions_data"
-_ACTION_W = 80   # frozen action-column width (edit + delete)
 
 ENERGY_SOURCES = [
     "Diesel",
@@ -252,9 +257,6 @@ class _ActionDelegate(BaseActionDelegate):
             for i in range(n)
         ]
 
-    def sizeHint(self, option, index):
-        return QSize(_ACTION_W, _DetailedTable._ROW_H)
-
     def editorEvent(self, event, model, option, index):
         if self._frozen:
             return False
@@ -344,102 +346,11 @@ class _EditRowDialog(QDialog):
         }
 
 
-# ── Frozen delete-button column overlay ───────────────────────────────────────
-
-
-class _FrozenActionCol(QTableWidget):
-    """Delete-button column pinned to the right edge of the table, never scrolls."""
-
-    def __init__(self, parent_table: QTableWidget, row_h: int):
-        super().__init__(parent_table)
-        self._parent_table = parent_table
-        self._row_h = row_h
-
-        self.setColumnCount(1)
-        hdr_item = QTableWidgetItem("Action")
-        hdr_item.setTextAlignment(Qt.AlignCenter | Qt.AlignVCenter)
-        self.setHorizontalHeaderItem(0, hdr_item)
-
-        self.setFixedWidth(_ACTION_W)
-        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.setFocusPolicy(Qt.NoFocus)
-        self.setSelectionMode(QTableWidget.NoSelection)
-        self.setFrameShape(QTableWidget.NoFrame)
-        self.setMouseTracking(True)
-        self.setStyleSheet(
-            "QTableWidget { background-color: palette(base); border-top-left-radius: 0px;"
-            " border-bottom-left-radius: 0px; border-bottom-right-radius: 7px; }"
-        )
-        self.viewport().setStyleSheet("border-bottom-right-radius: 7px;")
-        self.viewport().setMouseTracking(True)
-
-        self.verticalHeader().setVisible(False)
-        self.verticalHeader().setDefaultSectionSize(row_h)
-        self.verticalHeader().setMinimumSectionSize(row_h)
-
-        hdr = self.horizontalHeader()
-        hdr.setSectionResizeMode(0, QHeaderView.Fixed)
-        self.setColumnWidth(0, _ACTION_W)
-
-        parent_table.verticalScrollBar().valueChanged.connect(
-            self.verticalScrollBar().setValue
-        )
-
-    def sync_row_heights(self):
-        for r in range(self.rowCount()):
-            self.setRowHeight(r, self._parent_table.rowHeight(r))
-
-    def add_row(self):
-        row = self.rowCount()
-        self.insertRow(row)
-        self.setRowHeight(row, self._row_h)
-        item = QTableWidgetItem()
-        item.setData(Qt.UserRole, row)
-        item.setFlags(Qt.ItemIsEnabled)
-        self.setItem(row, 0, item)
-
-    def reposition(self):
-        p = self._parent_table
-        hdr_h = p.horizontalHeader().height()
-        self.horizontalHeader().setFixedHeight(hdr_h)
-        vp = p.viewport()
-        
-        # Position at absolute right edge of the table widget
-        x = p.width() - _ACTION_W
-        y = vp.y() - hdr_h
-        
-        self.move(x, y)
-        self.setFixedHeight(vp.height() + hdr_h)
-        self.raise_()
-
-
 # ── Detailed equipment table ──────────────────────────────────────────────────
 
 
 class _MachineryTable(TooltipTableMixin, QTableWidget):
-    """Equipment table that reports its full content height as its size hint.
-
-    With a Fixed vertical size policy (set by the owner), the surrounding layout
-    reserves exactly header + all rows, so every row is shown without the table's
-    own scrollbar and the subtotal/button rows below are never overlapped; the
-    page's scroll area does the scrolling. This hint is the single source of
-    truth for the table's height - no manual pinning or deferred geometry passes.
-    """
-
-    def _content_height(self) -> int:
-        hh = self.horizontalHeader()
-        h = (hh.height() or hh.sizeHint().height()) + 2 * self.frameWidth()
-        for r in range(self.rowCount()):
-            h += self.rowHeight(r)
-        return h
-
-    def sizeHint(self) -> QSize:
-        return QSize(super().sizeHint().width(), self._content_height())
-
-    def minimumSizeHint(self) -> QSize:
-        return QSize(super().minimumSizeHint().width(), self._content_height())
+    """Equipment table; Qt sizes it to show every row (see fit_to_contents)."""
 
 
 class _DetailedTable(QWidget):
@@ -453,17 +364,15 @@ class _DetailedTable(QWidget):
     HEADERS = [
         ("Equipment Name",      Qt.AlignLeft   | Qt.AlignVCenter),  # 0
         ("Energy Source",       Qt.AlignLeft   | Qt.AlignVCenter),  # 1
-        ("Fuel / Power Rating", Qt.AlignLeft   | Qt.AlignVCenter),  # 2
-        ("Avg Hrs/Day",         Qt.AlignLeft   | Qt.AlignVCenter),  # 3
-        ("No. of Days",         Qt.AlignLeft   | Qt.AlignVCenter),  # 4
-        ("EF (kg CO₂e/unit)",   Qt.AlignLeft   | Qt.AlignVCenter),  # 5
+        ("Fuel / Power\nRating", Qt.AlignLeft  | Qt.AlignVCenter),  # 2
+        ("Avg\nHrs/Day",        Qt.AlignLeft   | Qt.AlignVCenter),  # 3
+        ("No. of\nDays",        Qt.AlignLeft   | Qt.AlignVCenter),  # 4
+        ("EF\n(kg CO₂e/unit)",  Qt.AlignLeft   | Qt.AlignVCenter),  # 5
         ("Consumption",         Qt.AlignLeft   | Qt.AlignVCenter),  # 6
-        ("Emissions (kg CO₂e)", Qt.AlignLeft   | Qt.AlignVCenter),  # 7
+        ("Emissions\n(kg CO₂e)", Qt.AlignLeft   | Qt.AlignVCenter),  # 7
         ("Action",              Qt.AlignCenter | Qt.AlignVCenter),  # 8 hidden - frozen overlay
-        ("",                    Qt.AlignCenter | Qt.AlignVCenter),  # 9 placeholder - reserves _ACTION_W
+        ("",                    Qt.AlignCenter | Qt.AlignVCenter),  # 9 placeholder - reserves the Action width
     ]
-    _ROW_H = 36
-
     def __init__(self, on_change, parent=None):
         super().__init__(parent)
         self._on_change = on_change
@@ -473,38 +382,40 @@ class _DetailedTable(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(6)
 
-        # Table - no fixed height; grows/shrinks via sizeHint override
+        # Table - Qt sizes it from its rows (fit_to_contents)
         self._table = _MachineryTable(0, len(self.HEADERS))
+        self._table.setHorizontalHeader(WordWrapHeaderView(Qt.Horizontal))  # before the overlay syncs to it
         for col, (label, align) in enumerate(self.HEADERS):
             item = QTableWidgetItem(label)
             item.setTextAlignment(align)
             self._table.setHorizontalHeaderItem(col, item)
+        # Name and source share the spare width; number columns fit contents
         hh = self._table.horizontalHeader()
-        hh.setSectionResizeMode(QHeaderView.Stretch)
+        hh.setSectionResizeMode(QHeaderView.ResizeToContents)
+        hh.setSectionResizeMode(0, QHeaderView.Stretch)
+        hh.setSectionResizeMode(1, QHeaderView.Stretch)
         hh.setStretchLastSection(False)
-        hh.setMinimumSectionSize(60)
         hh.setSectionResizeMode(8, QHeaderView.Fixed)
         self._table.setColumnWidth(8, 0)
         self._table.setColumnHidden(8, True)
         hh.setSectionResizeMode(9, QHeaderView.Fixed)
-        self._table.setColumnWidth(9, _ACTION_W)
-        self._table.setViewportMargins(0, 0, _ACTION_W, 0)
         self._table.verticalHeader().setVisible(False)
         self._table.setEditTriggers(QTableWidget.NoEditTriggers)
         self._table.setSelectionMode(QTableWidget.SingleSelection)
         self._table.setSelectionBehavior(QTableWidget.SelectRows)
-        self._table.verticalHeader().setDefaultSectionSize(self._ROW_H)
+
         self._table.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
         self._table.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self._table.cellChanged.connect(self._on_cell_changed)
         self._table.cellDoubleClicked.connect(self._open_edit_dialog)
-        self._table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        self._table.setMinimumWidth(0)
-        self._table.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self._table.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        fit_to_contents(self._table)
         layout.addWidget(self._table)
 
-        self._frozen_col = _FrozenActionCol(self._table, self._ROW_H)
+        self._frozen_col = FrozenActionColumn(self._table)
+        self._frozen_col.widthChanged.connect(self._reserve_action_width)
+        self._frozen_col.setMouseTracking(True)            # hover on the buttons
+        self._frozen_col.viewport().setMouseTracking(True)
         self._action_delegate = _ActionDelegate(self._frozen_col, self)
         self._frozen_col.setItemDelegateForColumn(0, self._action_delegate)
         self._frozen_col.show()
@@ -560,6 +471,11 @@ class _DetailedTable(QWidget):
         if hasattr(self, "_frozen_col"):
             self._frozen_col.reposition()
             self._frozen_col.sync_row_heights()
+
+    def _reserve_action_width(self, w: int):
+        # placeholder col and right margin keep content out of the overlay zone
+        self._table.setColumnWidth(9, w)
+        self._table.setViewportMargins(0, 0, w, 0)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -618,7 +534,6 @@ class _DetailedTable(QWidget):
         self._table.blockSignals(True)
         row_idx = self._table.rowCount()
         self._table.insertRow(row_idx)
-        self._table.setRowHeight(row_idx, self._ROW_H)
 
         src  = d.get("source", ENERGY_SOURCES[0]) if d else ENERGY_SOURCES[0]
         _L   = Qt.AlignLeft  | Qt.AlignVCenter

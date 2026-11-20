@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (
 import os
 
 from PySide6.QtCore import QThread, Signal, QSize, Qt, QStandardPaths, QUrl
-from PySide6.QtGui import QPalette, QColor, QDesktopServices
+from PySide6.QtGui import QColor, QDesktopServices
 from ..utils.icons import make_icon
 from three_ps_lcca_gui.gui.themes import get_token, theme_manager
 from three_ps_lcca_gui.gui.theme import FS_SM
@@ -285,12 +285,6 @@ class StructureTabView(QWidget):
 
         # 1. Active Tabs
         self.tab_view = QTabWidget()
-
-        # QTabWidget's content pane paints using Base palette role, which differs
-        # from Window in dark mode. Copy Window → Base so both are identical.
-        palette = self.tab_view.palette()
-        palette.setColor(QPalette.Base, palette.color(QPalette.Window))
-        self.tab_view.setPalette(palette)
 
         # on_step(tab_name, k, total) reports each sub-tab before it is built,
         # so the loading UI can say what is happening during this long call.

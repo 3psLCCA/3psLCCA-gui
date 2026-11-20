@@ -17,15 +17,14 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
     QHeaderView,
     QScrollArea,
-    QSizePolicy,
     QMessageBox,
 )
-from PySide6.QtCore import Qt, QSize, QTimer
+from PySide6.QtCore import Qt, QTimer
 
 from .transport_dialog import TransportDialog
 from PySide6.QtGui import QColor
 from ...utils.definitions import STRUCTURE_CHUNKS, UNIT_DIMENSION
-from ...utils.table_widgets import TooltipTableMixin, WordWrapHeaderView
+from ...utils.table_widgets import TooltipTableMixin, WordWrapHeaderView, fit_to_contents
 from ...utils.display_format import fmt, fmt_comma
 from ...utils.icons import make_icon, make_icon_btn
 from ...utils.validation_helpers import freeze_widgets
@@ -45,19 +44,7 @@ class _TransportEmissionsTable(TooltipTableMixin, QTableWidget):
         hdr = WordWrapHeaderView(Qt.Horizontal, parent=self)
         self.setHorizontalHeader(hdr)
         hdr.show()
-
-    def _content_height(self) -> int:
-        hh = self.horizontalHeader()
-        h = (hh.height() or hh.sizeHint().height()) + 2 * self.frameWidth()
-        for r in range(self.rowCount()):
-            h += self.rowHeight(r)
-        return h
-
-    def sizeHint(self) -> QSize:
-        return QSize(super().sizeHint().width(), self._content_height())
-
-    def minimumSizeHint(self) -> QSize:
-        return QSize(super().minimumSizeHint().width(), self._content_height())
+        fit_to_contents(self)
 
 
 # ---------------------------------------------------------------------------
@@ -316,9 +303,9 @@ class VehicleCard(QGroupBox):
             ("Material",          _L),
             ("Category",          _L),
             ("kg Factor",         _R),
-            ("Quantity (kg)",      _R),
+            ("Quantity\n(kg)",     _R),
             ("Trips",             _R),
-            ("Emission (kgCO₂e)", _R),
+            ("Emission\n(kgCO₂e)", _R),
             ("Warnings",          _L),
         ]):
             item = QTableWidgetItem(label)
@@ -326,13 +313,14 @@ class VehicleCard(QGroupBox):
             table.setHorizontalHeaderItem(col, item)
         h = table.horizontalHeader()
         h.setStretchLastSection(False)
-        h.setSectionResizeMode(QHeaderView.Stretch)
+        # Text columns share the spare width; number columns fit contents
+        h.setSectionResizeMode(QHeaderView.ResizeToContents)
+        for col in (0, 1, 6):
+            h.setSectionResizeMode(col, QHeaderView.Stretch)
         table.setEditTriggers(QTableWidget.NoEditTriggers)
         table.setSelectionMode(QTableWidget.NoSelection)
         table.verticalHeader().setVisible(False)
-        table.verticalHeader().setDefaultSectionSize(32)
-        table.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+
 
         for mat in mat_results:
             row = table.rowCount()

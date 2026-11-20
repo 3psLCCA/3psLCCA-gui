@@ -30,7 +30,7 @@ from PySide6.QtWidgets import (
     QStyle,
 )
 from PySide6.QtCore import Qt, Signal, QThread, QSize, QRect, QStandardPaths, QTimer, QVariantAnimation, QEasingCurve
-from PySide6.QtGui import QPainter, QColor, QPalette
+from PySide6.QtGui import QPainter, QColor
 
 from three_ps_lcca_gui.gui.themes import get_token, theme_manager
 from three_ps_lcca_gui.gui.theme import (
@@ -81,11 +81,6 @@ class SectionTreeWidget(QTreeWidget):
 
     def _apply_theme_style(self):
         """Apply theme-consistent styling to the tree widget."""
-        # Sync Base/AlternateBase so viewport background matches window
-        p = self.palette()
-        p.setColor(QPalette.Base, p.color(QPalette.Window))
-        self.setPalette(p)
-
         self.setStyleSheet(f"""
             QTreeWidget {{
                 background-color: transparent;

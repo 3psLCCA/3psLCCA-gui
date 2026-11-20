@@ -3,67 +3,150 @@ Reusable table widgets shared across the application.
 
 Exports:
     GroupedHeaderView       - two-tier grouped horizontal header
-    WordWrapHeaderView      - single-tier header with word wrap (installed globally)
+    WordWrapHeaderView      - single-tier header, no eliding (installed globally)
     BaseActionDelegate      - base for painted action-column delegates
     TooltipTableMixin       - mixin that shows cell tooltip on overflow
     TableDoubleSpinBox      - QDoubleSpinBox styled for table cells
     TableSpinBox            - QSpinBox styled for table cells
     TableLineEdit           - QLineEdit styled for table cells
-    mark_editable_column    - tints a column to indicate it is editable
+    fit_to_contents         - let Qt size a table from its labels and rows
+    item_text_rect          - the style's text rect for a cell (QSS padding included)
+    FrozenActionColumn      - Action column pinned over a table's right edge
+    TableCard               - a table in a rounded box with a heading row and "+ Add" row
 """
 from PySide6.QtWidgets import (
+    QAbstractScrollArea,
+    QApplication,
     QDoubleSpinBox,
+    QFrame,
+    QHBoxLayout,
     QHeaderView,
+    QLabel,
     QLineEdit,
+    QPushButton,
+    QSizePolicy,
     QSpinBox,
     QStyledItemDelegate,
     QStyleOptionHeader,
     QStyleOptionViewItem,
     QStyle,
-    QTableView,
-    QAbstractItemView,
+    QTableWidget,
+    QTableWidgetItem,
+    QToolButton,
     QToolTip,
+    QVBoxLayout,
 )
-from PySide6.QtCore import Qt, QSize, QRect, QPoint, QEvent
-from PySide6.QtGui import QPainter, QBrush, QColor, QPalette, QFontMetrics
-from three_ps_lcca_gui.gui.themes import get_token
+from PySide6.QtCore import Qt, QSize, QRect, QEvent, QModelIndex, Signal
+from PySide6.QtGui import QPainter, QColor
+from shiboken6 import isValid
+from three_ps_lcca_gui.gui.assets.themes.table_style import COL_MIN_ROLE
+from three_ps_lcca_gui.gui.theme import BTN_SM, SP2, SP3
+
+
+# ---------------------------------------------------------------------------
+# Word-wrap header (no groups) - installed globally on plain QTableWidget/View
+# ---------------------------------------------------------------------------
+
+def contrast_color(bg: QColor) -> QColor:
+    """Return black or white for readable text on the given background color."""
+    lum = (0.299 * bg.red() + 0.587 * bg.green() + 0.114 * bg.blue()) / 255
+    return QColor("#000000") if lum > 0.55 else QColor("#ffffff")
+
+
+def item_text_rect(delegate: QStyledItemDelegate, option, index) -> QRect:
+    """Where the style puts a cell's text - QSS ``::item`` padding included.
+    Delegates that paint their own text draw into this instead of a hand-set inset."""
+    opt = QStyleOptionViewItem(option)
+    delegate.initStyleOption(opt, index)
+    style = opt.widget.style() if opt.widget else QApplication.style()
+    return style.subElementRect(QStyle.SE_ItemViewItemText, opt, opt.widget)
+
+
+class WordWrapHeaderView(QHeaderView):
+    """Horizontal header that never elides. Qt measures and paints the
+    sections; multi-line labels break at explicit "\\n"."""
+
+    def __init__(self, orientation_or_parent=Qt.Horizontal, parent=None):
+        if isinstance(orientation_or_parent, Qt.Orientation):
+            orientation = orientation_or_parent
+            actual_parent = parent
+        else:
+            orientation = Qt.Horizontal
+            actual_parent = orientation_or_parent
+        super().__init__(orientation, actual_parent)
+        self.setTextElideMode(Qt.ElideNone)
+        self.sectionResized.connect(self._on_section_resized)
+        self._updating = False
+
+    def _on_section_resized(self, logicalIndex: int, oldSize: int, newSize: int):
+        if not self._updating:
+            self._updating = True
+            try:
+                self.geometriesChanged.emit()
+            finally:
+                self._updating = False
+
+    def sectionSizeFromContents(self, logicalIndex):
+        # never under the column's minimum width from table_style.py
+        size = super().sectionSizeFromContents(logicalIndex)
+        model = self.model()
+        floor = model.headerData(logicalIndex, self.orientation(), COL_MIN_ROLE) if model else None
+        if floor:
+            size.setWidth(max(size.width(), floor))
+        return size
+
+    def _one_line_height(self, text="X"):
+        """Height of a one-line section, with the style's own padding."""
+        opt = QStyleOptionHeader()
+        self.initStyleOption(opt)
+        opt.text = text
+        return self.style().sizeFromContents(
+            QStyle.CT_HeaderSection, opt, QSize(), self
+        ).height()
 
 
 # ---------------------------------------------------------------------------
 # Two-tier grouped header
 # ---------------------------------------------------------------------------
 
-class GroupedHeaderView(QHeaderView):
-    """Horizontal header with spanning group labels on the top tier and
+class GroupedHeaderView(WordWrapHeaderView):
+    """Word-wrap header with spanning group labels on the top tier and
     individual column labels on the bottom tier.
 
     Args:
         groups: list of (start_col, span, label)
-        font:   optional QFont applied to all header text
     Columns NOT in any group span the full height with their label centred.
     """
 
-    def __init__(self, groups=(), font=None, parent=None):
+    def __init__(self, groups=(), parent=None):
         super().__init__(Qt.Horizontal, parent)
         self._groups    = list(groups)
-        self._font      = font
         self._col_group: dict[int, tuple] = {}
         for start, span, label in self._groups:
             for c in range(start, start + span):
                 self._col_group[c] = (start, span, label)
 
+    def _group_tier_height(self):
+        return max((self._one_line_height(label) for *_, label in self._groups),
+                   default=0)
+
     def sizeHint(self):
+        # Qt measures each label (style padding included); a grouped
+        # column's label sits under its group label
         s = super().sizeHint()
-        if self._groups:
-            return QSize(s.width(), s.height() * 2)
-        return QSize(s.width(), max(s.height(), 44))
+        if not self.model():
+            return s
+        tier = self._group_tier_height()
+        h = max((self.sectionSizeFromContents(i).height()
+                 + (tier if i in self._col_group else 0)
+                 for i in range(self.count()) if not self.isSectionHidden(i)),
+                default=0)
+        return QSize(s.width(), max(s.height(), h))
 
     def paintSection(self, painter, rect, logical_index):
-        if self._font:
-            painter.setFont(self._font)
         if self._groups and logical_index in self._col_group:
-            h2     = rect.height() // 2
-            bottom = QRect(rect.x(), rect.y() + h2, rect.width(), h2)
+            top    = self._group_tier_height()
+            bottom = QRect(rect.x(), rect.y() + top, rect.width(), rect.height() - top)
             painter.save()
             painter.setClipRect(bottom)
             super().paintSection(painter, bottom, logical_index)
@@ -82,13 +165,11 @@ class GroupedHeaderView(QHeaderView):
         if not self._groups:
             return
         painter = QPainter(self.viewport())
-        if self._font:
-            painter.setFont(self._font)
-        h2 = self.height() // 2
+        top = self._group_tier_height()
         for start, span, label in self._groups:
             x       = self.sectionViewportPosition(start)
             total_w = sum(self.sectionSize(start + i) for i in range(span))
-            group_rect = QRect(x, 0, total_w, h2)
+            group_rect = QRect(x, 0, total_w, top)
             opt = QStyleOptionHeader()
             self.initStyleOption(opt)
             opt.rect             = group_rect
@@ -108,98 +189,6 @@ class GroupedHeaderView(QHeaderView):
 
 
 # ---------------------------------------------------------------------------
-# Word-wrap header (no groups) - installed globally on plain QTableWidget/View
-# ---------------------------------------------------------------------------
-
-def contrast_color(bg: QColor) -> QColor:
-    """Return black or white for readable text on the given background color."""
-    lum = (0.299 * bg.red() + 0.587 * bg.green() + 0.114 * bg.blue()) / 255
-    return QColor("#000000") if lum > 0.55 else QColor("#ffffff")
-
-
-class WordWrapHeaderView(QHeaderView):
-    """Horizontal header that paints column labels with word wrap and dynamic height."""
-
-    _MIN_HEIGHT = 44
-
-    def __init__(self, orientation_or_parent=Qt.Horizontal, font=None, parent=None):
-        if isinstance(orientation_or_parent, Qt.Orientation):
-            orientation = orientation_or_parent
-            actual_parent = parent
-        else:
-            orientation = Qt.Horizontal
-            actual_parent = orientation_or_parent
-        super().__init__(orientation, actual_parent)
-        self._font = font
-        self.sectionResized.connect(self._on_section_resized)
-        self._updating = False
-
-    def _on_section_resized(self, logicalIndex: int, oldSize: int, newSize: int):
-        if not self._updating:
-            self._updating = True
-            try:
-                self.geometriesChanged.emit()
-            finally:
-                self._updating = False
-
-    def sizeHint(self):
-        s = super().sizeHint()
-        if not self.model():
-            return QSize(s.width(), max(s.height(), self._MIN_HEIGHT))
-        fm = QFontMetrics(self._font if self._font else self.font())
-        max_h = self._MIN_HEIGHT
-        for i in range(self.count()):
-            if self.isSectionHidden(i):
-                continue
-            txt = str(self.model().headerData(i, self.orientation(), Qt.DisplayRole) or "")
-            col_w = self.sectionSize(i)
-            w = max(30, (col_w if col_w > 10 else 100) - 12)
-            rect = fm.boundingRect(0, 0, w, 2000, self.defaultAlignment() | Qt.TextWordWrap, txt)
-            max_h = max(max_h, rect.height() + 14)
-        return QSize(s.width(), max_h)
-
-    def paintSection(self, painter, rect, logical_index):
-        bg = self.model().headerData(logical_index, self.orientation(), Qt.BackgroundRole)
-        bg_color = bg.color() if isinstance(bg, QBrush) else (bg if isinstance(bg, QColor) else None)
-        if bg_color and bg_color.isValid() and bg_color.alpha() > 0:
-            # Draw standard section first (Fusion-safe), then overlay tint + text with contrast pen.
-            painter.save()
-            super().paintSection(painter, rect, logical_index)
-            painter.restore()
-            painter.save()
-            painter.fillRect(rect.adjusted(0, 0, 0, -2), bg_color)
-            painter.setFont(self._font if self._font else self.font())
-            painter.setPen(contrast_color(bg_color))
-            text = self.model().headerData(logical_index, self.orientation(), Qt.DisplayRole) or ""
-            painter.drawText(rect.adjusted(6, 4, -6, -4), self.defaultAlignment() | Qt.TextWordWrap, str(text))
-            painter.restore()
-        else:
-            painter.save()
-            opt = QStyleOptionHeader()
-            self.initStyleOption(opt)
-            opt.section = logical_index
-            opt.rect = rect
-            text = str(self.model().headerData(logical_index, self.orientation(), Qt.DisplayRole) or "")
-            opt.text = ""  # blank text so style paints background/frame without drawing single-line text
-            # Isolate the style call: with the app stylesheet active, Qt <= 6.9's
-            # QStyleSheetStyle (CE_Header with border-radius) returns the painter
-            # with an EMPTY clip region, so the drawText below is clipped away and
-            # headings render blank. The installer pins pyside6<6.10, which is why
-            # this only shows up in the installed app (dev venv runs 6.12).
-            painter.save()
-            self.style().drawControl(QStyle.CE_Header, opt, painter, self)
-            painter.restore()
-            painter.setClipRect(rect)
-            painter.setFont(self._font if self._font else self.font())
-            fg = self.model().headerData(logical_index, self.orientation(), Qt.ForegroundRole)
-            fg_color = fg.color() if (fg and hasattr(fg, "color")) else QColor(get_token("text_secondary"))
-            painter.setPen(fg_color)
-            painter.drawText(rect.adjusted(6, 4, -6, -4), self.defaultAlignment() | Qt.TextWordWrap, text)
-            painter.restore()
-
-
-
-# ---------------------------------------------------------------------------
 # Base action delegate
 # ---------------------------------------------------------------------------
 
@@ -213,10 +202,17 @@ class BaseActionDelegate(QStyledItemDelegate):
     Class attributes to override per subclass:
         BTN_SIZE  - button diameter in px  (default 28)
         BTN_GAP   - gap between buttons px (default 6)
+        BTN_PAD   - clear space around the button strip (default 6)
+        MAX_BTNS  - most buttons in a row; sizes the column (default 2)
+
+    The strip is the cell's decoration as far as the style knows, so the
+    style sizes and places it - QSS ``::item`` padding included.
     """
 
     BTN_SIZE = 28
     BTN_GAP  = 6
+    BTN_PAD  = 6
+    MAX_BTNS = 2
 
     def __init__(self, table):
         super().__init__(table)
@@ -242,10 +238,34 @@ class BaseActionDelegate(QStyledItemDelegate):
     def _action_col(self) -> int:
         return self._table.columnCount() - 1
 
+    def _strip_option(self, rect: QRect | None = None) -> QStyleOptionViewItem:
+        """A view-item option whose decoration is the widest button strip."""
+        opt = QStyleOptionViewItem()
+        opt.initFrom(self._table)
+        opt.widget = self._table
+        if rect is not None:
+            opt.rect = rect
+        opt.features = QStyleOptionViewItem.HasDecoration
+        opt.decorationPosition = QStyleOptionViewItem.Left
+        opt.decorationAlignment = Qt.AlignLeft | Qt.AlignVCenter
+        n, pad = self.MAX_BTNS, self.BTN_PAD
+        opt.decorationSize = QSize(n * self.BTN_SIZE + (n - 1) * self.BTN_GAP + 2 * pad,
+                                   self.BTN_SIZE + 2 * pad)
+        return opt
+
+    def sizeHint(self, option, index):
+        # The style's cell size for the button strip
+        style = self._table.style()
+        return style.sizeFromContents(QStyle.CT_ItemViewItem, self._strip_option(),
+                                      QSize(), self._table)
+
     def _btn_rects(self, cell_rect: QRect, n: int) -> list[QRect]:
-        """Return n QRects left-aligned inside cell_rect."""
-        x = cell_rect.x() + 6
-        y = cell_rect.y() + (cell_rect.height() - self.BTN_SIZE) // 2
+        """Return n QRects left-aligned where the style puts the strip."""
+        style = self._table.style()
+        strip = style.subElementRect(QStyle.SE_ItemViewItemDecoration,
+                                     self._strip_option(cell_rect), self._table)
+        x = strip.x() + self.BTN_PAD
+        y = strip.y() + (strip.height() - self.BTN_SIZE) // 2
         return [
             QRect(x + i * (self.BTN_SIZE + self.BTN_GAP), y, self.BTN_SIZE, self.BTN_SIZE)
             for i in range(n)
@@ -256,21 +276,12 @@ class BaseActionDelegate(QStyledItemDelegate):
     # ------------------------------------------------------------------
 
     def paint(self, painter, option, index):
-        painter.save()
-        is_alt = self._table.alternatingRowColors() and (index.row() % 2 != 0)
+        # Standard cell background only; the buttons replace the cell text.
+        opt = QStyleOptionViewItem(option)
+        self.initStyleOption(opt, index)
+        style = opt.widget.style() if opt.widget else self._table.style()
+        style.drawPrimitive(QStyle.PE_PanelItemViewItem, opt, painter, opt.widget)
 
-        if option.state & QStyle.State_Selected:
-            bg = QColor(get_token("surface_pressed"))
-        elif option.state & QStyle.State_MouseOver:
-            bg = QColor(get_token("surface"))
-        else:
-            role = QPalette.AlternateBase if is_alt else QPalette.Base
-            bg = option.palette.color(role)
-
-        painter.fillRect(option.rect, bg)
-        painter.restore()
-
-        # We don't call super().paint() to ensure QSS hover rules are ignored.
         btns = self._get_btns_for_row(index.row())
         if not btns:
             return
@@ -354,14 +365,6 @@ class BaseActionDelegate(QStyledItemDelegate):
 # Tooltip mixin for QTableWidget subclasses
 # ---------------------------------------------------------------------------
 
-def round_table_viewport(table) -> None:
-    """Clip the viewport background to the table's rounded border corners."""
-    table.viewport().setStyleSheet(
-        "border-bottom-left-radius: 7px; border-bottom-right-radius: 7px;"
-        " background-color: transparent;"
-    )
-
-
 class TooltipTableMixin:
     """Mixin for QTableWidget: always shows a tooltip with the full cell text,
     and enables word wrap + ElideNone so text is never silently cut off.
@@ -372,7 +375,6 @@ class TooltipTableMixin:
         super().__init__(*args, **kwargs)
         self.setWordWrap(True)
         self.setTextElideMode(Qt.ElideNone)
-        round_table_viewport(self)
 
     def viewportEvent(self, event):
         if event.type() == QEvent.ToolTip:
@@ -388,61 +390,8 @@ class TooltipTableMixin:
 
 
 # ---------------------------------------------------------------------------
-# Editable-column tint
-# ---------------------------------------------------------------------------
-
-class _EditableColumnDelegate(QStyledItemDelegate):
-    """Paints a distinct background behind every cell in an editable column.
-    Only highlights cells that are actually interactive (have a cell widget
-    or the ItemIsEditable flag set).
-    """
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        from three_ps_lcca_gui.gui.themes import theme_manager
-        theme_manager().theme_changed.connect(self._on_theme_changed)
-
-    def _on_theme_changed(self):
-        parent = self.parent()
-        if parent and hasattr(parent, "viewport"):
-            parent.viewport().update()
-
-    def paint(self, painter, option, index):
-        # Check if the cell is actually editable:
-        # 1. Does it have a custom widget set (e.g. TableSpinBox)?
-        # 2. Or is its model-level flag set to ItemIsEditable?
-        table = self.parent()
-        is_widget = False
-        if isinstance(table, QTableView):
-            is_widget = table.indexWidget(index) is not None
-
-        is_flag = bool(index.flags() & Qt.ItemIsEditable)
-
-        if is_widget or is_flag:
-            painter.save()
-            bg = QColor(get_token("cell-editable-bg"))
-            if bg.isValid():
-                painter.fillRect(option.rect, bg)
-            painter.restore()
-
-        super().paint(painter, option, index)
-
-
-def mark_editable_column(table, col: int) -> None:
-    """Register the editable-column tint delegate on *col* of *table*."""
-    table.setItemDelegateForColumn(col, _EditableColumnDelegate(table))
-
-
-# ---------------------------------------------------------------------------
 # Compact spin boxes for use inside QTableWidget cells
 # ---------------------------------------------------------------------------
-
-# Base inline style to include whenever setStyleSheet is called on these widgets.
-# Required because a widget-level stylesheet overrides the app QSS entirely for
-# that widget - any properties omitted fall back to platform defaults, not main.qss.
-TABLE_SPINBOX_BASE_QSS = (
-    "background-color: transparent; border: none; border-radius: 0;"
-    " margin: 0; padding: 0 4px; min-height: 0;"
-)
 
 
 class _FitEditorMixin:
@@ -485,3 +434,222 @@ class TableLineEdit(QLineEdit):
     """QLineEdit subclass for table cells. Same rationale as TableDoubleSpinBox."""
 
 
+
+
+# ---------------------------------------------------------------------------
+# Content sizing
+# ---------------------------------------------------------------------------
+
+
+def fit_to_contents(table):
+    """Let Qt size a table from its labels and rows: every row shows (the
+    page scrolls, not the table) and rows grow with wrapped text."""
+    table.setSizeAdjustPolicy(QAbstractScrollArea.AdjustToContents)
+    table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+    table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
+    table.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+
+
+# ---------------------------------------------------------------------------
+# Floating Action column
+# ---------------------------------------------------------------------------
+
+
+class FrozenActionColumn(QTableWidget):
+    """One-column "Action" table pinned over the right edge of a main table.
+
+    Follows Qt's Frozen Column pattern: the overlay is a child of the main
+    table and is kept in step with it through signals, so it never scrolls
+    sideways and its rows always line up.
+
+    - Vertical scrolling is linked both ways.
+    - Row heights follow the main table's ``sectionResized`` signal.
+    - The header height follows the main header's ``geometriesChanged``.
+
+    The width is Qt's: the wider of the header label and the delegate's
+    buttons, both measured by the style. ``widthChanged`` tells the main
+    table, which keeps that much free on the right (a placeholder column
+    and/or ``setViewportMargins``) so no value sits under the overlay. Its
+    rows are never shorter than the action delegate's buttons.
+    """
+
+    widthChanged = Signal(int)
+
+    def __init__(self, parent_table: QTableWidget, title: str = "Action"):
+        super().__init__(parent_table)
+        self.setObjectName("actionColumn")  # main.qss: #actionColumn
+        self._parent_table = parent_table
+        self._width = 0
+
+        # Set the header here: main.py's filter swaps a plain header later,
+        # after reposition() has fixed its height, which left the Action
+        # header and rows out of line with the main table.
+        self.setHorizontalHeader(WordWrapHeaderView(Qt.Horizontal))
+        self.setColumnCount(1)
+        hdr_item = QTableWidgetItem(title)
+        hdr_item.setTextAlignment(Qt.AlignCenter | Qt.AlignVCenter)
+        self.setHorizontalHeaderItem(0, hdr_item)
+
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.setFocusPolicy(Qt.NoFocus)
+        self.setSelectionMode(QTableWidget.NoSelection)
+        self.setFrameShape(QTableWidget.NoFrame)
+
+        self.verticalHeader().setVisible(False)
+        self.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+
+        main_bar, own_bar = parent_table.verticalScrollBar(), self.verticalScrollBar()
+        main_bar.valueChanged.connect(own_bar.setValue)
+        own_bar.valueChanged.connect(main_bar.setValue)
+        parent_table.verticalHeader().sectionResized.connect(self._on_row_resized)
+        parent_table.horizontalHeader().geometriesChanged.connect(self._on_header_changed)
+
+    def setItemDelegateForColumn(self, column, delegate):
+        super().setItemDelegateForColumn(column, delegate)
+        # main-table rows must fit the buttons this delegate paints
+        btn_h = delegate.sizeHint(QStyleOptionViewItem(), QModelIndex()).height()
+        self._parent_table.verticalHeader().setMinimumSectionSize(btn_h)
+        self.update_width()
+
+    # ---- rows ----------------------------------------------------------
+    def _on_row_resized(self, row: int, _old: int, new: int):
+        if row < self.rowCount():
+            self.setRowHeight(row, new)
+
+    def sync_row_heights(self):
+        p = self._parent_table
+        for r in range(min(self.rowCount(), p.rowCount())):
+            self.setRowHeight(r, p.rowHeight(r))
+
+    def add_row(self, data=None):
+        """Append a row; ``data`` (default: the row index) goes in UserRole."""
+        row = self.rowCount()
+        self.insertRow(row)
+        p = self._parent_table
+        if row < p.rowCount():
+            self.setRowHeight(row, p.rowHeight(row))
+        item = QTableWidgetItem()
+        item.setData(Qt.UserRole, row if data is None else data)
+        item.setFlags(Qt.ItemIsEnabled)
+        self.setItem(row, 0, item)
+
+    def clear_rows(self):
+        self.setRowCount(0)
+
+    # ---- geometry ------------------------------------------------------
+    def _on_header_changed(self):
+        # The header still emits while the main table is being deleted.
+        if isValid(self) and isValid(self._parent_table):
+            self.reposition()
+
+    def update_width(self) -> int:
+        """Take Qt's width for the column; tell the main table if it changed."""
+        d = self.itemDelegateForColumn(0)
+        btn_w = d.sizeHint(QStyleOptionViewItem(), QModelIndex()).width() if d else 0
+        w = max(self.horizontalHeader().sectionSizeFromContents(0).width(), btn_w)
+        if w != self._width:
+            self._width = w
+            self.widthChanged.emit(w)
+        return w
+
+    def reposition(self):
+        """Sit on the right edge, header level with the main header."""
+        self.update_width()
+        p = self._parent_table
+        hdr_h = p.horizontalHeader().height()
+        self.horizontalHeader().setFixedHeight(hdr_h)
+        vp = p.viewport()
+        # a floating child sits outside any layout, so it is placed by hand;
+        # contentsRect is Qt's area inside the table's frame and QSS margin
+        self.setGeometry(p.contentsRect().right() + 1 - self._width, vp.y() - hdr_h,
+                         self._width, vp.height() + hdr_h)
+        self.raise_()
+
+
+# ---------------------------------------------------------------------------
+# Table card - heading row, table, "+ Add" row in one rounded box
+# ---------------------------------------------------------------------------
+
+
+class TableCard(QFrame):
+    """A table in a rounded box (main.qss: #tableCard):
+
+        heading row   title  ·  count  ----------  total  [•••]
+        the table
+        "+ Add" row   (optional, add_footer)
+
+    The heading row is ordinary labels in a layout, outside the table, so
+    the table's columns and Action overlay never run through it. The owner
+    fills in the count and total with set_count / set_total.
+    """
+
+    def __init__(self, table, title="", parent=None):
+        super().__init__(parent)
+        self.setObjectName("tableCard")
+        self.table = table
+        self.menu_btn = None
+        self.footer = None
+
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(1, 1, 1, 1)  # inside the 1 px border
+        lay.setSpacing(0)
+
+        self._head = QHBoxLayout()
+        self._head.setContentsMargins(SP3, SP2, SP2, 0)
+        self._head.setSpacing(SP2)
+        self.title_lbl = QLabel(title)
+        self.title_lbl.setObjectName("cardTitle")
+        self.count_lbl = QLabel()
+        self.count_lbl.setObjectName("cardCount")
+        self.total_lbl = QLabel()
+        self.total_lbl.setObjectName("cardTotal")
+        self._head.addWidget(self.title_lbl)
+        self._head.addWidget(self.count_lbl)
+        self._head.addStretch(1)
+        self._head.addWidget(self.total_lbl)
+
+        lay.addLayout(self._head)
+        lay.addWidget(table)
+
+    def set_title(self, text: str):
+        self.title_lbl.setText(text)
+
+    def set_count(self, text: str):
+        self.count_lbl.setText(f"·  {text}" if text else "")
+
+    def set_total(self, text: str):
+        self.total_lbl.setText(text)
+
+    def count_rows(self, noun: str = "item"):
+        """Show the table's row count ("3 items") and keep it up to date."""
+        def refresh(*_):
+            n = self.table.rowCount()
+            self.set_count(f"{n} {noun}" + ("" if n == 1 else "s"))
+        model = self.table.model()
+        model.rowsInserted.connect(refresh)
+        model.rowsRemoved.connect(refresh)
+        refresh()
+
+    def set_menu(self, menu) -> QToolButton:
+        """Add a "more actions" button at the end of the heading row; returns it."""
+        btn = QToolButton()
+        btn.setText("•••")
+        btn.setToolTip("More actions")
+        btn.setCursor(Qt.PointingHandCursor)
+        btn.setPopupMode(QToolButton.InstantPopup)
+        btn.setFixedSize(BTN_SM, BTN_SM)
+        btn.setMenu(menu)
+        self._head.addWidget(btn)
+        self.menu_btn = btn
+        return btn
+
+    def add_footer(self, text: str = "") -> QPushButton:
+        """Add the "+ Add ..." row under the table; returns the button."""
+        btn = QPushButton(text)
+        btn.setObjectName("cardFooter")
+        btn.setCursor(Qt.PointingHandCursor)
+        self.layout().addWidget(btn)
+        self.footer = btn
+        return btn

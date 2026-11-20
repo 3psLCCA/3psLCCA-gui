@@ -72,6 +72,7 @@ from .helper_functions.lifecycle_summary import compute_all_summaries
 from .helper_functions.lcc_colors import COLORS as LCC_PALETTE
 from .lcc_data import _get, _MASTER_ROWS, BREAKDOWN_STAGES
 from .lcc_plot import _VerticalTextDelegate, LCCBreakdownTable, LCCDetailsTable
+from three_ps_lcca_gui.gui.components.utils.table_widgets import item_text_rect
 from .plots_helper.plot_utils import ChartToolbar, WheelForwarder
 from .table_export import attach_table_context_menu, create_export_button
 
@@ -1132,46 +1133,23 @@ class _ConsolidatedTable(QWidget):
         table.setSelectionMode(QAbstractItemView.NoSelection)
         table.setFocusPolicy(Qt.NoFocus)
         table.verticalHeader().setVisible(False)
-        table.setShowGrid(True)
-        table.setAlternatingRowColors(False)
         table.setWordWrap(True)
-        table.setFont(_f(FS_MD, FW_NORMAL))
         table.setSizeAdjustPolicy(QAbstractScrollArea.AdjustToContents)
         table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
         table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.MinimumExpanding)
         table.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        table.setStyleSheet(
-            f"""
-            QTableWidget {{
-                background: {get_token('base')};
-                border: 1px solid {get_token('surface_mid')};
-                border-radius: {RADIUS_LG}px;
-                gridline-color: {get_token('surface_mid')};
-            }}
-            QHeaderView::section {{
-                background: {get_token('surface_mid')};
-                color: {get_token('text')};
-                font-size: {FS_SM}pt;
-                font-weight: {FW_SEMIBOLD};
-                padding: {SP2}px {SP3}px;
-                border: none;
-                border-bottom: 1px solid {get_token('surface_mid')};
-            }}
-            """
-        )
 
         # Headers
         table.setHorizontalHeader(WordWrapHeaderView(Qt.Horizontal, parent=table))
         table.horizontalHeader().setDefaultAlignment(Qt.AlignCenter)
-        table.horizontalHeader().setFont(_f(FS_SM, FW_SEMIBOLD))
-        table.horizontalHeader().setMinimumSectionSize(90)
         table.setHorizontalHeaderItem(0, QTableWidgetItem("Metric"))
         for ci, name in enumerate(names):
             table.setHorizontalHeaderItem(ci + 1, QTableWidgetItem(name))
 
+        # Metric names share the spare width; project columns fit contents
         table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
         for ci in range(1, n_cols + 1):
-            table.horizontalHeader().setSectionResizeMode(ci, QHeaderView.Stretch)
+            table.horizontalHeader().setSectionResizeMode(ci, QHeaderView.ResizeToContents)
 
         # Fill rows
         for row_idx, row_def in enumerate(all_rows):
@@ -1417,7 +1395,7 @@ class _HeatmapDelegate(QStyledItemDelegate):
         if fnt:
             painter.setFont(fnt)
         painter.drawText(
-            option.rect.adjusted(SP2, 0, -SP2, 0),
+            item_text_rect(self, option, index),
             Qt.AlignRight | Qt.AlignVCenter,
             txt,
         )
@@ -1427,9 +1405,13 @@ class _HeatmapDelegate(QStyledItemDelegate):
 class _ItemTickDelegate(QStyledItemDelegate):
     """Draws a vertical colored tick on the left edge of each cost item indicating its pillar."""
 
+    _TICK_W = 4    # the tick bar
+    _TICK_GAP = 6  # tick to text
+
     def sizeHint(self, option, index):
+        # Qt's size for the text (style padding included) plus the tick
         base = super().sizeHint(option, index)
-        return QSize(base.width() + 18, max(28, base.height() + 4))
+        return QSize(base.width() + self._TICK_W + self._TICK_GAP, base.height())
 
     def paint(self, painter, option, index):
         painter.save()
@@ -1440,13 +1422,16 @@ class _ItemTickDelegate(QStyledItemDelegate):
         else:
             painter.fillRect(option.rect, QColor(get_token("base")))
 
+        # tick at the style's text start, text after it
+        text_rect = item_text_rect(self, option, index)
+        text_rect.setLeft(text_rect.left() + self._TICK_W + self._TICK_GAP)
         tick_color_hex = index.data(Qt.UserRole + 1)
         if tick_color_hex:
             painter.fillRect(
-                option.rect.left() + 4,
-                option.rect.top() + 4,
-                4,
-                option.rect.height() - 8,
+                text_rect.left() - self._TICK_W - self._TICK_GAP,
+                text_rect.top(),
+                self._TICK_W,
+                text_rect.height(),
                 QColor(tick_color_hex),
             )
 
@@ -1457,7 +1442,6 @@ class _ItemTickDelegate(QStyledItemDelegate):
         if fnt:
             painter.setFont(fnt)
         painter.setPen(c_fg)
-        text_rect = option.rect.adjusted(14, 2, -4, -2) if tick_color_hex else option.rect.adjusted(8, 2, -4, -2)
         painter.drawText(text_rect, Qt.TextWordWrap | Qt.AlignLeft | Qt.AlignVCenter, txt)
         painter.restore()
 
@@ -1593,32 +1577,8 @@ class _DetailedBreakdownSection(QWidget):
         table.setSelectionMode(QAbstractItemView.NoSelection)
         table.setFocusPolicy(Qt.NoFocus)
         table.verticalHeader().setVisible(False)
-        table.setShowGrid(False)
-        table.setStyleSheet(
-            f"""
-            QTableWidget {{
-                background: {get_token('base')};
-                border: 1px solid {get_token('surface_mid')};
-                border-radius: {RADIUS_LG}px;
-            }}
-            QTableWidget::item:selected {{
-                background: transparent;
-            }}
-            QHeaderView::section {{
-                background: {get_token('surface_mid')};
-                color: {get_token('text')};
-                font-size: {FS_SM}pt;
-                font-weight: {FW_SEMIBOLD};
-                padding: {SP2}px {SP3}px;
-                border: none;
-                border-bottom: 1px solid {get_token('surface_mid')};
-            }}
-            """
-        )
 
         table.setWordWrap(True)
-        table.setShowGrid(True)
-        table.setFont(_f(FS_MD, FW_NORMAL))
         table.setSizeAdjustPolicy(QAbstractScrollArea.AdjustToContents)
         table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
         table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.MinimumExpanding)
@@ -1627,8 +1587,6 @@ class _DetailedBreakdownSection(QWidget):
         # Headers
         table.setHorizontalHeader(WordWrapHeaderView(Qt.Horizontal, parent=table))
         table.horizontalHeader().setDefaultAlignment(Qt.AlignCenter)
-        table.horizontalHeader().setFont(_f(FS_SM, FW_SEMIBOLD))
-        table.horizontalHeader().setMinimumSectionSize(90)
         table.setHorizontalHeaderItem(0, QTableWidgetItem("Stage"))
         table.setHorizontalHeaderItem(1, QTableWidgetItem("Cost Item"))
         for ci, name in enumerate(names):
@@ -1642,7 +1600,7 @@ class _DetailedBreakdownSection(QWidget):
         table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
         table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
         for ci in range(n_cols):
-            table.horizontalHeader().setSectionResizeMode(ci + 2, QHeaderView.Stretch)
+            table.horizontalHeader().setSectionResizeMode(ci + 2, QHeaderView.ResizeToContents)
 
         # Compute per-column positive max and negative max (for heatmap normalization)
         col_pos_max: dict[int, float] = {}

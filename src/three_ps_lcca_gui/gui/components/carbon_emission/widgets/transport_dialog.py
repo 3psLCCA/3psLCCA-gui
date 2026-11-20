@@ -84,7 +84,6 @@ from PySide6.QtGui import QColor, QDoubleValidator
 
 from ...utils.table_widgets import (
     TableLineEdit,
-    mark_editable_column,
     TooltipTableMixin,
 )
 from ...utils.definitions import STRUCTURE_CHUNKS, UNIT_DIMENSION, UNIT_DISPLAY
@@ -161,7 +160,6 @@ class TransportDialog(QDialog):
             self.ef_in.setValue(0.0)
 
         # FINAL STABILIZATION PASS
-        mark_editable_column(self.mat_table, 4)
         self.mat_table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
         self._update_summary()
 
@@ -331,30 +329,24 @@ class TransportDialog(QDialog):
         self.mat_table = _TransportTable()
         self.mat_table.setColumnCount(6)
         self.mat_table.setHorizontalHeaderLabels(
-            ["", "Material", "Category", "Unit", "kg / unit", "Quantity (kg)"]
+            ["", "Material", "Category", "Unit", "kg / unit", "Quantity\n(kg)"]
         )
         self.mat_table.verticalHeader().setVisible(False)
         self.mat_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.mat_table.setSelectionMode(QAbstractItemView.NoSelection)
-        self.mat_table.setAlternatingRowColors(True)
-        self.mat_table.setShowGrid(False)
-        self.mat_table.verticalHeader().setDefaultSectionSize(34)
-        
-        self.mat_table.verticalHeader().setSectionResizeMode(QHeaderView.Interactive)
+        self.mat_table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
 
         ll.addWidget(self.mat_table)
 
         # Safe header configuration for Windows
         h = self.mat_table.horizontalHeader()
         h.setSectionResizeMode(QHeaderView.Interactive)
-        h.setSectionResizeMode(0, QHeaderView.Fixed)
+        h.setSectionResizeMode(0, QHeaderView.ResizeToContents)
         h.setSectionResizeMode(1, QHeaderView.Stretch)
         h.setSectionResizeMode(2, QHeaderView.Interactive)
         h.setSectionResizeMode(3, QHeaderView.Interactive)
-        h.setSectionResizeMode(4, QHeaderView.Fixed)
+        h.setSectionResizeMode(4, QHeaderView.ResizeToContents)
         h.setSectionResizeMode(5, QHeaderView.Interactive)
-        self.mat_table.setColumnWidth(0, 36)
-        self.mat_table.setColumnWidth(4, 120)
 
         self.mat_count_lbl = QLabel("")
         self.mat_count_lbl.setStyleSheet(f"color: gray; font-size: {FS_SM}pt;")

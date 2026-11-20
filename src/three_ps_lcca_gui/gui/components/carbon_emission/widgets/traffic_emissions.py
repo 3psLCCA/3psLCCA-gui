@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
     QWidget,
 )
-from PySide6.QtCore import Qt, QSize
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QBrush, QColor
 from three_ps_lcca_gui.gui.themes import get_token, theme_manager
 from three_ps_lcca_gui.gui.theme import FS_SECTION
@@ -21,7 +21,7 @@ from ...utils.form_builder.form_definitions import FieldDef, Section
 from ...utils.form_builder.form_builder import build_form, make_section_header
 from ...utils.remarks_editor import RemarksEditor
 from ...utils.display_format import fmt
-from ...utils.table_widgets import TableDoubleSpinBox, TABLE_SPINBOX_BASE_QSS, mark_editable_column, TooltipTableMixin
+from ...utils.table_widgets import TableDoubleSpinBox, TooltipTableMixin, fit_to_contents
 
 from ...utils.validation_helpers import confirm_clear_all
 from PySide6.QtWidgets import QStyledItemDelegate
@@ -126,15 +126,14 @@ class _EmissionsTable(TooltipTableMixin, QTableWidget):
             item = QTableWidgetItem(label)
             item.setTextAlignment(align)
             self.setHorizontalHeaderItem(col, item)
-        self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        # Vehicle names share the spare width; number columns fit contents
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        self.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
         self.verticalHeader().setVisible(False)
-        self.verticalHeader().setDefaultSectionSize(36)
         self.setEditTriggers(QTableWidget.NoEditTriggers)
         self.setSelectionMode(QTableWidget.NoSelection)
-        self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        mark_editable_column(self, _COL_FACTOR)
+        fit_to_contents(self)
 
         for row, (key, label) in enumerate(_VEHICLES):
             lbl_item = QTableWidgetItem(label)
@@ -172,13 +171,6 @@ class _EmissionsTable(TooltipTableMixin, QTableWidget):
             sb.update()
         self.viewport().update()
 
-    def sizeHint(self):
-        header_h = self.horizontalHeader().height() or 36
-        rows_h = self.rowCount() * self.verticalHeader().defaultSectionSize()
-        return QSize(super().sizeHint().width(), max(60, header_h + rows_h + 10))
-
-    def minimumSizeHint(self):
-        return self.sizeHint()
 
     def _on_factor_changed(self):
         self._recalculate()

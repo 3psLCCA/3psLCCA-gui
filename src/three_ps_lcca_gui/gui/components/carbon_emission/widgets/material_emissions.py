@@ -1,6 +1,6 @@
 from three_ps_lcca_gui.gui.themes import get_token
 from three_ps_lcca_gui.gui.theme import FS_MD
-from ...utils.form_builder.form_builder import make_section_header, make_section_label
+from ...utils.form_builder.form_builder import make_section_label
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -11,11 +11,10 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
     QHeaderView,
     QFrame,
-    QSizePolicy,
     QScrollArea,
     QToolTip,
 )
-from PySide6.QtCore import Qt, QSize, QTimer, QRect, QEvent
+from PySide6.QtCore import Qt, QTimer, QRect, QEvent
 from PySide6.QtGui import QColor
 import datetime
 
@@ -27,6 +26,9 @@ from ...utils.table_widgets import (
     GroupedHeaderView,
     BaseActionDelegate,
     TooltipTableMixin,
+    TableCard,
+    FrozenActionColumn,
+    fit_to_contents,
 )
 
 
@@ -136,7 +138,6 @@ def calc_carbon(item: dict) -> float:
 # Action column constants
 # ---------------------------------------------------------------------------
 
-_ACTION_W = 80  # fixed action column width (used in resizeEvent + sizeHint)
 
 
 # ---------------------------------------------------------------------------
@@ -176,9 +177,6 @@ class _CarbonActionDelegate(BaseActionDelegate):
             return []
         return [self._icons[key] for key in data.get("btns", [])]
 
-    def sizeHint(self, option, index):
-        return QSize(_ACTION_W, self.BTN_SIZE + 14)
-
     def editorEvent(self, event, model, option, index):
         if self._frozen:
             return False
@@ -211,78 +209,17 @@ class _CarbonActionDelegate(BaseActionDelegate):
 # ---------------------------------------------------------------------------
 
 
-class _FrozenActionTable(QTableWidget):
-    """Overlay pinned to the right edge; main table reserves space via setViewportMargins."""
+class _FrozenActionTable(FrozenActionColumn):
+    """Shared floating Action column, plus a per-row tint for invalid rows."""
 
     def __init__(self, parent_table):
         super().__init__(parent_table)
-        self._parent_table = parent_table
-
-        self.setColumnCount(1)
-        hdr_item = QTableWidgetItem("Action")
-        hdr_item.setTextAlignment(Qt.AlignCenter | Qt.AlignVCenter)
-        self.setHorizontalHeaderItem(0, hdr_item)
-
-        self.setFixedWidth(_ACTION_W)
-        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.setFocusPolicy(Qt.NoFocus)
-        self.setSelectionMode(QTableWidget.NoSelection)
-        self.setFrameShape(QTableWidget.NoFrame)
-        self.setStyleSheet(
-            """
-            QTableWidget {
-                background-color: palette(base);
-                border-top-left-radius: 0px;
-                border-bottom-left-radius: 0px;
-            }
-        """
-        )
-
-        self.verticalHeader().setVisible(False)
-        self.verticalHeader().setDefaultSectionSize(35)
-        self.verticalHeader().setMinimumSectionSize(35)
-
-        hdr = self.horizontalHeader()
-        hdr.setSectionResizeMode(0, QHeaderView.Fixed)
-        self.setColumnWidth(0, _ACTION_W)
-
-        parent_table.verticalScrollBar().valueChanged.connect(
-            self.verticalScrollBar().setValue
-        )
-
-    def sync_row_heights(self):
-        for r in range(self.rowCount()):
-            self.setRowHeight(r, self._parent_table.rowHeight(r))
-
-    def add_row(self, row_data):
-        row = self.rowCount()
-        self.insertRow(row)
-        self.setRowHeight(row, self._parent_table.rowHeight(row))
-        item = QTableWidgetItem()
-        item.setData(Qt.UserRole, row_data)
-        item.setFlags(Qt.ItemIsEnabled)
-        self.setItem(row, 0, item)
-
-    def clear_rows(self):
-        self.setRowCount(0)
 
     def set_row_style(self, row: int, color_hex: str):
         bg = QColor(color_hex)
         it = self.item(row, 0)
         if it:
             it.setBackground(bg)
-
-    def reposition(self):
-        p = self._parent_table
-        main_hdr_h = p.horizontalHeader().height()
-        self.horizontalHeader().setFixedHeight(main_hdr_h)
-        vp = p.viewport()
-        x = p.width() - _ACTION_W
-        y = vp.y() - main_hdr_h
-        self.move(x, y)
-        self.setFixedHeight(vp.height() + main_hdr_h)
 
 
 # ---------------------------------------------------------------------------
@@ -304,10 +241,10 @@ class CarbonTable(TooltipTableMixin, QTableWidget):
         ("Material", _L),  # 1
         ("Value", _C),  # 2  ┐ Quantity group (sub-col → center)
         ("Unit", _C),  # 3  ┘
-        ("Conversion Factor", _R),  # 4
+        ("Conversion\nFactor", _R),  # 4
         ("Value", _C),  # 5  ┐ Emission group (sub-col → center)
         ("Unit", _C),  # 6  ┘
-        ("Total Emissions \n (kgCO₂e)", _R),  # 7
+        ("Total Emissions\n(kgCO₂e)", _R),  # 7
         # ("Warning", _L),  # 8
         ("Action", _C),  # 9
         ("", _C),  # 10 placeholder - reserves space for frozen overlay
@@ -317,7 +254,7 @@ class CarbonTable(TooltipTableMixin, QTableWidget):
         ("Material", _L),  # 1
         ("Value", _C),  # 2  ┐ Quantity group (sub-col → center)
         ("Unit", _C),  # 3  ┘
-        ("Conversion Factor", _R),  # 4
+        ("Conversion\nFactor", _R),  # 4
         ("Value", _C),  # 5  ┐ Emission group (sub-col → center)
         ("Unit", _C),  # 6  ┘
         ("Reason", _L),  # 7
@@ -338,17 +275,18 @@ class CarbonTable(TooltipTableMixin, QTableWidget):
             item = QTableWidgetItem(label)
             item.setTextAlignment(align)
             self.setHorizontalHeaderItem(col, item)
-        self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        # Text columns share the spare width; number columns fit their contents
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        for col, (label, align) in enumerate(headers):
+            if align == self._L:
+                self.horizontalHeader().setSectionResizeMode(col, QHeaderView.Stretch)
         self.horizontalHeader().setStretchLastSection(False)
-        self.horizontalHeader().setMinimumSectionSize(60)
         self.setEditTriggers(QTableWidget.NoEditTriggers)
         self.setSelectionMode(QTableWidget.NoSelection)
         self.setWordWrap(True)
         self.setTextElideMode(Qt.ElideNone)
-        self.verticalHeader().setDefaultSectionSize(35)
         self.verticalHeader().setVisible(False)
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        fit_to_contents(self)
 
         # Hide the real action col - frozen overlay renders it
         action_col = len(headers) - 2  # second-to-last (last is placeholder)
@@ -356,44 +294,24 @@ class CarbonTable(TooltipTableMixin, QTableWidget):
         self.setColumnWidth(action_col, 0)
         self.setColumnHidden(action_col, True)
 
-        # Placeholder col fixed at _ACTION_W
+        # Placeholder col keeps the overlay's width (_reserve_action_width)
         placeholder_col = len(headers) - 1
         self.horizontalHeader().setSectionResizeMode(placeholder_col, QHeaderView.Fixed)
-        self.setColumnWidth(placeholder_col, _ACTION_W)
-
-        # Reserve right margin so scrollable content never enters the overlay zone
-        self.setViewportMargins(0, 0, _ACTION_W, 0)
 
         # Frozen overlay
         self._frozen_overlay = _FrozenActionTable(self)
+        self._frozen_overlay.widthChanged.connect(self._reserve_action_width)
         self._frozen_overlay.show()
 
-        self._set_column_widths()
-
-    def _set_column_widths(self):
-        # Initial defaults at ~800px viewport (rest ≈ 720px)
-        # Sub-column pairs are equal: qty=43px each, emission=65px each
-        if self.is_included:
-            for col, w in enumerate([75, 164, 60, 60, 70, 85, 85, 114, 80]):
-                self.setColumnWidth(col, w)
-        else:
-            for col, w in enumerate([72, 158, 43, 43, 50, 65, 65, 216, 80]):
-                self.setColumnWidth(col, w)
+    def _reserve_action_width(self, w: int):
+        # placeholder col and right margin keep content out of the overlay zone
+        self.setColumnWidth(self.columnCount() - 1, w)
+        self.setViewportMargins(0, 0, w, 0)
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        self.resizeRowsToContents()
-
         self._frozen_overlay.reposition()
         self._frozen_overlay.sync_row_heights()
-
-    def sizeHint(self):
-        header_h = self.horizontalHeader().height() or 35
-        rows_h = sum(self.rowHeight(r) for r in range(self.rowCount()))
-        return QSize(super().sizeHint().width(), max(60, header_h + rows_h + 10))
-
-    def minimumSizeHint(self):
-        return self.sizeHint()
 
     def viewportEvent(self, event):
         if event.type() == QEvent.ToolTip:
@@ -408,7 +326,6 @@ class CarbonTable(TooltipTableMixin, QTableWidget):
         return super().viewportEvent(event)
 
     def update_height(self):
-        self.resizeRowsToContents()
         self.updateGeometry()
         if hasattr(self, "_frozen_overlay"):
             self._frozen_overlay.reposition()
@@ -506,9 +423,6 @@ class MaterialEmissions(QWidget):
         main_layout.addWidget(self._hline())
 
         # ── Included Section ─────────────────────────────────────────────
-        for widget in make_section_header("Included in Carbon Emissions Calculation"):
-            main_layout.addWidget(widget)
-
         self.included_table = CarbonTable(is_included=True)
         self._included_action = _CarbonActionDelegate(
             self.included_table._frozen_overlay, self
@@ -516,12 +430,12 @@ class MaterialEmissions(QWidget):
         self.included_table._frozen_overlay.setItemDelegateForColumn(
             0, self._included_action
         )
-        main_layout.addWidget(self.included_table)
+        # card: title and row count above the table
+        included_card = TableCard(self.included_table, "Included in Carbon Emissions Calculation")
+        included_card.count_rows()
+        main_layout.addWidget(included_card)
 
         # ── Excluded Section ─────────────────────────────────────────────
-        for widget in make_section_header("Excluded from Carbon Emissions Calculation"):
-            main_layout.addWidget(widget)
-
         self.excluded_table = CarbonTable(is_included=False)
         self._excluded_action = _CarbonActionDelegate(
             self.excluded_table._frozen_overlay, self
@@ -529,7 +443,10 @@ class MaterialEmissions(QWidget):
         self.excluded_table._frozen_overlay.setItemDelegateForColumn(
             0, self._excluded_action
         )
-        main_layout.addWidget(self.excluded_table)
+        # card: title and row count above the table
+        excluded_card = TableCard(self.excluded_table, "Excluded from Carbon Emissions Calculation")
+        excluded_card.count_rows()
+        main_layout.addWidget(excluded_card)
         main_layout.addStretch()
 
         scroll.setWidget(container)

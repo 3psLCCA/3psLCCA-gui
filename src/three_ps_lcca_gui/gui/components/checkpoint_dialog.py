@@ -26,7 +26,6 @@ from three_ps_lcca_gui.gui.theme import (
     SP2, SP3, SP4, SP8, SP10,
 )
 from three_ps_lcca_gui.gui.themes import get_token
-from three_ps_lcca_gui.gui.components.utils.table_widgets import round_table_viewport
 from three_ps_lcca_gui.gui.styles import font as _f
 
 
@@ -157,13 +156,11 @@ class CheckpointManagerDialog(QDialog):
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.table.setSelectionMode(QAbstractItemView.SingleSelection)
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
-        self.table.setAlternatingRowColors(True)
         self.table.verticalHeader().setVisible(False)
         layout.addWidget(self.table)
         # Apply rounded viewport and connect selection signal after the table is
         # parented via addWidget; doing so before causes a segfault when Qt
         # traverses the transparent-background chain on an unparented viewport.
-        round_table_viewport(self.table)
         self.table.selectionModel().selectionChanged.connect(self._on_selection_changed)
 
         layout.addSpacing(4)
@@ -213,7 +210,6 @@ class CheckpointManagerDialog(QDialog):
             _ro = Qt.ItemIsEnabled | Qt.ItemIsSelectable
 
             label_item = QTableWidgetItem(cp.get("label", ""))
-            label_item.setFont(_f(FS_MD, FW_SEMIBOLD))
             label_item.setFlags(_ro)
 
             date_item = QTableWidgetItem(formatted_date)
@@ -223,7 +219,6 @@ class CheckpointManagerDialog(QDialog):
             notes_item.setFlags(_ro)
 
             file_item = QTableWidgetItem(cp.get("filename", ""))
-            file_item.setFont(_f(FS_SM))
             file_item.setFlags(_ro)
 
             self.table.setItem(row, 0, label_item)

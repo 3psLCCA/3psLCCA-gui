@@ -1,6 +1,5 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QTabWidget
 from PySide6.QtCore import Qt, Signal
-from PySide6.QtGui import QPalette
 from three_ps_lcca_gui.gui.components.carbon_emission.widgets.material_emissions import MaterialEmissions
 from three_ps_lcca_gui.gui.components.carbon_emission.widgets.transport_emissions import (
     TransportEmissions,
@@ -22,14 +21,6 @@ class CarbonEmissionTabView(QWidget):
         main_layout.setContentsMargins(0, 0, 0, 0)
 
         self.tab_view = QTabWidget()
-
-        # QTabWidget's content pane paints using the Base palette role, which
-        # differs from Window in dark mode (gray vs black).
-        # Fix: copy the Window color into the Base role so both paint identically,
-        # no QSS needed - this follows the active theme automatically.
-        palette = self.tab_view.palette()
-        palette.setColor(QPalette.Base, palette.color(QPalette.Window))
-        self.tab_view.setPalette(palette)
 
         tabs = [
             (SCCWidget, "Social Cost of Carbon"),

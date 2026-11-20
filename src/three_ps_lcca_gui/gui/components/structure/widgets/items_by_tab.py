@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
     QScrollArea,
     QFrame,
 )
+from three_ps_lcca_gui.gui.theme import SP4
 from three_ps_lcca_gui.gui.themes import get_token
 from .base_table import StructureTableWidget
 
@@ -67,6 +68,7 @@ class ItemsByTabView(QWidget):
         self.scroll.setFrameShape(QFrame.NoFrame)
         self.container = QWidget()
         self.container_layout = QVBoxLayout(self.container)
+        self.container_layout.setSpacing(SP4)  # gap between the table cards
         self.scroll.setWidget(self.container)
         self.layout.addWidget(self.scroll)
 
@@ -127,11 +129,6 @@ class ItemsByTabView(QWidget):
                 continue
             tab_name = TAB_NAMES.get(chunk_id, chunk_id)
 
-            # The table carries its own heading row (title, count, total)
-            group = QWidget()
-            g_layout = QVBoxLayout(group)
-            g_layout.setContentsMargins(0, 0, 0, 12)
-
             scope = _RowScope(self, chunk_id)
             table = StructureTableWidget(scope, tab_name, show_component=True,
                                          title=self.TITLE.format(tab=tab_name), **self.TABLE_OPTIONS)
@@ -140,8 +137,8 @@ class ItemsByTabView(QWidget):
                 table.add_row(item, len(scope.rows), comp_name)
                 scope.rows.append((comp_name, idx))
             self._table_filled(table, rows)
-            g_layout.addWidget(table)
-            self.container_layout.addWidget(group)
+            # card: heading row (title, count, total) above the table
+            self.container_layout.addWidget(table.card())
 
         if not any(rows_by_chunk.values()):
             empty_lbl = QLabel(self.EMPTY_TEXT)

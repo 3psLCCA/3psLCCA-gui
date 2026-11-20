@@ -1,0 +1,92 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Table target behaviour</title>
+<style>
+  body { font-family: sans-serif; font-size: 13px; margin: 16px; }
+
+  /* the card: drag its bottom-right corner to make the window narrower */
+  .card {
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    padding: 8px 8px 0;
+    width: 900px;
+    max-width: 100%;
+    resize: horizontal;
+    overflow: hidden;
+  }
+
+  /* the TABLE scrolls sideways, never the page */
+  .scroll { overflow-x: auto; }
+
+  table { border-collapse: collapse; width: 100%; }
+  th, td { border-bottom: 1px solid #ddd; padding: 6px 12px; white-space: nowrap; }
+  th { text-align: center; }
+  td.num { text-align: right; }
+
+  /* minimum widths (theme.py COL_W_* + 2 x COL_PAD_X) */
+  .name     { min-width: 175px; white-space: normal; text-align: left; } /* width: 100% = takes the spare width */
+  .quantity { min-width: 84px; }
+  .rate     { min-width: 84px; }
+  .source   { min-width: 91px; }
+  .amount   { min-width: 105px; }
+
+  /* Action: floats on the right edge, columns scroll under its left side, never under it */
+  .action {
+    position: sticky;
+    right: 0;
+    background: #fff;
+    border-left: 1px solid #ddd;
+    min-width: 74px;
+  }
+</style>
+</head>
+<body>
+
+<h3>Target: table behaviour</h3>
+<ol>
+  <li>Every column has a <b>minimum</b> width; it grows with its content, never shrinks below it.</li>
+  <li>Work name takes the spare width when the window is wide.</li>
+  <li>When the columns don't fit, the <b>table</b> gets a scrollbar, not the page.</li>
+  <li>Action stays on the right edge while scrolling and never covers another column.</li>
+</ol>
+<p>Drag the card's bottom-right corner to make it narrower.</p>
+
+<div class="card">
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr>
+          <th class="name" style="width:100%">Work name</th>
+          <th class="quantity">Quantity</th>
+          <th class="rate">Rate (INR)</th>
+          <th class="source">Source</th>
+          <th class="amount">Amount (INR)</th>
+          <th class="action">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="name">Reinforcement in pile cap</td>
+          <td class="num">2.37 t</td>
+          <td class="num">74,458.40</td>
+          <td>SOR 2023</td>
+          <td class="num">1,76,466.41</td>
+          <td class="action">Edit &nbsp; Delete</td>
+        </tr>
+        <tr>
+          <td class="name">Concreting in pile cap (M40) including formwork and curing</td>
+          <td class="num">48.60 m³</td>
+          <td class="num">5,590.60</td>
+          <td>Manual</td>
+          <td class="num">2,71,703.16</td>
+          <td class="action">Edit &nbsp; Delete</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+</body>
+</html>

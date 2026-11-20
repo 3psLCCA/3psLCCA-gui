@@ -8,13 +8,13 @@ Use LCCChartWidget(results) to get a QWidget ready to embed in Qt.
 import matplotlib
 matplotlib.use("QtAgg")
 
-from three_ps_lcca_gui.gui.themes import get_token, theme_manager
+from three_ps_lcca_gui.gui.themes import get_token
 from three_ps_lcca_gui.gui.theme import (
     FONT_FAMILY,
-    FS_SM, FS_MD, FW_NORMAL, FW_SEMIBOLD, FW_BOLD, RADIUS_SM
+    FS_SM, FS_MD, FW_NORMAL, FW_SEMIBOLD, FW_BOLD, RADIUS_SM, SP2
 )
 from three_ps_lcca_gui.gui.components.utils.display_format import fmt_currency
-from three_ps_lcca_gui.gui.components.utils.table_widgets import round_table_viewport, contrast_color
+from three_ps_lcca_gui.gui.components.utils.table_widgets import contrast_color, fit_to_contents, item_text_rect
 from .plots_helper.Pie import COLORS
 from .helper_functions.lcc_colors import COLORS as LCC_PALETTE
 from .lcc_data import (
@@ -29,11 +29,11 @@ from .plots_helper.bar_chart import create_bar_chart
 matplotlib.rcParams["font.family"] = FONT_FAMILY
 
 from PySide6.QtCore import QEvent, QObject, QRect, QSize, Qt
-from PySide6.QtGui import QColor, QFont, QPainter, QPen, QFontMetrics
+from PySide6.QtGui import QColor, QFont
 from PySide6.QtWidgets import (
     QApplication, QHeaderView, QLabel, QScrollArea, QFrame,
-    QSizePolicy, QStyledItemDelegate, QTableWidget, QTableWidgetItem,
-    QVBoxLayout, QWidget, QToolTip, QHBoxLayout,
+    QSizePolicy, QStyle, QStyledItemDelegate, QStyleOptionViewItem,
+    QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget, QToolTip, QHBoxLayout,
 )
 
 try:
@@ -164,7 +164,7 @@ class _StageLabelDelegate(QStyledItemDelegate):
         if font:
             painter.setFont(font)
         text = index.data(Qt.DisplayRole) or ""
-        painter.drawText(option.rect.adjusted(6, 0, -6, 0),
+        painter.drawText(item_text_rect(self, option, index),
                          Qt.AlignCenter | Qt.TextWordWrap, str(text))
         painter.restore()
 
@@ -181,14 +181,11 @@ class LCCDetailsTable(QWidget):
         lay.setSpacing(0)
 
         self.table = QTableWidget()
-        round_table_viewport(self.table)
         self.table.setItemDelegateForColumn(0, _StageLabelDelegate(self.table))
         self.table.setColumnCount(5)
         self.table.verticalHeader().setVisible(False)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.setSelectionMode(QTableWidget.NoSelection)
-        self.table.setShowGrid(True)
-        self.table.setAlternatingRowColors(False)
 
         headers = [
             "Stage",
@@ -206,23 +203,15 @@ class LCCDetailsTable(QWidget):
                     item.setBackground(QColor(hex_color))
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Interactive)
-        self.table.horizontalHeader().setMinimumSectionSize(120)
         self.table.horizontalHeader().setDefaultAlignment(Qt.AlignCenter)
         self.table.setWordWrap(True)
+        fit_to_contents(self.table)
 
         self._build_data(results)
-        self.table.resizeRowsToContents()
 
         attach_table_context_menu(self.table, title="Consolidated Stage Summary", default_filename="stage_cost_summary.svg")
 
         lay.addWidget(self.table)
-
-        # Compute height from actual row heights after word-wrap
-        header_h = self.table.horizontalHeader().sizeHint().height()
-        total_row_h = sum(self.table.rowHeight(r) for r in range(self.table.rowCount()))
-        table_h = header_h + total_row_h + 2
-        self.table.setFixedHeight(table_h)
-        self.setFixedHeight(table_h)
 
     def export_as_image(self, file_path: str | None = None, parent=None, format: str = "svg"):
         """Export the table as an SVG vector or PNG/JPEG image."""
@@ -326,8 +315,9 @@ class _VerticalTextDelegate(QStyledItemDelegate):
         fg = index.data(Qt.ForegroundRole)
         painter.setPen(fg.color() if (fg and hasattr(fg, "color")) else option.palette.text().color())
 
+        rect = item_text_rect(self, option, index)
         if option.rect.height() < 55:
-            painter.drawText(option.rect.adjusted(2, 2, -2, -2), Qt.AlignCenter | Qt.TextWordWrap, text)
+            painter.drawText(rect, Qt.AlignCenter | Qt.TextWordWrap, text)
         else:
             painter.translate(
                 option.rect.x() + option.rect.width() / 2,
@@ -335,17 +325,21 @@ class _VerticalTextDelegate(QStyledItemDelegate):
             )
             painter.rotate(-90)
 
+            # the style's text rect, turned with the painter
             text_rect = QRect(
-                -option.rect.height() // 2,
-                -option.rect.width() // 2,
-                option.rect.height(),
-                option.rect.width(),
+                -rect.height() // 2,
+                -rect.width() // 2,
+                rect.height(),
+                rect.width(),
             )
             painter.drawText(text_rect, Qt.AlignCenter, text)
         painter.restore()
 
     def sizeHint(self, option, index):
-        return QSize(64, 80)
+        # Rotated text: one text line (style padding included) sets the width;
+        # the stage span gives the height
+        base = super().sizeHint(option, index)
+        return QSize(base.height(), base.height())
 
 
 
@@ -383,29 +377,45 @@ class _ColorDelegate(QStyledItemDelegate):
         return base
 
 
+class _RelativeBarDelegate(QStyledItemDelegate):
+    """Relative Cost cell: a bar for the row's value inside the style's content
+    rect (QSS padding included). Credits grow left of the zero line, costs right."""
+
+    _INSET_Y = 3  # bar clear of the row lines
+
+    def __init__(self, pos_max: float, neg_max: float, parent=None):
+        super().__init__(parent)
+        self._pos_max = pos_max
+        self._neg_max = neg_max
+
+    def paint(self, painter, option, index):
+        # Cell background (the row tint) through the style
+        opt = QStyleOptionViewItem(option)
+        self.initStyleOption(opt, index)
+        style = opt.widget.style() if opt.widget else QApplication.style()
+        style.drawPrimitive(QStyle.PE_PanelItemViewItem, opt, painter, opt.widget)
+
+        value = index.data(Qt.UserRole)
+        color = index.data(Qt.UserRole + 1)
+        if not value or not color:
+            return
+        r = item_text_rect(self, option, index).adjusted(0, self._INSET_Y, 0, -self._INSET_Y)
+        span = (self._pos_max + self._neg_max) or 1.0
+        zero_x = r.left() + round(r.width() * self._neg_max / span)
+        w = max(1, round(r.width() * abs(value) / span))
+        x = zero_x - w if value < 0 else zero_x
+        painter.fillRect(QRect(x, r.top(), w, r.height()), QColor(color))
+
+
 class LCCBreakdownTable(QWidget):
-    """Detailed row-by-row LCC cost breakdown- pure QPainter widget.
+    """Detailed row-by-row LCC cost breakdown: a pillar legend above a table.
 
-    Columns: Stage (fixed) | Cost Item (draggable) | Value (draggable) | Relative Cost (draggable)
+    Columns: Stage | Cost Item | Value | Relative Cost
 
-    Column dividers can be dragged to resize. Hover over Cost Item or Value cells
-    shows the full text as a tooltip. Long labels wrap within their cell.
+    Qt sizes everything: the Stage and Value columns fit their contents, Cost
+    Item (word-wrapped) and Relative Cost share the rest, and rows fit their text.
+    Hover shows the full label, the value to 4 decimals, or the bar's value.
     """
-
-    _STAGE_W   = 64    # fixed- stage column never resizes
-    _PAD_X     = 6
-    _VAL_PAD_X = 8   # horizontal padding for the Value column (col 3)
-    _VAL_PAD_Y = 10  # vertical padding for the Value column (col 3)
-    _ITEM_PAD_Y = 8  # vertical padding for the Cost Item column (col 2)
-    _LEGEND_H  = 28    # height reserved for legend at top
-    _PAD_TOP   = 32    # legend (28) + 4px gap before header
-    _MIN_ROW_H = 40
-    _DRAG_HIT  = 5     # px tolerance for divider hit-test
-
-    # column ratio/width defaults  (flex_w = W - _STAGE_W)
-    _DEF_ITEM_RATIO = 0.25   # Cost Item - 25 %
-    _DEF_BAR_RATIO  = 0.55   # Relative Cost bar- 55 % (highest priority)
-    # Value gets the remainder: 20 %
 
     # Colors from lcc_colors.py (single source of truth for this widget)
     _PILLAR_COLORS = {
@@ -419,6 +429,7 @@ class LCCBreakdownTable(QWidget):
         "end_of_life":     LCC_PALETTE["end_color"],
         "reconstruction":  LCC_PALETTE.get("recon_color", "#B0BEC5"),
     }
+    _CELL_TEXT = "#1a1a1a"  # cells are always light tints
 
     def __init__(self, results: dict, currency: str = "INR",
                  stage_labels: dict | None = None,
@@ -428,31 +439,17 @@ class LCCBreakdownTable(QWidget):
         self._currency = currency
         self._stage_labels = stage_labels or {}  # result_key → custom stage name
         self._row_labels   = row_labels   or {}  # cost key   → custom row label
-        self._rows = []          # list of (pillar, label, value)
-        self._stage_blocks = []  # list of [label, color_hex, start, end, sy, sh]
-        self._row_layouts = []   # list of (y, h) per row
-        self._total_content_h = 0
-        self._max_val = 1.0
-
-        # Column layout state- ratios of the flexible zone (W - _STAGE_W)
-        self._item_ratio = self._DEF_ITEM_RATIO   # Cost Item / flex_w
-        self._bar_ratio  = self._DEF_BAR_RATIO    # Relative Cost / flex_w
-        # Value column gets the rest: flex_w * (1 - item - bar)
-
-        # Drag state
-        self._drag_col = None   # "bar" | "val" | None
-        self._drag_start_x = 0
-        self._drag_start_item = 0.0
-        self._drag_start_bar  = 0.0
-
+        self._rows = []          # list of (pillar, label, value, stage_color)
+        self._stage_blocks = []  # list of (label, color_hex, start, end)
         self._build(results)
-        self.setMouseTracking(True)
-        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.MinimumExpanding)
-        theme_manager().theme_changed.connect(self.update)
 
-    def minimumSizeHint(self) -> QSize:
-        """Allow the widget to shrink horizontally below its painted width."""
-        return QSize(100, 400)
+        lay = QVBoxLayout(self)
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(SP2)
+        lay.addWidget(self._make_legend())
+        self.table = self._make_table()
+        lay.addWidget(self.table)
+        lay.addStretch(1)  # spare height goes below the table
 
     # ── data ──────────────────────────────────────────────────────────────────
 
@@ -487,403 +484,106 @@ class LCCBreakdownTable(QWidget):
             if result_key == "reconstruction":
                 # Buffer to fold into end_of_life block as a sub-section
                 _buffered_recon = stage_rows
-            elif result_key == "end_of_life":
-                start = row_idx
-                if _buffered_recon is not None:
-                    for cat, label, value in _buffered_recon:
-                        self._rows.append((cat, f"Reconstruction | {label}", value, stage_color))
-                        row_idx += 1
-                for cat, label, value in stage_rows:
-                    self._rows.append((cat, label, value, stage_color))
-                    row_idx += 1
-                self._stage_blocks.append([
-                    self._stage_labels.get(result_key,
-                                           stage_def["label"].replace("\n", " ")),
-                    stage_color,
-                    start,
-                    row_idx - 1,
-                    0, 0,  # sy, sh- filled by _calculate_layout
-                ])
-            else:
-                start = row_idx
-                for cat, label, value in stage_rows:
-                    self._rows.append((cat, label, value, stage_color))
-                    row_idx += 1
-                self._stage_blocks.append([
-                    self._stage_labels.get(result_key,
-                                           stage_def["label"].replace("\n", " ")),
-                    stage_color,
-                    start,
-                    row_idx - 1,
-                    0, 0,  # sy, sh- filled by _calculate_layout
-                ])
-
-        if self._rows:
-            self._max_val = max(
-                abs(r[2]) for r in self._rows if r[0] != "_subheader"
-            ) or 1.0
-
-    # ── layout ────────────────────────────────────────────────────────────────
-
-    def _col_x(self, W: int) -> tuple[int, int, int]:
-        """Return (x_val, x_bar, bar_w) for the current column state.
-
-        Column order: Stage | Cost Item | Value | Relative Cost
-          x_val = divider between Cost Item and Value
-          x_bar = divider between Value and Relative Cost
-          bar_w = width of the Relative Cost bar column
-        """
-        flex_w = W - self._STAGE_W
-        x_val = self._STAGE_W + int(flex_w * self._item_ratio)
-        val_w  = int(flex_w * (1.0 - self._item_ratio - self._bar_ratio))
-        x_bar  = x_val + val_w
-        # clamp so bar column is never off-screen
-        x_bar = min(x_bar, W - 60)
-        return x_val, x_bar, W - x_bar
-
-    def _calculate_layout(self):
-        W = self.width()
-        if W <= 0:
-            return
-
-        x_val, x_bar, _ = self._col_x(W)
-        item_w = x_val - self._STAGE_W - self._PAD_X * 2
-        item_w = max(item_w, 1)
-
-        fm = QFontMetrics(QFont(FONT_FAMILY, FS_MD, FW_NORMAL))
-        curr_y = self._PAD_TOP + self._MIN_ROW_H  # header height
-        self._row_layouts = []
-
-        for cat, label, *_ in self._rows:
-            if cat == "_subheader":
-                h = 22
-            else:
-                text_rect = fm.boundingRect(0, 0, item_w, 2000,
-                                            Qt.TextWordWrap | Qt.AlignLeft, label)
-                h = max(self._MIN_ROW_H, text_rect.height() + self._ITEM_PAD_Y * 2)
-            self._row_layouts.append((curr_y, h))
-            curr_y += h
-
-        self._total_content_h = curr_y + 8
-        self.setFixedHeight(self._total_content_h)
-
-        for block in self._stage_blocks:
-            s, e = block[2], block[3]
-            sy = self._row_layouts[s][0]
-            ey = self._row_layouts[e][0] + self._row_layouts[e][1]
-            block[4] = sy
-            block[5] = ey - sy
-
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        self._calculate_layout()
-
-    # ── tooltip ───────────────────────────────────────────────────────────────
-
-    def event(self, event: QEvent):
-        if event.type() == QEvent.ToolTip:
-            W = self.width()
-            x_val, x_bar, bar_w = self._col_x(W)
-            pos = event.pos()
-
-            for idx, (y, h) in enumerate(self._row_layouts):
-                if not (y <= pos.y() < y + h):
-                    continue
-                cat, label, value, _stage_color = self._rows[idx]
-                if cat == "_subheader":
-                    continue
-
-                # Cost Item column → show full label when clipped
-                if self._STAGE_W <= pos.x() < x_val:
-                    fm = QFontMetrics(QFont(FONT_FAMILY, FS_MD, FW_NORMAL))
-                    item_w = x_val - self._STAGE_W - self._PAD_X * 2
-                    elided = fm.elidedText(label, Qt.ElideRight, item_w)
-                    tip = label if elided != label or "\n" in label else ""
-                    if tip:
-                        QToolTip.showText(event.globalPos(), tip)
-                        return True
-
-                # Value column → show full precision
-                if x_val <= pos.x() < x_bar:
-                    QToolTip.showText(
-                        event.globalPos(),
-                        f"{fmt_currency(value, self._currency, decimals=4)} {self._currency}",
-                    )
-                    return True
-
-                # Relative Cost bar column → show rounded value
-                if x_bar <= pos.x() < W:
-                    QToolTip.showText(
-                        event.globalPos(),
-                        f"{fmt_currency(value, self._currency, decimals=2)} {self._currency}",
-                    )
-                    return True
-
-            QToolTip.hideText()
-        return super().event(event)
-
-    # ── column drag resize ────────────────────────────────────────────────────
-
-    def _divider_at(self, x: int) -> str | None:
-        """Return which divider is within _DRAG_HIT of x.
-
-        'val' = Cost Item / Value boundary (x_val)
-        'bar' = Value / Relative Cost boundary (x_bar)
-        """
-        W = self.width()
-        x_val, x_bar, _ = self._col_x(W)
-        if abs(x - x_val) <= self._DRAG_HIT:
-            return "val"
-        if abs(x - x_bar) <= self._DRAG_HIT:
-            return "bar"
-        return None
-
-    def mousePressEvent(self, event):
-        if event.button() == Qt.MouseButton.LeftButton:
-            div = self._divider_at(event.pos().x())
-            if div:
-                self._drag_col = div
-                self._drag_start_x = event.pos().x()
-                self._drag_start_item = self._item_ratio
-                self._drag_start_bar  = self._bar_ratio
-                event.accept()
-                return
-        super().mousePressEvent(event)
-
-    def mouseMoveEvent(self, event):
-        W = self.width()
-        flex_w = W - self._STAGE_W
-
-        if self._drag_col and flex_w > 0:
-            dx = event.pos().x() - self._drag_start_x
-
-            if self._drag_col == "val":
-                # Moving x_val (Cost Item / Value boundary): adjusts item_ratio
-                new_item = self._drag_start_item + dx / flex_w
-                new_item = max(0.15, min(new_item, 1.0 - self._bar_ratio - 0.10))
-                self._item_ratio = new_item
-
-            elif self._drag_col == "bar":
-                # Moving x_bar (Value / Relative Cost boundary): adjusts bar_ratio.
-                # Moving right (dx > 0) widens Value → bar_ratio shrinks.
-                new_bar = self._drag_start_bar - dx / flex_w
-                new_bar = max(0.10, min(new_bar, 1.0 - self._item_ratio - 0.10))
-                self._bar_ratio = new_bar
-
-            self._calculate_layout()
-            self.update()
-            event.accept()
-            return
-
-        # Cursor hint
-        div = self._divider_at(event.pos().x())
-        if div:
-            self.setCursor(Qt.CursorShape.SizeHorCursor)
-        else:
-            self.unsetCursor()
-
-        super().mouseMoveEvent(event)
-
-    def mouseReleaseEvent(self, event):
-        if self._drag_col:
-            self._drag_col = None
-            event.accept()
-            return
-        super().mouseReleaseEvent(event)
-
-    # ── paint ─────────────────────────────────────────────────────────────────
-
-    def paintEvent(self, event):
-        if not self._row_layouts:
-            self._calculate_layout()
-
-        p = QPainter(self)
-        # Fill whole background to avoid gaps between rows
-        p.fillRect(self.rect(), QColor(get_token("window")))
-        p.setRenderHint(QPainter.RenderHint.Antialiasing, False)
-        p.setRenderHint(QPainter.RenderHint.TextAntialiasing, True)
-
-        color_text      = QColor(get_token("text"))
-        color_header_bg = QColor(get_token("surface_mid"))
-        color_success   = QColor(get_token("success"))
-        color_row_sep   = QColor(get_token("border", "pressed"))
-
-        pillar_colors = {k: QColor(v) for k, v in self._PILLAR_COLORS.items()}
-
-        W = self.width()
-        x_val, x_bar, bar_w = self._col_x(W)
-        item_w = x_val - self._STAGE_W
-        _bar_pad  = 3
-        bar_w_max = int(bar_w * 0.95)
-
-        # ── legend (top) ──────────────────────────────────────────────────────
-        legend_y = (self._LEGEND_H - 16) // 2   # vertically center in legend band
-        lx = self._STAGE_W + self._PAD_X
-        p.save()
-        p.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        p.setFont(QFont(FONT_FAMILY, FS_MD, FW_NORMAL))
-        for pillar, color in pillar_colors.items():
-            p.fillRect(lx, legend_y, 16, 16, QColor(color))
-            p.setPen(color_text)
-            p.drawText(lx + 20, legend_y - 1, 120, 18,
-                       Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
-                       pillar.capitalize())
-            lx += 130
-        p.restore()
-
-        # ── header ────────────────────────────────────────────────────────────
-        hdr_y = self._PAD_TOP
-        p.fillRect(0, hdr_y, W, self._MIN_ROW_H, color_header_bg)
-        p.setFont(QFont(FONT_FAMILY, FS_MD, FW_SEMIBOLD))
-        p.setPen(color_text)
-        p.drawText(QRect(self._PAD_X, hdr_y, self._STAGE_W - self._PAD_X * 2, self._MIN_ROW_H),
-                   Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, "Stage")
-        p.drawText(QRect(self._STAGE_W + self._PAD_X, hdr_y + self._ITEM_PAD_Y,
-                         item_w - self._PAD_X * 2, self._MIN_ROW_H - self._ITEM_PAD_Y * 2),
-                   Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, "Cost Item")
-        p.drawText(QRect(x_val + self._VAL_PAD_X, hdr_y + self._VAL_PAD_Y,
-                         x_bar - x_val - self._VAL_PAD_X * 2, self._MIN_ROW_H - self._VAL_PAD_Y * 2),
-                   Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter,
-                   f"Value ({self._currency})")
-        p.drawText(QRect(x_bar + self._PAD_X, hdr_y,
-                         bar_w - self._PAD_X * 2, self._MIN_ROW_H),
-                   Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, "")
-
-        # ── data rows ─────────────────────────────────────────────────────────
-        row_font = QFont(FONT_FAMILY, FS_MD, FW_NORMAL)
-
-        for idx, (cat, label, value, stage_color_hex) in enumerate(self._rows):
-            ry, rh = self._row_layouts[idx]
-
-            # ── sub-header (Reconstruction label band) ────────────────────────
-            if cat == "_subheader":
-                sc = QColor(stage_color_hex)
-                band = QColor(
-                    min(255, sc.red()   * 40 // 100 + 153),
-                    min(255, sc.green() * 40 // 100 + 153),
-                    min(255, sc.blue()  * 40 // 100 + 153),
-                )
-                p.fillRect(self._STAGE_W, ry, W - self._STAGE_W, rh, band)
-                p.setFont(QFont(FONT_FAMILY, FS_MD, FW_SEMIBOLD))
-                p.setPen(QColor("#1a1a1a"))
-                p.drawText(
-                    QRect(self._STAGE_W + self._PAD_X, ry,
-                          W - self._STAGE_W - self._PAD_X * 2, rh),
-                    Qt.AlignmentFlag.AlignCenter,
-                    label,
-                )
                 continue
+            start = row_idx
+            if result_key == "end_of_life" and _buffered_recon is not None:
+                for cat, label, value in _buffered_recon:
+                    self._rows.append((cat, f"Reconstruction | {label}", value, stage_color))
+                    row_idx += 1
+            for cat, label, value in stage_rows:
+                self._rows.append((cat, label, value, stage_color))
+                row_idx += 1
+            self._stage_blocks.append((
+                self._stage_labels.get(result_key, stage_def["label"].replace("\n", " ")),
+                stage_color,
+                start,
+                row_idx - 1,
+            ))
 
-            pillar_color = pillar_colors.get(cat, QColor("#888888"))
+    # ── widgets ───────────────────────────────────────────────────────────────
 
-            # Row background- same light shade across Cost Item, Bar, and Value columns
-            # Merged into one fill to avoid vertical gaps at x_bar/x_val
-            tint = QColor(
-                min(255, pillar_color.red()   * 25 // 100 + 191),
-                min(255, pillar_color.green() * 25 // 100 + 191),
-                min(255, pillar_color.blue()  * 25 // 100 + 191),
-            )
-            p.fillRect(self._STAGE_W, ry, W - self._STAGE_W, rh, tint)
+    @staticmethod
+    def _tint(hex_color: str) -> QColor:
+        """The light shade of a pillar/stage color used behind cell text."""
+        c = QColor(hex_color)
+        return QColor(min(255, c.red() * 25 // 100 + 191),
+                      min(255, c.green() * 25 // 100 + 191),
+                      min(255, c.blue() * 25 // 100 + 191))
 
-            # Cost Item label (word-wrap)- dark text, bg is always light
-            p.setFont(row_font)
-            p.setPen(QColor("#1a1a1a"))
-            p.drawText(
-                QRect(self._STAGE_W + self._PAD_X, ry + self._ITEM_PAD_Y,
-                      item_w - self._PAD_X * 2, rh - self._ITEM_PAD_Y * 2),
-                Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter | Qt.TextWordWrap,
-                label,
-            )
+    def _make_legend(self) -> QLabel:
+        swatches = "&nbsp;&nbsp;&nbsp;&nbsp;".join(
+            f'<span style="color:{color}">&#9632;</span>&nbsp;{pillar.capitalize()}'
+            for pillar, color in self._PILLAR_COLORS.items()
+        )
+        legend = QLabel(swatches)
+        legend.setTextFormat(Qt.RichText)
+        legend.setFont(QFont(FONT_FAMILY, FS_MD, FW_NORMAL))
+        return legend
 
-            # Value & bar - diverging at x_bar.
-            # Positive: value text left of x_bar, bar grows RIGHT from x_bar.
-            # Negative: bar grows LEFT from x_bar, value text right of x_bar.
-            val_text = fmt_currency(value, self._currency, decimals=2)
-            bar_h = rh - _bar_pad * 2
-            filled = int((abs(value) / self._max_val) * bar_w_max)
-            if value != 0:
-                filled = max(filled, 1)
+    def _make_table(self) -> QTableWidget:
+        t = QTableWidget(len(self._rows), 4)
+        t.setHorizontalHeaderLabels(
+            ["Stage", "Cost Item", f"Value ({self._currency})", "Relative Cost"])
+        t.verticalHeader().setVisible(False)
+        t.setEditTriggers(QTableWidget.NoEditTriggers)
+        t.setSelectionMode(QTableWidget.NoSelection)
+        t.setFocusPolicy(Qt.NoFocus)
+        t.setWordWrap(True)
 
-            p.setFont(QFont(FONT_FAMILY, FS_MD, FW_SEMIBOLD))
-            if value < 0:
-                # Bar grows left from x_bar - same width scale as positive bars
-                p.fillRect(
-                    x_bar - filled, ry + _bar_pad,
-                    filled, bar_h,
-                    QColor(pillar_color),
-                )
-                # Value text in the right (Relative Cost) column
-                p.setPen(QColor("#1a1a1a"))
-                p.drawText(
-                    QRect(x_bar + self._VAL_PAD_X, ry + self._VAL_PAD_Y,
-                          bar_w - self._VAL_PAD_X * 2, rh - self._VAL_PAD_Y * 2),
-                    Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
-                    val_text,
-                )
-            else:
-                # Bar grows right - original behaviour
-                p.fillRect(
-                    x_bar + _bar_pad, ry + _bar_pad,
-                    filled, bar_h,
-                    QColor(pillar_color),
-                )
-                # Value text in the left (Value) column - original behaviour
-                p.setPen(QColor("#1a1a1a"))
-                p.drawText(
-                    QRect(x_val + self._VAL_PAD_X, ry + self._VAL_PAD_Y,
-                          x_bar - x_val - self._VAL_PAD_X * 2, rh - self._VAL_PAD_Y * 2),
-                    Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter,
-                    val_text,
-                )
-            p.setFont(row_font)
+        # Stage and Value fit their contents; Cost Item and the bars share the rest
+        h = t.horizontalHeader()
+        h.setSectionResizeMode(QHeaderView.ResizeToContents)
+        h.setSectionResizeMode(1, QHeaderView.Stretch)
+        h.setSectionResizeMode(3, QHeaderView.Stretch)
+        h.setStretchLastSection(False)
 
-            # row separator
-            p.setPen(color_row_sep)
-            p.drawLine(self._STAGE_W, ry + rh - 1, W, ry + rh - 1)
+        values = [r[2] for r in self._rows]
+        pos_max = max([v for v in values if v > 0], default=0.0)
+        neg_max = max([-v for v in values if v < 0], default=0.0)
+        t.setItemDelegateForColumn(0, _VerticalTextDelegate(t))
+        t.setItemDelegateForColumn(3, _RelativeBarDelegate(pos_max, neg_max, t))
 
-        # ── stage blocks ──────────────────────────────────────────────────────
-        p.setFont(QFont(FONT_FAMILY, FS_MD, FW_BOLD))
-        for stage_label, stage_color_hex, _, _, sy, sh in self._stage_blocks:
-            sc = QColor(stage_color_hex)
-            stage_tint = QColor(
-                min(255, sc.red()   * 25 // 100 + 191),
-                min(255, sc.green() * 25 // 100 + 191),
-                min(255, sc.blue()  * 25 // 100 + 191),
-            )
-            p.fillRect(0, sy, self._STAGE_W, sh, stage_tint)
-            p.save()
-            p.translate(self._STAGE_W / 2, sy + sh / 2)
-            p.rotate(-90)
-            p.setPen(QColor("#1a1a1a"))
-            p.drawText(QRect(-sh // 2, -self._STAGE_W // 2, sh, self._STAGE_W),
-                       Qt.AlignmentFlag.AlignCenter, stage_label)
-            p.restore()
+        dark = QColor(self._CELL_TEXT)
+        f_row = QFont(FONT_FAMILY, FS_MD, FW_NORMAL)
+        f_val = QFont(FONT_FAMILY, FS_MD, FW_SEMIBOLD)
+        f_stage = QFont(FONT_FAMILY, FS_MD, FW_BOLD)
 
-        # ── stage boundary lines ──────────────────────────────────────────────
-        # Draw a full-width separator after each stage except the last one so the
-        # three life cycle phases (Initial / Use / End-of-Life) are clearly delimited.
-        sep_color = QColor(get_token("surface_mid"))
-        sep_color.setAlpha(220)
-        p.setPen(QPen(sep_color, 2))
-        for i, (_, _, _, _, sy, sh) in enumerate(self._stage_blocks):
-            if i < len(self._stage_blocks) - 1:
-                sep_y = sy + sh
-                p.drawLine(0, sep_y, W, sep_y)
+        def cell(text, font, bg, tip="", align=Qt.AlignLeft | Qt.AlignVCenter):
+            it = QTableWidgetItem(text)
+            it.setFont(font)
+            it.setBackground(bg)
+            it.setForeground(dark)
+            it.setTextAlignment(align)
+            if tip:
+                it.setToolTip(tip)
+            return it
 
-        # ── outer border ──────────────────────────────────────────────────────
-        total_h = self._total_content_h - 8
-        border_color = QColor(get_token("surface_mid"))
-        # Using full opacity for outer border to avoid blending issues
-        p.setPen(QPen(border_color, 1))
-        p.setBrush(Qt.BrushStyle.NoBrush)
-        p.drawRect(0, self._PAD_TOP, W - 1, total_h - self._PAD_TOP)
+        for r, (cat, label, value, _stage_color) in enumerate(self._rows):
+            bg = self._tint(self._PILLAR_COLORS.get(cat, "#888888"))
+            t.setItem(r, 1, cell(label, f_row, bg, tip=label))
+            t.setItem(r, 2, cell(
+                fmt_currency(value, self._currency, decimals=2), f_val, bg,
+                tip=f"{fmt_currency(value, self._currency, decimals=4)} {self._currency}",
+                align=Qt.AlignRight | Qt.AlignVCenter))
+            bar = cell("", f_row, bg,
+                       tip=f"{fmt_currency(value, self._currency, decimals=2)} {self._currency}")
+            bar.setData(Qt.UserRole, value)
+            bar.setData(Qt.UserRole + 1, self._PILLAR_COLORS.get(cat, "#888888"))
+            t.setItem(r, 3, bar)
 
-        p.end()
+        for label, color, start, end in self._stage_blocks:
+            t.setItem(start, 0, cell(label, f_stage, self._tint(color), tip=label,
+                                     align=Qt.AlignCenter))
+            if end > start:
+                t.setSpan(start, 0, end - start + 1, 1)
+
+        fit_to_contents(t)
+        return t
+
+    # ── export ────────────────────────────────────────────────────────────────
 
     def export_as_image(self, file_path: str | None = None, parent=None, format: str = "svg"):
         """Export the detailed table as an SVG vector (Option 4) or PNG/JPEG image."""
-        if not self._row_layouts:
-            self._calculate_layout()
         return export_widget_as_image(
             self,
             title="Detailed Cost Breakdown",
@@ -893,8 +593,6 @@ class LCCBreakdownTable(QWidget):
         )
 
     def copy_to_clipboard(self):
-        if not self._row_layouts:
-            self._calculate_layout()
         return copy_widget_to_clipboard(self)
 
     def contextMenuEvent(self, event):

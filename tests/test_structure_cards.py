@@ -6,8 +6,7 @@ file fails here instead of only at app start.
 import pytest
 
 QtWidgets = pytest.importorskip("PySide6.QtWidgets")
-from PySide6.QtCore import QObject, QRect, Signal  # noqa: E402
-from PySide6.QtGui import QImage, QPainter  # noqa: E402
+from PySide6.QtCore import QObject, Signal  # noqa: E402
 from PySide6.QtWidgets import QStyleOptionViewItem  # noqa: E402
 
 from three_ps_lcca_gui.gui.components.structure.widgets.manager import StructureManagerWidget  # noqa: E402
@@ -70,28 +69,11 @@ def test_header_counts_only_components_with_materials(widget):
     assert widget.count_lbl.text() == "2 components"
 
 
-class _RecordingPainter(QPainter):
-    """Paints into an image and keeps every string passed to drawText."""
-
-    def __init__(self, image):
-        super().__init__(image)
-        self.texts = []
-
-    def drawText(self, *args):
-        self.texts += [a for a in args if isinstance(a, str)]
-        return super().drawText(*args)
-
-
 def test_name_with_line_break_is_one_line(widget):
-    # a name saved with a line break is drawn as one line
+    # a name saved with a line break is shown as one line
     table = widget.sections["Pile Cap"]
     index = table.model().index(1, 0)
     assert "\n" in index.data()
     option = QStyleOptionViewItem()
-    option.rect = QRect(0, 0, 400, 40)
-    option.widget = table
-    image = QImage(400, 40, QImage.Format_ARGB32)
-    painter = _RecordingPainter(image)
-    table.itemDelegateForIndex(index).paint(painter, option, index)
-    painter.end()
-    assert "Crash barrier [M40]" in painter.texts
+    table.itemDelegateForIndex(index).initStyleOption(option, index)
+    assert option.text == "Crash barrier [M40]"

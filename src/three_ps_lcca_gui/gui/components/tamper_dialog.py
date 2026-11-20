@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
     QFrame,
     QTreeWidget,
     QTreeWidgetItem,
+    QHeaderView,
     QTabWidget,
     QWidget,
     QTextEdit,
@@ -220,8 +221,11 @@ class TamperDialog(QDialog):
 
         self.tamper_log_tree = QTreeWidget()
         self.tamper_log_tree.setHeaderLabels(["Timestamp", "Event", "Details"])
-        self.tamper_log_tree.setColumnWidth(0, 140)
-        self.tamper_log_tree.setColumnWidth(1, 160)
+        # Timestamp and Event fit their contents; Details takes the rest
+        hdr = self.tamper_log_tree.header()
+        hdr.setSectionResizeMode(QHeaderView.ResizeToContents)
+        hdr.setSectionResizeMode(2, QHeaderView.Stretch)
+        hdr.setStretchLastSection(False)
         layout.addWidget(self.tamper_log_tree)
 
         refresh_btn = QPushButton("↻  Refresh")

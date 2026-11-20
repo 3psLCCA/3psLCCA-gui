@@ -41,7 +41,7 @@ from typing import Any
 
 import pandas as pd
 
-from PySide6.QtCore import Qt, QEvent, QSize, QTimer, Signal
+from PySide6.QtCore import Qt, QEvent, QTimer, Signal
 from PySide6.QtGui import QColor, QBrush, QDoubleValidator
 from PySide6.QtWidgets import (
     QApplication,
@@ -59,7 +59,6 @@ from PySide6.QtWidgets import (
     QScrollArea,
     QSizePolicy,
     QStyledItemDelegate,
-    QStyleOptionViewItem,
     QTabWidget,
     QTableWidget,
     QTableWidgetItem,
@@ -71,13 +70,13 @@ from three_ps_lcca_gui.gui.themes import get_token
 from three_ps_lcca_gui.gui.theme import FS_MD, FS_SM
 from .widgets.material_dialog import build_excel_snapshot
 import sys
-from ..utils.table_widgets import round_table_viewport
 from ..utils.unit_resolver import (
     get_unit_info as _gui,
     get_known_units as _gku,
 )
 from ..utils.unit_resolver import get_known_units as _gku
 from ..utils.unit_resolver import get_unit_info
+from ..utils.table_widgets import fit_to_contents
 from PySide6.QtWidgets import QPlainTextEdit
 import traceback
 import json
@@ -708,9 +707,8 @@ IMPORT_COLUMNS: list[tuple[str, str, bool]] = [
     ("_issues", "Issues", False),
 ]
 
-# Column widths - tuned to content, not header length
-#  ID   Name   Quantity   Unit  Rate  RateSrc  CEF  CUnit  CF  CESrc  Scrap  Rec%  Issues
-_COL_WIDTHS = [55, 200, 55, 65, 80, 140, 80, 110, 90, 140, 75, 80, 200]
+# Free-text columns share the spare width; the rest fit their contents
+_STRETCH_FIELDS = {"name", "rate_src", "carbon_emission_src", "_issues"}
 
 # Col 0 is the selection checkbox; all IMPORT_COLUMNS data starts at col 1
 _CB_COL = 0
@@ -729,48 +727,14 @@ _ISSUES_COL = (
 
 
 class _CellDelegate(QStyledItemDelegate):
-    """
-    Paints the cell-editable-bg tint on editable cells.
-    When numeric=True, also attaches a QDoubleValidator to the editor.
-    """
+    """When numeric=True, attaches a QDoubleValidator to the editor."""
 
     def __init__(self, numeric: bool = False, parent=None):
         super().__init__(parent)
         self._numeric = numeric
-        from three_ps_lcca_gui.gui.themes import theme_manager
-        theme_manager().theme_changed.connect(self._on_theme_changed)
-
-    def _on_theme_changed(self):
-        p = self.parent()
-        if p and hasattr(p, "viewport"):
-            p.viewport().update()
-
-    def paint(self, painter, option, index):
-        # Determine background color: explicit (error/warning) or tint (editable)
-        bg = index.data(Qt.BackgroundRole)
-        if isinstance(bg, QBrush):
-            bg = bg.color()
-            
-        if (bg is None or not bg.isValid()) and (index.flags() & Qt.ItemIsEditable):
-            bg = QColor(get_token("cell-editable-bg"))
-
-        if bg and bg.isValid():
-            painter.save()
-            painter.fillRect(option.rect, bg)
-            painter.restore()
-            
-        # To prevent QSS 'background-color' from painting over our manual fill,
-        # we pass a modified option with a transparent background brush.
-        new_option = QStyleOptionViewItem(option)
-        new_option.backgroundBrush = QBrush(Qt.NoBrush)
-        super().paint(painter, new_option, index)
 
     def createEditor(self, parent, option, index):
         editor = QLineEdit(parent)
-        editor.setStyleSheet(
-            "QLineEdit { background: palette(base); border: 1px solid palette(highlight);"
-            " border-radius: 0; margin: 0; padding: 0 2px; min-height: 0; }"
-        )
         if self._numeric:
             validator = QDoubleValidator(editor)
             validator.setNotation(QDoubleValidator.StandardNotation)
@@ -798,7 +762,6 @@ class ImportComponentTable(QTableWidget):
 
     def __init__(self, component_name: str, rows: list[dict], parent=None):
         super().__init__(parent)
-        round_table_viewport(self)
         self.component_name = component_name
         self._rows = rows
 
@@ -806,9 +769,6 @@ class ImportComponentTable(QTableWidget):
         self.setColumnCount(len(IMPORT_COLUMNS) + _DATA_START)
         self.setHorizontalHeaderLabels([""] + [lbl for _, lbl, _ in IMPORT_COLUMNS])
 
-        # Checkbox column: fixed, narrow
-        self.horizontalHeader().setSectionResizeMode(_CB_COL, QHeaderView.Fixed)
-        self.setColumnWidth(_CB_COL, 28)
 
         # Show the Excel CID# column name on header hover (data cols only)
         for col, (field, _, _n) in enumerate(IMPORT_COLUMNS):
@@ -821,24 +781,20 @@ class ImportComponentTable(QTableWidget):
                     f"Excel column: CID#{cid_name}"
                 )
 
-        self.horizontalHeader().setSectionResizeMode(QHeaderView.Interactive)
-        self.horizontalHeader().setSectionResizeMode(_CB_COL, QHeaderView.Fixed)
-        self.horizontalHeader().setStretchLastSection(False)
-        self.verticalHeader().setDefaultSectionSize(32)
-        self.verticalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        hh = self.horizontalHeader()
+        hh.setSectionResizeMode(QHeaderView.ResizeToContents)
+        for col, (field, _, _n) in enumerate(IMPORT_COLUMNS):
+            if field in _STRETCH_FIELDS:
+                hh.setSectionResizeMode(col + _DATA_START, QHeaderView.Stretch)
+        hh.setStretchLastSection(False)
         self.setWordWrap(True)
         self.setTextElideMode(Qt.ElideNone)
-        self.setAlternatingRowColors(True)
         self.setEditTriggers(QTableWidget.DoubleClicked | QTableWidget.SelectedClicked)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-
-        for col, w in enumerate(_COL_WIDTHS):
-            self.setColumnWidth(col + _DATA_START, w)
+        fit_to_contents(self)
 
         # Install cell delegate on every editable data column:
-        # tints the cell with cell-editable-bg and enforces numeric input where needed.
+        # enforces numeric input where needed.
         _plain_delegate = _CellDelegate(numeric=False, parent=self)
         _numeric_delegate = _CellDelegate(numeric=True, parent=self)
         for col, (field, _, numeric) in enumerate(IMPORT_COLUMNS):
@@ -1042,15 +998,6 @@ class ImportComponentTable(QTableWidget):
     def _update_height(self):
         """Let the layout engine know our preferred height changed."""
         self.updateGeometry()
-
-    def sizeHint(self):
-        header_h = self.horizontalHeader().height() or 35
-        # Sum actual row heights because they can wrap/resize
-        rows_h = sum(self.rowHeight(i) for i in range(self.rowCount()))
-        return QSize(super().sizeHint().width(), header_h + rows_h + 4)
-
-    def minimumSizeHint(self):
-        return self.sizeHint()
 
     # -- selection ------------------------------------------------------------
 

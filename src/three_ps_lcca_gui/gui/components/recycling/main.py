@@ -1,6 +1,7 @@
 from three_ps_lcca_gui.gui.themes import get_token
 from three_ps_lcca_gui.gui.theme import FS_MD
-from ..utils.form_builder.form_builder import make_section_header, make_section_label
+from three_ps_lcca_gui.gui.assets.themes.table_style import ColumnMinWidthMixin, apply_column_style
+from ..utils.form_builder.form_builder import make_section_label
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
@@ -11,11 +12,10 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
     QHeaderView,
     QFrame,
-    QSizePolicy,
     QScrollArea,
     QToolTip,
 )
-from PySide6.QtCore import Qt, QSize, QTimer, QRect, QEvent
+from PySide6.QtCore import Qt, QTimer, QRect, QEvent
 
 import time
 import datetime
@@ -27,6 +27,9 @@ from ..utils.table_widgets import (
     GroupedHeaderView,
     BaseActionDelegate,
     TooltipTableMixin,
+    TableCard,
+    FrozenActionColumn,
+    fit_to_contents,
 )
 
 
@@ -41,7 +44,6 @@ CHUNKS = [
     ("str_misc", "Misc"),
 ]
 
-_ACTION_W = 80  # fixed action column width
 
 REASON_INCOMPLETE = "Incomplete Data"
 REASON_EXCLUDED   = "Manually Excluded"
@@ -134,9 +136,6 @@ class _RecyclingActionDelegate(BaseActionDelegate):
             return []
         return [self._icons[key] for key in data.get("btns", [])]
 
-    def sizeHint(self, option, index):
-        return QSize(_ACTION_W, self.BTN_SIZE + 14)
-
     def editorEvent(self, event, model, option, index):
         if self._frozen:
             return False
@@ -165,88 +164,11 @@ class _RecyclingActionDelegate(BaseActionDelegate):
 
 
 # ---------------------------------------------------------------------------
-# Frozen Action overlay - single-column widget pinned to the right edge
-# ---------------------------------------------------------------------------
-
-
-class _FrozenActionTable(QTableWidget):
-    """Overlay pinned to the right edge; main table reserves space via setViewportMargins."""
-
-    def __init__(self, parent_table):
-        super().__init__(parent_table)
-        self._parent_table = parent_table
-
-        self.setColumnCount(1)
-        hdr_item = QTableWidgetItem("Action")
-        hdr_item.setTextAlignment(Qt.AlignCenter | Qt.AlignVCenter)
-        self.setHorizontalHeaderItem(0, hdr_item)
-
-        self.setFixedWidth(_ACTION_W)
-        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.setFocusPolicy(Qt.NoFocus)
-        self.setSelectionMode(QTableWidget.NoSelection)
-        self.setFrameShape(QTableWidget.NoFrame)
-        self.setStyleSheet(
-            """
-            QTableWidget {
-                background-color: palette(base);
-                border-top-left-radius: 0px;
-                border-bottom-left-radius: 0px;
-                border-bottom-right-radius: 7px;
-            }
-        """
-        )
-        self.viewport().setStyleSheet(
-            "border-bottom-right-radius: 7px; background-color: transparent;"
-        )
-
-        self.verticalHeader().setVisible(False)
-        self.verticalHeader().setDefaultSectionSize(35)
-        self.verticalHeader().setMinimumSectionSize(35)
-
-        hdr = self.horizontalHeader()
-        hdr.setSectionResizeMode(0, QHeaderView.Fixed)
-        self.setColumnWidth(0, _ACTION_W)
-
-        parent_table.verticalScrollBar().valueChanged.connect(
-            self.verticalScrollBar().setValue
-        )
-
-    def sync_row_heights(self):
-        for r in range(self.rowCount()):
-            self.setRowHeight(r, self._parent_table.rowHeight(r))
-
-    def add_row(self, row_data):
-        row = self.rowCount()
-        self.insertRow(row)
-        self.setRowHeight(row, self._parent_table.rowHeight(row))
-        item = QTableWidgetItem()
-        item.setData(Qt.UserRole, row_data)
-        item.setFlags(Qt.ItemIsEnabled)
-        self.setItem(row, 0, item)
-
-    def clear_rows(self):
-        self.setRowCount(0)
-
-    def reposition(self):
-        p = self._parent_table
-        main_hdr_h = p.horizontalHeader().height()
-        self.horizontalHeader().setFixedHeight(main_hdr_h)
-        vp = p.viewport()
-        x = p.width() - _ACTION_W
-        y = vp.y() - main_hdr_h
-        self.move(x, y)
-        self.setFixedHeight(vp.height() + main_hdr_h)
-
-
-# ---------------------------------------------------------------------------
 # Recycling Table
 # ---------------------------------------------------------------------------
 
 
-class RecyclingTable(TooltipTableMixin, QTableWidget):
+class RecyclingTable(ColumnMinWidthMixin, TooltipTableMixin, QTableWidget):
     _L = Qt.AlignLeft | Qt.AlignVCenter
     _R = Qt.AlignRight | Qt.AlignVCenter
     _C = Qt.AlignCenter
@@ -260,7 +182,7 @@ class RecyclingTable(TooltipTableMixin, QTableWidget):
         ("Value", _C),  # 2  ┐ Quantity group
         ("Unit", _C),  # 3  ┘
         ("Recyclability %", _R),  # 4
-        ("Recyclable Quantity", _R),  # 5
+        ("Recyclable\nQuantity", _R),  # 5
         ("Scrap Rate", _R),  # 6
         ("Recovered Value", _R),  # 7
         ("Warning", _L),  # 8
@@ -294,20 +216,16 @@ class RecyclingTable(TooltipTableMixin, QTableWidget):
             self.setHorizontalHeaderItem(col, item)
 
         h = self.horizontalHeader()
-        h.setSectionResizeMode(QHeaderView.Stretch)
+        h.setSectionResizeMode(QHeaderView.ResizeToContents)
         h.setStretchLastSection(False)
-        h.setMinimumSectionSize(60)
 
         self.setEditTriggers(QTableWidget.NoEditTriggers)
         self.setSelectionMode(QTableWidget.NoSelection)
         self.setWordWrap(True)
         self.setTextElideMode(Qt.ElideNone)
-        self.verticalHeader().setDefaultSectionSize(35)
-        self.verticalHeader().setMinimumSectionSize(35)
         self.verticalHeader().setVisible(False)
-        self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        fit_to_contents(self)
 
         # Hide real action col; placeholder reserves overlay space
         action_col = len(headers) - 2
@@ -316,12 +234,18 @@ class RecyclingTable(TooltipTableMixin, QTableWidget):
         self.setColumnWidth(action_col, 0)
         self.setColumnHidden(action_col, True)
         h.setSectionResizeMode(placeholder_col, QHeaderView.Fixed)
-        self.setColumnWidth(placeholder_col, _ACTION_W)
+        # minimum widths from the shared column rules (assets/themes/table_style.py);
+        # col 1 holds the material name (takes the spare width), "Value" is a quantity
+        apply_column_style(self, {1: "name", 2: "quantity"})
 
-        self.setViewportMargins(0, 0, _ACTION_W, 0)
-
-        self._frozen_overlay = _FrozenActionTable(self)
+        self._frozen_overlay = FrozenActionColumn(self)
+        self._frozen_overlay.widthChanged.connect(self._reserve_action_width)
         self._frozen_overlay.show()
+
+    def _reserve_action_width(self, w: int):
+        # placeholder col and right margin keep content out of the overlay zone
+        self.setColumnWidth(self.columnCount() - 1, w)
+        self.setViewportMargins(0, 0, w, 0)
 
     def viewportEvent(self, event):
         if event.type() == QEvent.ToolTip:
@@ -337,21 +261,10 @@ class RecyclingTable(TooltipTableMixin, QTableWidget):
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        self.resizeRowsToContents()
-
         self._frozen_overlay.reposition()
         self._frozen_overlay.sync_row_heights()
 
-    def sizeHint(self):
-        header_h = self.horizontalHeader().height() or 35
-        rows_h = sum(self.rowHeight(r) for r in range(self.rowCount()))
-        return QSize(super().sizeHint().width(), max(60, header_h + rows_h + 10))
-
-    def minimumSizeHint(self):
-        return self.sizeHint()
-
     def update_height(self):
-        self.resizeRowsToContents()
         self.updateGeometry()
         if hasattr(self, "_frozen_overlay"):
             self._frozen_overlay.reposition()
@@ -440,9 +353,6 @@ class Recycling(QWidget):
         main_layout.addWidget(self._hline())
 
         # ── Included Section ─────────────────────────────────────────────
-        for widget in make_section_header("Included in Recyclability"):
-            main_layout.addWidget(widget)
-
         self.included_table = RecyclingTable(is_included=True)
         self._included_action = _RecyclingActionDelegate(
             self.included_table._frozen_overlay, self
@@ -450,12 +360,12 @@ class Recycling(QWidget):
         self.included_table._frozen_overlay.setItemDelegateForColumn(
             0, self._included_action
         )
-        main_layout.addWidget(self.included_table)
+        # card: title and row count above the table
+        included_card = TableCard(self.included_table, "Included in Recyclability")
+        included_card.count_rows()
+        main_layout.addWidget(included_card)
 
         # ── Excluded Section ─────────────────────────────────────────────
-        for widget in make_section_header("Excluded from Recyclability"):
-            main_layout.addWidget(widget)
-
         self.excluded_table = RecyclingTable(is_included=False)
         self._excluded_action = _RecyclingActionDelegate(
             self.excluded_table._frozen_overlay, self
@@ -463,7 +373,10 @@ class Recycling(QWidget):
         self.excluded_table._frozen_overlay.setItemDelegateForColumn(
             0, self._excluded_action
         )
-        main_layout.addWidget(self.excluded_table)
+        # card: title and row count above the table
+        excluded_card = TableCard(self.excluded_table, "Excluded from Recyclability")
+        excluded_card.count_rows()
+        main_layout.addWidget(excluded_card)
         main_layout.addStretch()
 
         scroll.setWidget(container)
@@ -544,14 +457,14 @@ class Recycling(QWidget):
             return it
         # Included table: col 6 = Scrap Rate, col 7 = Recovered Value
         self.included_table.setHorizontalHeaderItem(
-            6, _hdr(f"Scrap Rate ({cu}/unit)" if cu else "Scrap Rate (per unit)")
+            6, _hdr(f"Scrap Rate\n({cu}/unit)" if cu else "Scrap Rate\n(per unit)")
         )
         self.included_table.setHorizontalHeaderItem(
-            7, _hdr(f"Recovered Value ({cu})" if cu else "Recovered Value")
+            7, _hdr(f"Recovered Value\n({cu})" if cu else "Recovered Value")
         )
         # Excluded table: col 5 = Scrap Rate
         self.excluded_table.setHorizontalHeaderItem(
-            5, _hdr(f"Scrap Rate ({cu}/unit)" if cu else "Scrap Rate (per unit)")
+            5, _hdr(f"Scrap Rate\n({cu}/unit)" if cu else "Scrap Rate\n(per unit)")
         )
 
     def _populate_included(self, items, currency: str):
