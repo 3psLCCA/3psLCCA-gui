@@ -374,6 +374,7 @@ class StructureManagerWidget(QWidget):
         def _sync_footer(*_, t=table, f=footer):
             empty = t.rowCount() == 0
             f.setText("+  Add first material" if empty else "+  Add material")
+            t.setVisible(not empty)  # no rows: just the heading and the Add row
 
         table.model().rowsInserted.connect(_sync_footer)
         table.model().rowsRemoved.connect(_sync_footer)
