@@ -1,6 +1,11 @@
 from three_ps_lcca_gui.gui.themes import get_token
 from three_ps_lcca_gui.gui.theme import FS_MD
-from three_ps_lcca_gui.gui.assets.themes.table_style import ColumnMinWidthMixin, apply_column_style
+from three_ps_lcca_gui.gui.assets.themes.column_style import (
+    apply_column_style,
+    pin_last_column,
+    pinned_view,
+    refit,
+)
 from ..utils.form_builder.form_builder import make_section_label
 from PySide6.QtWidgets import (
     QWidget,
@@ -10,12 +15,12 @@ from PySide6.QtWidgets import (
     QLabel,
     QTableWidget,
     QTableWidgetItem,
-    QHeaderView,
     QFrame,
     QScrollArea,
     QToolTip,
+    QStyleOptionViewItem,
 )
-from PySide6.QtCore import Qt, QTimer, QRect, QEvent
+from PySide6.QtCore import Qt, QTimer, QRect, QEvent, QModelIndex
 
 import time
 import datetime
@@ -28,7 +33,6 @@ from ..utils.table_widgets import (
     BaseActionDelegate,
     TooltipTableMixin,
     TableCard,
-    FrozenActionColumn,
     fit_to_contents,
 )
 
@@ -127,7 +131,7 @@ class _RecyclingActionDelegate(BaseActionDelegate):
         }
 
     def _raw_row_data(self, row) -> dict | None:
-        item = self._table.item(row, 0)
+        item = self._table.item(row, self._action_col())
         return item.data(Qt.UserRole) if item else None
 
     def _get_btns_for_row(self, row) -> list[tuple]:
@@ -168,7 +172,7 @@ class _RecyclingActionDelegate(BaseActionDelegate):
 # ---------------------------------------------------------------------------
 
 
-class RecyclingTable(ColumnMinWidthMixin, TooltipTableMixin, QTableWidget):
+class RecyclingTable(TooltipTableMixin, QTableWidget):
     _L = Qt.AlignLeft | Qt.AlignVCenter
     _R = Qt.AlignRight | Qt.AlignVCenter
     _C = Qt.AlignCenter
@@ -186,8 +190,7 @@ class RecyclingTable(ColumnMinWidthMixin, TooltipTableMixin, QTableWidget):
         ("Scrap Rate", _R),  # 6
         ("Recovered Value", _R),  # 7
         ("Warning", _L),  # 8
-        ("Action", _C),  # 9
-        ("", _C),  # 10 placeholder
+        ("Action", _C),  # 9  buttons, pinned to the right edge
     ]
 
     EXCLUDED_HEADERS = [
@@ -198,11 +201,10 @@ class RecyclingTable(ColumnMinWidthMixin, TooltipTableMixin, QTableWidget):
         ("Recyclability %", _R),  # 4
         ("Scrap Rate", _R),  # 5
         ("Reason", _L),  # 6
-        ("Action", _C),  # 7
-        ("", _C),  # 8 placeholder
+        ("Action", _C),  # 7  buttons, pinned to the right edge
     ]
 
-    def __init__(self, is_included: bool, parent=None):
+    def __init__(self, is_included: bool, handler, parent=None):
         super().__init__(parent)
         self.is_included = is_included
 
@@ -215,37 +217,24 @@ class RecyclingTable(ColumnMinWidthMixin, TooltipTableMixin, QTableWidget):
             item.setTextAlignment(align)
             self.setHorizontalHeaderItem(col, item)
 
-        h = self.horizontalHeader()
-        h.setSectionResizeMode(QHeaderView.ResizeToContents)
-        h.setStretchLastSection(False)
-
         self.setEditTriggers(QTableWidget.NoEditTriggers)
         self.setSelectionMode(QTableWidget.NoSelection)
-        self.setWordWrap(True)
         self.setTextElideMode(Qt.ElideNone)
         self.verticalHeader().setVisible(False)
-        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        fit_to_contents(self)
+        fit_to_contents(self)  # every row shows; the page scrolls down
 
-        # Hide real action col; placeholder reserves overlay space
-        action_col = len(headers) - 2
-        placeholder_col = len(headers) - 1
-        h.setSectionResizeMode(action_col, QHeaderView.Fixed)
-        self.setColumnWidth(action_col, 0)
-        self.setColumnHidden(action_col, True)
-        h.setSectionResizeMode(placeholder_col, QHeaderView.Fixed)
-        # minimum widths from the shared column rules (assets/themes/table_style.py);
-        # col 1 holds the material name (takes the spare width), "Value" is a quantity
+        # Action buttons: paint and handle clicks in the last column
+        self.action_delegate = _RecyclingActionDelegate(self, handler)
+        self.setItemDelegateForColumn(len(headers) - 1, self.action_delegate)
+        btn_h = self.action_delegate.sizeHint(QStyleOptionViewItem(), QModelIndex()).height()
+        self.verticalHeader().setMinimumSectionSize(btn_h)  # rows fit the buttons
+
+        # widths from the header labels (assets/themes/column_style.py); col 1
+        # holds the material name (takes the spare width), "Value" is a quantity.
+        # The table scrolls sideways itself, with Action pinned to its right edge.
         apply_column_style(self, {1: "name", 2: "quantity"})
-
-        self._frozen_overlay = FrozenActionColumn(self)
-        self._frozen_overlay.widthChanged.connect(self._reserve_action_width)
-        self._frozen_overlay.show()
-
-    def _reserve_action_width(self, w: int):
-        # placeholder col and right margin keep content out of the overlay zone
-        self.setColumnWidth(self.columnCount() - 1, w)
-        self.setViewportMargins(0, 0, w, 0)
+        pin_last_column(self)
+        self.action_delegate.track(pinned_view(self))
 
     def viewportEvent(self, event):
         if event.type() == QEvent.ToolTip:
@@ -259,25 +248,14 @@ class RecyclingTable(ColumnMinWidthMixin, TooltipTableMixin, QTableWidget):
             QToolTip.hideText()
         return super().viewportEvent(event)
 
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        self._frozen_overlay.reposition()
-        self._frozen_overlay.sync_row_heights()
-
     def update_height(self):
+        """Re-fit columns, rows and the pinned Action column to the rows now."""
+        refit(self)
         self.updateGeometry()
-        if hasattr(self, "_frozen_overlay"):
-            self._frozen_overlay.reposition()
-            self._frozen_overlay.sync_row_heights()
 
     def clear_rows(self):
         self.setRowCount(0)
-        self._frozen_overlay.clear_rows()
         self.update_height()
-
-    def showEvent(self, event):
-        super().showEvent(event)
-        self._frozen_overlay.reposition()
 
 
 # ---------------------------------------------------------------------------
@@ -353,26 +331,16 @@ class Recycling(QWidget):
         main_layout.addWidget(self._hline())
 
         # ── Included Section ─────────────────────────────────────────────
-        self.included_table = RecyclingTable(is_included=True)
-        self._included_action = _RecyclingActionDelegate(
-            self.included_table._frozen_overlay, self
-        )
-        self.included_table._frozen_overlay.setItemDelegateForColumn(
-            0, self._included_action
-        )
+        self.included_table = RecyclingTable(is_included=True, handler=self)
+        self._included_action = self.included_table.action_delegate
         # card: title and row count above the table
         included_card = TableCard(self.included_table, "Included in Recyclability")
         included_card.count_rows()
         main_layout.addWidget(included_card)
 
         # ── Excluded Section ─────────────────────────────────────────────
-        self.excluded_table = RecyclingTable(is_included=False)
-        self._excluded_action = _RecyclingActionDelegate(
-            self.excluded_table._frozen_overlay, self
-        )
-        self.excluded_table._frozen_overlay.setItemDelegateForColumn(
-            0, self._excluded_action
-        )
+        self.excluded_table = RecyclingTable(is_included=False, handler=self)
+        self._excluded_action = self.excluded_table.action_delegate
         # card: title and row count above the table
         excluded_card = TableCard(self.excluded_table, "Excluded from Recyclability")
         excluded_card.count_rows()
@@ -516,16 +484,6 @@ class Recycling(QWidget):
             )
             action_item.setFlags(Qt.ItemIsEnabled)
             t.setItem(row, 9, action_item)
-            t.setItem(row, 10, QTableWidgetItem())  # placeholder
-            t._frozen_overlay.add_row(
-                {
-                    "btns": ["edit", "exclude"],
-                    "chunk_id": chunk_id,
-                    "comp_name": comp_name,
-                    "idx": idx,
-                    "item": item,
-                }
-            )
 
         t.update_height()
 
@@ -571,16 +529,6 @@ class Recycling(QWidget):
             )
             action_item.setFlags(Qt.ItemIsEnabled)
             t.setItem(row, 7, action_item)
-            t.setItem(row, 8, QTableWidgetItem())  # placeholder
-            t._frozen_overlay.add_row(
-                {
-                    "btns": btn_keys,
-                    "chunk_id": chunk_id,
-                    "comp_name": comp_name,
-                    "idx": idx,
-                    "item": item,
-                }
-            )
 
         t.update_height()
 
