@@ -33,7 +33,9 @@ from ..utils.remarks_editor import RemarksEditor
 from ..utils.wpi_manager import WPIManager, WPIProfile
 from .wpi_table import _WPITable
 from .wpi_selector import _WPISelector
-from ..utils.table_widgets import TableDoubleSpinBox, TableSpinBox, TooltipTableMixin, fit_to_contents
+from ..utils.table_widgets import (
+    EditableCellDelegate, TableDoubleSpinBox, TableSpinBox, TooltipTableMixin, fit_to_contents,
+)
 from three_ps_lcca_gui.gui.themes import get_token
 
 # ── Dev mode ──────────────────────────────────────────────────────────────────
@@ -372,6 +374,7 @@ class _VehicleTrafficTable(TooltipTableMixin, QTableWidget):
         self.verticalHeader().setVisible(False)
         self.setEditTriggers(QTableWidget.NoEditTriggers)
         self.setSelectionMode(QTableWidget.NoSelection)
+        self.setItemDelegate(EditableCellDelegate(self))
         fit_to_contents(self)
 
         self._vpd, self._acc, self._pwr = {}, {}, {}
@@ -455,6 +458,7 @@ class _PeakHoursTable(TooltipTableMixin, QTableWidget):
         self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.verticalHeader().setVisible(False)
         self.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.setItemDelegate(EditableCellDelegate(self))
         fit_to_contents(self)
 
         self._on_change = on_change

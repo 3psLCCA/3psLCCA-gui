@@ -460,6 +460,36 @@ QTableView::item {
     padding: 0px 8px;
 }
 
+/* inputs placed in cells (TableSpinBox etc.) are part of the cell, not form
+   fields: drop the form border, radius, padding and min-height so they sit
+   flush like the cell text. Frozen / validation colours above still apply.
+   The cell behind an editable input is tinted by EditableCellDelegate
+   (table_widgets.py), so the input itself stays transparent. */
+QTableView QSpinBox,
+QTableView QDoubleSpinBox,
+QTableView QLineEdit,
+QTableView QSpinBox:focus,
+QTableView QDoubleSpinBox:focus,
+QTableView QLineEdit:focus,
+QTableView QSpinBox:disabled,
+QTableView QDoubleSpinBox:disabled,
+QTableView QLineEdit:disabled {
+    background-color: transparent;
+    border: none;
+    border-radius: 0px;
+    margin: 0px;
+    padding: 0px 4px;
+    min-height: 0px;
+}
+
+/* an input in a selected row sits on the highlight (set by EditableCellDelegate);
+   beats the [frozen="true"] grey */
+QTableView QSpinBox[rowSelected="true"],
+QTableView QDoubleSpinBox[rowSelected="true"],
+QTableView QLineEdit[rowSelected="true"] {
+    color: $text-on-primary;
+}
+
 /* ── Table card (TableCard in table_widgets.py) ─────────────────────────── */
 /* heading row (title · count, total, ••• menu), the table, "+ Add" row */
 QFrame#tableCard {

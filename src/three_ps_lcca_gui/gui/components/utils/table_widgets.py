@@ -16,6 +16,7 @@ Exports:
 """
 from PySide6.QtWidgets import (
     QAbstractScrollArea,
+    QAbstractSpinBox,
     QApplication,
     QDoubleSpinBox,
     QFrame,
@@ -36,11 +37,12 @@ from PySide6.QtWidgets import (
     QToolTip,
     QVBoxLayout,
 )
-from PySide6.QtCore import Qt, QSize, QRect, QEvent, QModelIndex, Signal
+from PySide6.QtCore import Qt, QObject, QSize, QRect, QEvent, QModelIndex, Signal
 from PySide6.QtGui import QPainter, QColor
 from shiboken6 import isValid
 from three_ps_lcca_gui.gui.assets.themes.table_style import COL_MIN_ROLE
 from three_ps_lcca_gui.gui.theme import BTN_SM, SP2, SP3
+from three_ps_lcca_gui.gui.themes import get_token
 
 
 # ---------------------------------------------------------------------------
@@ -430,6 +432,62 @@ class _FitEditorMixin:
         super().changeEvent(event)
         if event.type() in (QEvent.StyleChange, QEvent.FontChange):
             self._fit_editor()
+
+
+class _CellStateWatcher(QObject):
+    """Repaints a table when one of its cell inputs is frozen / unfrozen,
+    so EditableCellDelegate's tint follows. Kept apart from the delegate:
+    QStyledItemDelegate.eventFilter handles its editors' keys."""
+
+    _EVENTS = (QEvent.EnabledChange, QEvent.ReadOnlyChange, QEvent.DynamicPropertyChange)
+
+    def __init__(self, view):
+        super().__init__(view)
+        self._view = view
+
+    def eventFilter(self, obj, event):
+        if event.type() in self._EVENTS and isValid(self._view):
+            self._view.viewport().update()
+        return False
+
+
+class EditableCellDelegate(QStyledItemDelegate):
+    """Tints a cell whose input (setCellWidget) can be typed in, so it reads
+    as "type here". Frozen, read-only and disabled inputs leave the cell
+    plain. The input itself is transparent in table cells (main.qss), so the
+    tint fills the whole cell, padding included.
+
+    Use as the table's item delegate: table.setItemDelegate(EditableCellDelegate(table))
+    """
+
+    def __init__(self, view):
+        super().__init__(view)
+        self._view = view
+        self._watcher = _CellStateWatcher(view)
+        self._watched = set()
+
+    @staticmethod
+    def _is_editable(w) -> bool:
+        if not isinstance(w, (QAbstractSpinBox, QLineEdit)):
+            return False
+        return w.isEnabled() and not w.isReadOnly() and not w.property("frozen")
+
+    def paint(self, painter, option, index):
+        w = self._view.indexWidget(index)
+        if w is not None:
+            if id(w) not in self._watched:  # repaint when the input is frozen / unfrozen
+                self._watched.add(id(w))
+                w.installEventFilter(self._watcher)
+            if self._is_editable(w):
+                painter.fillRect(option.rect, QColor(get_token("cell-editable-bg")))
+            # the transparent input shows the row highlight behind it; main.qss
+            # [rowSelected="true"] switches its text to the highlight text colour
+            selected = bool(option.state & QStyle.State_Selected)
+            if bool(w.property("rowSelected")) != selected:
+                w.setProperty("rowSelected", selected)
+                w.style().unpolish(w)
+                w.style().polish(w)
+        super().paint(painter, option, index)
 
 
 class TableDoubleSpinBox(_FitEditorMixin, QDoubleSpinBox):

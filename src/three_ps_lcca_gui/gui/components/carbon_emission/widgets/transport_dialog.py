@@ -83,6 +83,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor, QDoubleValidator
 
 from ...utils.table_widgets import (
+    EditableCellDelegate,
     TableLineEdit,
     TooltipTableMixin,
 )
@@ -334,6 +335,7 @@ class TransportDialog(QDialog):
         self.mat_table.verticalHeader().setVisible(False)
         self.mat_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.mat_table.setSelectionMode(QAbstractItemView.NoSelection)
+        self.mat_table.setItemDelegate(EditableCellDelegate(self.mat_table))
         self.mat_table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
 
         ll.addWidget(self.mat_table)

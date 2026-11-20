@@ -24,7 +24,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QAbstractScrollArea,
 )
-from ..utils.table_widgets import TableDoubleSpinBox
+from ..utils.table_widgets import EditableCellDelegate, TableDoubleSpinBox
 
 # ── Vehicles ──────────────────────────────────────────────────────────────────
 
@@ -40,6 +40,7 @@ _VEHICLES = [
 ]
 from ..utils.wpi_manager import WPIManager, WPIProfile, empty_data
 from three_ps_lcca_gui.gui.themes import theme_manager
+from three_ps_lcca_gui.gui.theme import COL_PAD_X, COL_W_WPI
 
 # ── Column definitions ────────────────────────────────────────────────────────
 
@@ -142,6 +143,7 @@ class _WPITable(QTableWidget):
     def _setup_table(self):
         self.setEditTriggers(QTableWidget.NoEditTriggers)
         self.setSelectionMode(QTableWidget.NoSelection)
+        self.setItemDelegate(EditableCellDelegate(self))
         self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAsNeeded)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
@@ -152,6 +154,9 @@ class _WPITable(QTableWidget):
         # Hide Qt's built-in column header - we use row 0 and 1 instead
         self.horizontalHeader().setVisible(False)
         self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        # columns share the width but never shrink below a 4-decimal value;
+        # past that the table scrolls sideways instead of clipping values
+        self.horizontalHeader().setMinimumSectionSize(COL_W_WPI + 2 * COL_PAD_X)
 
         self.verticalHeader().setVisible(True)
         self.verticalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)

@@ -146,5 +146,6 @@ COL_W_QUANTITY    = 12 * CHAR_W_AVG   # the other half of quantity x rate
 COL_W_PERCENT     =  6 * CHAR_W_AVG   # "100.00"
 COL_W_NOTE        = 15 * CHAR_W_AVG   # wraps by word, like a component
 COL_W_DATETIME    = 16 * CHAR_W_AVG   # "20-11-2026 14:30"
+COL_W_WPI         =  9 * CHAR_W_AVG   # "131.4000", a WPI ratio at 4 decimals
 
 

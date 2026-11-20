@@ -21,7 +21,9 @@ from ...utils.form_builder.form_definitions import FieldDef, Section
 from ...utils.form_builder.form_builder import build_form, make_section_header
 from ...utils.remarks_editor import RemarksEditor
 from ...utils.display_format import fmt
-from ...utils.table_widgets import TableDoubleSpinBox, TooltipTableMixin, fit_to_contents
+from ...utils.table_widgets import (
+    EditableCellDelegate, TableDoubleSpinBox, TooltipTableMixin, fit_to_contents,
+)
 
 from ...utils.validation_helpers import confirm_clear_all
 from PySide6.QtWidgets import QStyledItemDelegate
@@ -89,8 +91,9 @@ _COL_EMISSIONS = 3
 
 _ROW_ZERO_ROLE = Qt.UserRole + 1
 
-class _EmissionsRowDelegate(QStyledItemDelegate):
-    """Paints a full-cell background if the item has the zero-row role set."""
+class _EmissionsRowDelegate(EditableCellDelegate):
+    """Paints a full-cell background if the item has the zero-row role set;
+    editable factor cells are tinted by EditableCellDelegate."""
     def paint(self, painter, option, index):
         is_zero = index.data(_ROW_ZERO_ROLE)
         if is_zero:
