@@ -524,7 +524,7 @@ QPushButton#cardFooter:pressed { background-color: $primary-active; }
 QPushButton#cardFooter:disabled { color: $text_disabled; }
 
 /* ── Transport emissions (transport_emissions.py) ───────────────────────── */
-/* summary card; each delivery is a #tableCard (table_widgets.TableCard) */
+/* category totals card; each delivery is a #tableCard (table_widgets.TableCard) */
 QFrame#transportSummary {
     background-color: $base;
     border: 1px solid $border-faint;
@@ -533,17 +533,6 @@ QFrame#transportSummary {
 
 QLabel#statLabel { color: $text_secondary; }
 QLabel#statValue { font-weight: $weight-semibold; }
-
-QLabel#summaryTotal {
-    color: $primary;
-    font-size: $font-size-disp;
-    font-weight: $weight-bold;
-}
-
-QLabel#deliveriesHeading {
-    color: $text_secondary;
-    font-weight: $weight-semibold;
-}
 
 QFrame#warnBox {
     background-color: $warn-bg;

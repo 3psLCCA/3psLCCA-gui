@@ -2,13 +2,13 @@ import math
 import datetime
 import time
 from three_ps_lcca_gui.gui.themes import get_token
-from ...utils.form_builder.form_builder import make_section_label
+# load form_builder before validation_helpers: they import each other
+from ...utils.form_builder import form_builder  # noqa: F401
 
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
-    QPushButton,
     QLabel,
     QFrame,
     QGridLayout,
@@ -23,8 +23,15 @@ from PySide6.QtCore import Qt, QTimer
 
 from .transport_dialog import TransportDialog
 from ...utils.definitions import STRUCTURE_CHUNKS, UNIT_DIMENSION
-from ...utils.table_widgets import TableCard, TooltipTableMixin, WordWrapHeaderView, fit_to_contents
-from three_ps_lcca_gui.gui.theme import SP1, SP2, SP3, SP4
+from ...utils.fab_button import FabButton
+from ...utils.table_widgets import (
+    TableCard, TooltipTableMixin, WordWrapHeaderView, fit_to_contents,
+)
+from three_ps_lcca_gui.gui.assets.themes.column_style import (
+    apply_column_style,
+)
+from three_ps_lcca_gui.gui.styles import font
+from three_ps_lcca_gui.gui.theme import SP1, SP2, SP3, SP4, FS_MD, FS_SECTION, FW_BOLD
 from ...utils.display_format import fmt, fmt_comma
 from ...utils.icons import make_icon, make_icon_btn
 from ...utils.validation_helpers import freeze_widgets
@@ -50,17 +57,6 @@ class _TransportEmissionsTable(TooltipTableMixin, QTableWidget):
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-
-def _hline() -> QFrame:
-    f = QFrame()
-    f.setFrameShape(QFrame.HLine)
-    f.setFrameShadow(QFrame.Sunken)
-    return f
-
-
-def _section_label(text: str) -> QLabel:
-    return make_section_label(text)
 
 
 def _named_label(text: str, name: str) -> QLabel:
@@ -136,14 +132,14 @@ def calc_vehicle_emission(entry: dict, mat_index: dict) -> tuple:
     warnings = []
 
     if cap <= 0:
-        warnings.append("Payload capacity is zero - check vehicle data.")
+        warnings.append("The payload capacity of the vehicle is 0. Make sure that the vehicle data is correct.")
         return 0.0, [], warnings
 
     if dist <= 0:
-        warnings.append("Distance is zero - no emission calculated.")
+        warnings.append("The distance is 0 km. The emission is 0 kgCO₂e.")
 
     if ef <= 0:
-        warnings.append("Emission factor is zero - no emission calculated.")
+        warnings.append("The emission factor is 0. The emission is 0 kgCO₂e.")
 
     for mat_entry in uuids:
         # materials is now [{uuid, kg_factor}]
@@ -159,10 +155,10 @@ def calc_vehicle_emission(entry: dict, mat_index: dict) -> tuple:
                     "name": "Unknown",
                     "status": "removed",
                     "emission": 0.0,
-                    "warning": "⚠ Material removed from structure",
+                    "warning": "⚠ Not in Construction Works Data",
                 }
             )
-            warnings.append(f"Material {mat_uuid[:8]}... was removed from structure.")
+            warnings.append(f"Material {mat_uuid[:8]}… is not in Construction Works Data.")
             continue
 
         item, category, chunk_id, comp_name = mat_index[mat_uuid]
@@ -195,18 +191,18 @@ def calc_vehicle_emission(entry: dict, mat_index: dict) -> tuple:
 
         warns = []
         if qty <= 0:
-            warns.append("⚠ Zero quantity")
+            warns.append("⚠ The quantity is 0.")
         if qty_kg <= 0 and qty > 0:
-            warns.append("⚠ Zero kg - check factor")
+            warns.append("⚠ The weight is 0 kg. Make sure that the kg factor is correct.")
         if trips > 1000:
-            warns.append(f"⚠ {trips} trips - unusually high")
+            warns.append(f"⚠ The number of trips ({trips:,}) is high.")
         is_mass = UNIT_DIMENSION.get(unit.lower()) == "Mass"
         if not is_mass and abs(kg_factor - 1.0) < 1e-6:
-            warns.append(f"⚠ 1:1 factor for {unit} - verify conversion")
+            warns.append(f"⚠ The kg factor is 1 kg/{unit}. Make sure that this value is correct.")
 
         warn = " | ".join(warns)
         if trips > 1000:
-            warnings.append(f"'{name}': {trips} trips - unusually high, check data.")
+            warnings.append(f"{name}: The number of trips ({trips:,}) is high. Make sure that the quantity and the vehicle capacity are correct.")
 
         material_results.append(
             {
@@ -238,9 +234,11 @@ class VehicleCard(TableCard):
     """One delivery, laid out like the structure table cards:
 
         name  ·  origin · km  ----------  emission  [•••]
-        capacity · gross · empty · EF   (muted)
         warning callout                 (if any)
-        material breakdown table
+        material table
+        "Edit delivery" row
+
+    The vehicle specs are the tooltip of the heading.
     """
 
     def __init__(
@@ -259,9 +257,19 @@ class VehicleCard(TableCard):
         table = self._build_table(mat_results)
         super().__init__(table, title=(v.get("name") or "").strip() or "Delivery", parent=parent)
 
-        route = [p for p in ((r.get("origin") or "").strip(), f"{fmt(r.get('distance_km', 0))} km") if p]
+        route = [p for p in ((r.get("origin") or "").strip(), f"{fmt_comma(r.get('distance_km', 0))} km") if p]
         self.set_count("  ·  ".join(route))
         self.set_total(f"{fmt_comma(total_emission)} kgCO₂e")
+
+        gross = v.get("gross_weight", 0)
+        cap = v.get("capacity", 0)
+        empty = v.get("empty_weight", max(0.0, gross - cap))
+        specs = (
+            f"Capacity {fmt_comma(cap)} t  ·  Gross {fmt_comma(gross)} t  ·  "
+            f"Empty {fmt_comma(empty)} t  ·  EF {fmt(v.get('emission_factor', 0))} kgCO₂e/t-km"
+        )
+        self.title_lbl.setToolTip(specs)
+        self.count_lbl.setToolTip(specs)
 
         menu = QMenu(self)
         menu.setStyleSheet(
@@ -277,122 +285,79 @@ class VehicleCard(TableCard):
         trash_act.triggered.connect(on_trash)
         freeze_widgets(frozen, self.set_menu(menu))
 
-        # vehicle specs and warnings sit between the heading row and the table,
-        # indented like the heading so the text lines up
-        gross = v.get("gross_weight", 0)
-        cap = v.get("capacity", 0)
-        empty = v.get("empty_weight", max(0.0, gross - cap))
-        specs = _named_label(
-            f"Capacity {fmt(cap)} t   ·   Gross {fmt(gross)} t   ·   "
-            f"Empty {fmt(empty)} t   ·   EF {fmt(v.get('emission_factor', 0))} kgCO₂e/t-km",
-            "cardCount",
-        )
-        specs.setWordWrap(True)
-        extra = QVBoxLayout()
-        extra.setContentsMargins(SP3, SP1, SP3, 0)
-        extra.setSpacing(SP2)
-        extra.addWidget(specs)
-        if warnings:
+        apply_column_style(table)
+
+        # warnings (delivery and per material) sit between the heading and the table
+        row_warnings = [
+            f"{m.get('name') or 'Material'}: {w.replace('⚠', '').strip()}"
+            for m in mat_results
+            for w in (m.get("warning") or "").split(" | ")
+            if w and "trips" not in w  # high trip counts are in `warnings` already
+        ]
+        all_warnings = list(warnings) + row_warnings
+        if all_warnings:
             warn_box = QFrame()
             warn_box.setObjectName("warnBox")
             warn_layout = QHBoxLayout(warn_box)
             warn_layout.setContentsMargins(10, 8, 10, 8)
             warn_layout.setSpacing(8)
             warn_layout.addWidget(_named_label("!", "warnIcon"), 0, Qt.AlignTop)
-            warn_text = _named_label("\n".join(warnings), "warnText")
+            warn_text = _named_label("\n".join(all_warnings), "warnText")
             warn_text.setWordWrap(True)
             warn_layout.addWidget(warn_text, 1)
+            extra = QVBoxLayout()
+            extra.setContentsMargins(SP3, SP2, SP3, 0)
             extra.addWidget(warn_box)
-        self.layout().insertLayout(1, extra)
+            self.layout().insertLayout(1, extra)
 
-        # bottom padding when there is no footer row under the table
-        self.layout().addSpacing(SP3)
         table.setVisible(bool(mat_results))
+        footer = self.add_footer("Edit delivery")
+        footer.clicked.connect(on_edit)
+        freeze_widgets(frozen, footer)
 
     @staticmethod
     def _build_table(mat_results: list) -> QTableWidget:
         table = _TransportEmissionsTable()
-        table.setColumnCount(7)
         _L = Qt.AlignLeft  | Qt.AlignVCenter
         _R = Qt.AlignRight | Qt.AlignVCenter
-        for col, (label, align) in enumerate([
-            ("Material",          _L),
-            ("Category",          _L),
-            ("kg Factor",         _R),
-            ("Quantity\n(kg)",     _R),
-            ("Trips",             _R),
-            ("Emission\n(kgCO₂e)", _R),
-            ("Warnings",          _L),
-        ]):
+        headers = [
+            ("Material",  _L),
+            ("Category",  _L),
+            ("kg Factor", _R),
+            ("Quantity",  _R),
+            ("Trips",     _R),
+            ("Emission",  _R),
+        ]
+        table.setColumnCount(len(headers))
+        for col, (label, align) in enumerate(headers):
             item = QTableWidgetItem(label)
             item.setTextAlignment(align)
             table.setHorizontalHeaderItem(col, item)
-        h = table.horizontalHeader()
-        h.setStretchLastSection(False)
-        # Text columns share the spare width; number columns fit contents
-        h.setSectionResizeMode(QHeaderView.ResizeToContents)
-        for col in (0, 1, 6):
-            h.setSectionResizeMode(col, QHeaderView.Stretch)
         table.setEditTriggers(QTableWidget.NoEditTriggers)
         table.setSelectionMode(QTableWidget.NoSelection)
         table.verticalHeader().setVisible(False)
 
-
+        item = VehicleCard._item
         for mat in mat_results:
             row = table.rowCount()
             table.insertRow(row)
-            status = mat.get("status", "ok")
-
-            if status == "ok":
-                table.setItem(row, 0, VehicleCard._item(mat.get("name", "")))
-                table.setItem(row, 1, VehicleCard._item(mat.get("category", "")))
-                table.setItem(row, 2, VehicleCard._item(fmt(mat.get("kg_factor", 1)), Qt.AlignRight | Qt.AlignVCenter))
-                table.setItem(
-                    row,
-                    3,
-                    VehicleCard._item(
-                        f"{mat.get('qty_kg', 0):,.0f}", Qt.AlignRight | Qt.AlignVCenter
-                    ),
-                )
-                table.setItem(
-                    row,
-                    4,
-                    VehicleCard._item(
-                        str(mat.get("trips", 0)), Qt.AlignRight | Qt.AlignVCenter
-                    ),
-                )
-                table.setItem(
-                    row,
-                    5,
-                    VehicleCard._item(
-                        fmt_comma(mat.get('emission', 0)),
-                        Qt.AlignRight | Qt.AlignVCenter,
-                    ),
-                )
-
-                warn = mat.get("warning", "")
-                warn_item = VehicleCard._item(warn if warn else "", Qt.AlignCenter)
-                if warn:
-                    # Truncate display text, full detail in tooltip
-                    parts = warn.split(" | ")
-                    display = parts[0] + (" ..." if len(parts) > 1 else "")
-                    warn_item = VehicleCard._item(display, Qt.AlignCenter)
-                    # warn_item.setForeground(QColor("#874d00"))
-                    # warn_item.setBackground(QColor("#fffbe6"))
-                    # Bullet list in tooltip
-                    tooltip = "\n".join(f"• {p}" for p in parts)
-                    warn_item.setToolTip(tooltip)
-                table.setItem(row, 6, warn_item)
-
+            name = mat.get("name", "")
+            if mat.get("status", "ok") == "ok":
+                unit = mat.get("unit", "")
+                kf = fmt_comma(mat.get("kg_factor", 1))
+                cells = [
+                    (name, _L),
+                    (mat.get("category", ""), _L),
+                    (f"{kf} kg/{unit}" if unit else kf, _R),
+                    (f"{fmt_comma(mat.get('qty_kg', 0))} kg", _R),
+                    (f"{mat.get('trips', 0):,}", _R),
+                    (f"{fmt_comma(mat.get('emission', 0))} kgCO₂e", _R),
+                ]
             else:
-                table.setItem(row, 0, VehicleCard._item(mat.get("name", "")))
-                table.setItem(row, 1, VehicleCard._item(mat.get("category", "")))
-                for c in range(2, 6):
-                    table.setItem(row, c, VehicleCard._item("-", Qt.AlignCenter))
-                label = "In Trash" if status == "trashed" else "Removed"
-                # no cell colour: the "✕ In Trash" / "✕ Removed" text says it
-                warn_item = VehicleCard._item(f"✕ {label}", Qt.AlignCenter)
-                table.setItem(row, 6, warn_item)
+                label = "in Trash" if mat.get("status") == "trashed" else "removed"
+                cells = [(f"{name} ({label})", _L), (mat.get("category", ""), _L)] + [("-", _R)] * 4
+            for col, (text, align) in enumerate(cells):
+                table.setItem(row, col, item(text, align))
         return table
 
     @staticmethod
@@ -425,47 +390,42 @@ class TransportEmissions(QWidget):
                 lambda name: QTimer.singleShot(0, self.on_refresh) if name in _WATCHED else None
             )
 
+        # Laid out like a Construction Works tab (structure/widgets/manager.py):
+        # heading row, then cards, in a scroll area, with a floating "+".
         outer = QVBoxLayout(self)
 
-        outer.setContentsMargins(0, 0, 0, 0)
-
-        # ── Scroll area: summary card, then the delivery cards ───────────
-        # The summary scrolls with the list instead of staying pinned on top.
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.NoFrame)
+        # keep the scrollbar's room so cards don't change width when it appears
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
         page = QWidget()
         page_layout = QVBoxLayout(page)
-        page_layout.setSpacing(16)
+        page_layout.setSpacing(SP4)
         scroll.setWidget(page)
         outer.addWidget(scroll)
 
-        # ── Summary card: total + Add, line, category totals ─────────────
+        # ── Heading row: title, delivery count, total ────────────────────
+        head = QHBoxLayout()
+        head.setContentsMargins(SP1, SP2, SP1, SP1)
+        head.setSpacing(SP3)
+        title = QLabel("Transportation")
+        title.setFont(font(FS_SECTION, FW_BOLD))
+        self.vehicle_lbl = _named_label("", "statLabel")
+        self.vehicle_lbl.setFont(font(FS_MD))
+        self.total_lbl = QLabel()
+        self.total_lbl.setFont(font(FS_SECTION, FW_BOLD))
+        head.addWidget(title, 0, Qt.AlignBottom)
+        head.addWidget(self.vehicle_lbl, 0, Qt.AlignBottom)
+        head.addStretch()
+        head.addWidget(self.total_lbl, 0, Qt.AlignBottom)
+        page_layout.addLayout(head)
+
+        # ── Category totals card ─────────────────────────────────────────
         summary = QFrame()
         summary.setObjectName("transportSummary")
         summary_layout = QVBoxLayout(summary)
-        summary_layout.setContentsMargins(20, 16, 20, 16)
-        summary_layout.setSpacing(14)
-
-        top = QHBoxLayout()
-        total_col = QVBoxLayout()
-        total_col.setSpacing(2)
-        total_col.addWidget(_named_label("Total transport emissions", "statLabel"))
-        self.total_lbl = _named_label("- kgCO₂e", "summaryTotal")
-        total_col.addWidget(self.total_lbl)
-        self.vehicle_lbl = _named_label("- vehicles", "statLabel")
-        total_col.addWidget(self.vehicle_lbl)
-        top.addLayout(total_col)
-        top.addStretch()
-
-        self.add_btn = QPushButton("+ Add Delivery")
-        self.add_btn.setMinimumHeight(32)
-        self.add_btn.clicked.connect(self._open_add_dialog)
-        top.addWidget(self.add_btn, 0, Qt.AlignVCenter)
-        summary_layout.addLayout(top)
-
-        summary_layout.addWidget(_hline())
-
+        summary_layout.setContentsMargins(SP4, SP3, SP4, SP3)
         cats, (
             self.foundation_lbl,
             self.sub_lbl,
@@ -480,14 +440,18 @@ class TransportEmissions(QWidget):
         summary_layout.addLayout(cats)
         page_layout.addWidget(summary)
 
-        page_layout.addWidget(_named_label("Deliveries", "deliveriesHeading"))
-
         # ── Delivery cards (rebuilt by on_refresh) ───────────────────────
         self.container = QWidget()
         self.container_layout = QVBoxLayout(self.container)
         self.container_layout.setContentsMargins(0, 0, 0, 0)
-        self.container_layout.setSpacing(8)
+        self.container_layout.setSpacing(SP4)
         page_layout.addWidget(self.container, 1)
+        # room under the last card so the floating button doesn't cover it
+        page_layout.addSpacing(64)
+
+        # Floating "+" (expands to "+ Add Delivery" on hover)
+        self.add_btn = FabButton("+ Add Delivery", self)
+        self.add_btn.clicked.connect(self._open_add_dialog)
 
     # ── Refresh ──────────────────────────────────────────────────────────
 
@@ -560,7 +524,7 @@ class TransportEmissions(QWidget):
         # Update summary
         self.total_lbl.setText(f"{fmt_comma(total_emission)} kgCO₂e")
         self.vehicle_lbl.setText(
-            f"{active_count} vehicle" + ("" if active_count == 1 else "s")
+            f"{active_count} deliver" + ("y" if active_count == 1 else "ies")
         )
         for lbl, cat in (
             (self.foundation_lbl, "Foundation"),
@@ -647,7 +611,7 @@ class TransportEmissions(QWidget):
         confirm = QMessageBox.question(
             self,
             "Remove Delivery",
-            "Remove this delivery entry? Materials will be available for reassignment.",
+            "Remove this delivery? You can then add its materials to a different delivery.",
             QMessageBox.Yes | QMessageBox.No,
         )
         if confirm != QMessageBox.Yes:
@@ -733,12 +697,12 @@ class TransportEmissions(QWidget):
 
         if result["active_count"] == 0:
             warnings.append(
-                "No active vehicle entries found - add at least one vehicle and its transport details in the Transportation/Equipment Emissions tab to calculate transport carbon emissions"
+                "There are no deliveries. Add a delivery in the Transportation Emissions tab."
             )
         elif result["total_emission"] == 0.0:
             warnings.append(
-                "Total transport carbon emission is 0 kgCO₂e - "
-                "one or more required inputs (distance, payload, or emission factor) may be zero; review each vehicle entry to ensure all values are complete"
+                "The total transport emission is 0 kgCO₂e. Make sure that the distance, "
+                "payload and emission factor of each delivery are correct."
             )
 
         if result["all_warnings"]:

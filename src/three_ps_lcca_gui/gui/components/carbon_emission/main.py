@@ -9,6 +9,7 @@ from three_ps_lcca_gui.gui.components.carbon_emission.widgets.machinery_emission
 )
 from three_ps_lcca_gui.gui.components.carbon_emission.widgets.traffic_emissions import TrafficEmissions
 from three_ps_lcca_gui.gui.components.carbon_emission.widgets.scc_widget import SCCWidget
+from three_ps_lcca_gui.gui.components.utils.form_builder.form_builder import make_section_label
 
 
 class CarbonEmissionTabView(QWidget):
@@ -17,8 +18,11 @@ class CarbonEmissionTabView(QWidget):
     def __init__(self, controller=None, on_step=None):
         super().__init__()
 
+        # page title and margins as on Construction Works Data (structure/main.py)
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setContentsMargins(24, 20, 24, 16)
+        main_layout.setSpacing(16)
+        main_layout.addWidget(make_section_label("Carbon Emissions Data", pad_top=4, pad_bottom=0))
 
         self.tab_view = QTabWidget()
 
