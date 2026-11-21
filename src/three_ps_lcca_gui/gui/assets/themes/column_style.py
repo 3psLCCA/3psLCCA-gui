@@ -297,6 +297,8 @@ class _Controller(QObject):
             t = ev.type()
             if (obj is self.table.viewport() and t == QEvent.Resize) or \
                (obj is self.table and t in (QEvent.FontChange, QEvent.StyleChange, QEvent.Show)):
+                if self.pin and t in (QEvent.Resize, QEvent.Show):
+                    self.pin.sync()     # move it now, so it never paints one frame at the old edge
                 self.schedule()
             if self.confine and obj is self.table and t == QEvent.Show:
                 # a table is usually styled before it has a parent: reach the page's
