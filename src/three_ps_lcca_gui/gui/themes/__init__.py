@@ -248,6 +248,8 @@ def _derive_compat_tokens(raw: dict[str, str], state: dict[str, float]) -> dict[
         "sidebar-sel":         _alpha("primary", "pressed"),
         "cell-invalid-bg":     _alpha("danger",  "pressed"),
         "cell-warn-bg":        _alpha("warning", "pressed"),
+        "warn-bg":             _alpha("warning", "pressed"),  # warning callout fill
+        "warn-edge":           _alpha("warning", "hover"),    # warning callout border
         "cell-editable-bg":    _alpha("primary", "hover"),
         "cell-warn-row-bg":    _alpha("danger",  "hover"),
         "icon-brand":          raw.get("brand", raw.get("primary", "")),

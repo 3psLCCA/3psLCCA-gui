@@ -2,7 +2,6 @@ import math
 import datetime
 import time
 from three_ps_lcca_gui.gui.themes import get_token
-from three_ps_lcca_gui.gui.theme import FS_MD, FS_SM
 from ...utils.form_builder.form_builder import make_section_label
 
 from PySide6.QtWidgets import (
@@ -12,18 +11,20 @@ from PySide6.QtWidgets import (
     QPushButton,
     QLabel,
     QFrame,
-    QGroupBox,
+    QGridLayout,
     QTableWidget,
     QTableWidgetItem,
     QHeaderView,
     QScrollArea,
     QMessageBox,
+    QMenu,
 )
 from PySide6.QtCore import Qt, QTimer
 
 from .transport_dialog import TransportDialog
 from ...utils.definitions import STRUCTURE_CHUNKS, UNIT_DIMENSION
-from ...utils.table_widgets import TooltipTableMixin, WordWrapHeaderView, fit_to_contents
+from ...utils.table_widgets import TableCard, TooltipTableMixin, WordWrapHeaderView, fit_to_contents
+from three_ps_lcca_gui.gui.theme import SP1, SP2, SP3, SP4
 from ...utils.display_format import fmt, fmt_comma
 from ...utils.icons import make_icon, make_icon_btn
 from ...utils.validation_helpers import freeze_widgets
@@ -58,15 +59,33 @@ def _hline() -> QFrame:
     return f
 
 
-def _vline() -> QFrame:
-    f = QFrame()
-    f.setFrameShape(QFrame.VLine)
-    f.setFrameShadow(QFrame.Sunken)
-    return f
-
-
 def _section_label(text: str) -> QLabel:
     return make_section_label(text)
+
+
+def _named_label(text: str, name: str) -> QLabel:
+    """QLabel styled from main.qss through its object name."""
+    lbl = QLabel(text)
+    lbl.setObjectName(name)
+    return lbl
+
+
+def _stat_grid(pairs: list) -> tuple:
+    """Grid of muted labels over bold values, one column per pair.
+
+    Returns (QGridLayout, [value QLabel, ...]) so callers can update values.
+    """
+    grid = QGridLayout()
+    grid.setHorizontalSpacing(16)
+    grid.setVerticalSpacing(2)
+    values = []
+    for col, (label, value) in enumerate(pairs):
+        grid.addWidget(_named_label(label, "statLabel"), 0, col)
+        val = _named_label(value, "statValue")
+        grid.addWidget(val, 1, col)
+        grid.setColumnStretch(col, 1)
+        values.append(val)
+    return grid, values
 
 
 # ---------------------------------------------------------------------------
@@ -215,13 +234,13 @@ def calc_vehicle_emission(entry: dict, mat_index: dict) -> tuple:
 # ---------------------------------------------------------------------------
 
 
-class VehicleCard(QGroupBox):
-    """
-    Displays one vehicle entry with:
-    - Header: name, route, total emission
-    - Material breakdown table
-    - Warnings
-    - Edit / Trash buttons
+class VehicleCard(TableCard):
+    """One delivery, laid out like the structure table cards:
+
+        name  ·  origin · km  ----------  emission  [•••]
+        capacity · gross · empty · EF   (muted)
+        warning callout                 (if any)
+        material breakdown table
     """
 
     def __init__(
@@ -237,63 +256,61 @@ class VehicleCard(QGroupBox):
     ):
         v = entry.get("vehicle", {})
         r = entry.get("route", {})
-        from_loc   = r.get("origin", "").strip()
-        route_part = f"{from_loc}  |  " if from_loc else ""
-        title = (
-            f"{v.get('name', 'Delivery')}  -  "
-            f"{route_part}"
-            f"{fmt(r.get('distance_km', 0))} km  |  "
-            f"{fmt_comma(total_emission)} kgCO₂e"
+        table = self._build_table(mat_results)
+        super().__init__(table, title=(v.get("name") or "").strip() or "Delivery", parent=parent)
+
+        route = [p for p in ((r.get("origin") or "").strip(), f"{fmt(r.get('distance_km', 0))} km") if p]
+        self.set_count("  ·  ".join(route))
+        self.set_total(f"{fmt_comma(total_emission)} kgCO₂e")
+
+        menu = QMenu(self)
+        menu.setStyleSheet(
+            f"QMenu {{ padding: {SP1}px; }}"
+            f"QMenu::item {{ padding: {SP2}px {SP4}px {SP2}px {SP2}px; }}"
+            f"QMenu::icon {{ padding-left: {SP3}px; }}"
+            f"QMenu::separator {{ margin: {SP1}px {SP2}px; }}"
         )
-        super().__init__(title, parent)
+        edit_act = menu.addAction(make_icon("edit"), "Edit delivery")
+        edit_act.triggered.connect(on_edit)
+        menu.addSeparator()
+        trash_act = menu.addAction(make_icon("trash", color=get_token("danger")), "Remove delivery")
+        trash_act.triggered.connect(on_trash)
+        freeze_widgets(frozen, self.set_menu(menu))
 
-        layout = QVBoxLayout(self)
-        layout.setSpacing(6)
+        # vehicle specs and warnings sit between the heading row and the table,
+        # indented like the heading so the text lines up
+        gross = v.get("gross_weight", 0)
+        cap = v.get("capacity", 0)
+        empty = v.get("empty_weight", max(0.0, gross - cap))
+        specs = _named_label(
+            f"Capacity {fmt(cap)} t   ·   Gross {fmt(gross)} t   ·   "
+            f"Empty {fmt(empty)} t   ·   EF {fmt(v.get('emission_factor', 0))} kgCO₂e/t-km",
+            "cardCount",
+        )
+        specs.setWordWrap(True)
+        extra = QVBoxLayout()
+        extra.setContentsMargins(SP3, SP1, SP3, 0)
+        extra.setSpacing(SP2)
+        extra.addWidget(specs)
+        if warnings:
+            warn_box = QFrame()
+            warn_box.setObjectName("warnBox")
+            warn_layout = QHBoxLayout(warn_box)
+            warn_layout.setContentsMargins(10, 8, 10, 8)
+            warn_layout.setSpacing(8)
+            warn_layout.addWidget(_named_label("!", "warnIcon"), 0, Qt.AlignTop)
+            warn_text = _named_label("\n".join(warnings), "warnText")
+            warn_text.setWordWrap(True)
+            warn_layout.addWidget(warn_text, 1)
+            extra.addWidget(warn_box)
+        self.layout().insertLayout(1, extra)
 
-        # Vehicle specs row
-        specs_row = QHBoxLayout()
-        gross = v.get('gross_weight', 0)
-        cap = v.get('capacity', 0)
-        empty = v.get('empty_weight', max(0.0, gross - cap))
-        specs = [
-            f"Capacity: {fmt(cap)}t",
-            f"Gross Wt (loaded): {fmt(gross)}t",
-            f"Empty Wt: {fmt(empty)}t",
-            f"EF: {fmt(v.get('emission_factor', 0))} kgCO₂e/t-km",
-        ]
-        for spec in specs:
-            lbl = QLabel(spec)
-            lbl.setStyleSheet(f"font-size: {FS_SM}pt;")
-            specs_row.addWidget(lbl)
-            specs_row.addWidget(_vline())
-        specs_row.addStretch()
-        layout.addLayout(specs_row)
+        # bottom padding when there is no footer row under the table
+        self.layout().addSpacing(SP3)
+        table.setVisible(bool(mat_results))
 
-        # Warnings
-        for warn in warnings:
-            warn_lbl = QLabel(f"! {warn}")
-            warn_lbl.setWordWrap(True)
-            warn_lbl.setStyleSheet(f"font-size: {FS_SM}pt;")
-            layout.addWidget(warn_lbl)
-
-        # Materials table
-        if mat_results:
-            table = self._build_table(mat_results)
-            layout.addWidget(table)
-
-        # Buttons
-        btn_row = QHBoxLayout()
-        edit_btn = make_icon_btn("edit", "Edit Delivery", size=32, hover_color="241, 196, 15")
-        trash_btn = make_icon_btn("trash", "Remove", size=32, icon_color=get_token("danger"), hover_color="192, 57, 43")
-        edit_btn.clicked.connect(on_edit)
-        trash_btn.clicked.connect(on_trash)
-        freeze_widgets(frozen, edit_btn, trash_btn)
-        btn_row.addStretch()
-        btn_row.addWidget(edit_btn)
-        btn_row.addWidget(trash_btn)
-        layout.addLayout(btn_row)
-
-    def _build_table(self, mat_results: list) -> QTableWidget:
+    @staticmethod
+    def _build_table(mat_results: list) -> QTableWidget:
         table = _TransportEmissionsTable()
         table.setColumnCount(7)
         _L = Qt.AlignLeft  | Qt.AlignVCenter
@@ -327,39 +344,39 @@ class VehicleCard(QGroupBox):
             status = mat.get("status", "ok")
 
             if status == "ok":
-                table.setItem(row, 0, self._item(mat.get("name", "")))
-                table.setItem(row, 1, self._item(mat.get("category", "")))
-                table.setItem(row, 2, self._item(fmt(mat.get("kg_factor", 1)), Qt.AlignRight | Qt.AlignVCenter))
+                table.setItem(row, 0, VehicleCard._item(mat.get("name", "")))
+                table.setItem(row, 1, VehicleCard._item(mat.get("category", "")))
+                table.setItem(row, 2, VehicleCard._item(fmt(mat.get("kg_factor", 1)), Qt.AlignRight | Qt.AlignVCenter))
                 table.setItem(
                     row,
                     3,
-                    self._item(
+                    VehicleCard._item(
                         f"{mat.get('qty_kg', 0):,.0f}", Qt.AlignRight | Qt.AlignVCenter
                     ),
                 )
                 table.setItem(
                     row,
                     4,
-                    self._item(
+                    VehicleCard._item(
                         str(mat.get("trips", 0)), Qt.AlignRight | Qt.AlignVCenter
                     ),
                 )
                 table.setItem(
                     row,
                     5,
-                    self._item(
+                    VehicleCard._item(
                         fmt_comma(mat.get('emission', 0)),
                         Qt.AlignRight | Qt.AlignVCenter,
                     ),
                 )
 
                 warn = mat.get("warning", "")
-                warn_item = self._item(warn if warn else "", Qt.AlignCenter)
+                warn_item = VehicleCard._item(warn if warn else "", Qt.AlignCenter)
                 if warn:
                     # Truncate display text, full detail in tooltip
                     parts = warn.split(" | ")
                     display = parts[0] + (" ..." if len(parts) > 1 else "")
-                    warn_item = self._item(display, Qt.AlignCenter)
+                    warn_item = VehicleCard._item(display, Qt.AlignCenter)
                     # warn_item.setForeground(QColor("#874d00"))
                     # warn_item.setBackground(QColor("#fffbe6"))
                     # Bullet list in tooltip
@@ -368,17 +385,18 @@ class VehicleCard(QGroupBox):
                 table.setItem(row, 6, warn_item)
 
             else:
-                table.setItem(row, 0, self._item(mat.get("name", "")))
-                table.setItem(row, 1, self._item(mat.get("category", "")))
+                table.setItem(row, 0, VehicleCard._item(mat.get("name", "")))
+                table.setItem(row, 1, VehicleCard._item(mat.get("category", "")))
                 for c in range(2, 6):
-                    table.setItem(row, c, self._item("-", Qt.AlignCenter))
+                    table.setItem(row, c, VehicleCard._item("-", Qt.AlignCenter))
                 label = "In Trash" if status == "trashed" else "Removed"
                 # no cell colour: the "✕ In Trash" / "✕ Removed" text says it
-                warn_item = self._item(f"✕ {label}", Qt.AlignCenter)
+                warn_item = VehicleCard._item(f"✕ {label}", Qt.AlignCenter)
                 table.setItem(row, 6, warn_item)
         return table
 
-    def _item(self, text="", align=None) -> QTableWidgetItem:
+    @staticmethod
+    def _item(text="", align=None) -> QTableWidgetItem:
         it = QTableWidgetItem(text)
         it.setFlags(Qt.ItemIsEnabled)
         if align:
@@ -408,55 +426,68 @@ class TransportEmissions(QWidget):
             )
 
         outer = QVBoxLayout(self)
-        outer.setSpacing(8)
 
-        # ── Summary Bar ──────────────────────────────────────────────────
-        summary_bar = QWidget()
-        summary_layout = QHBoxLayout(summary_bar)
-        summary_layout.setContentsMargins(8, 8, 8, 8)
+        outer.setContentsMargins(0, 0, 0, 0)
 
-        self.total_lbl = QLabel("<b>Total Transport Emissions:</b> - kgCO₂e")
-        self.vehicle_lbl = QLabel("Vehicles: -")
-        self.add_btn = QPushButton("+ Add Delivery")
-        self.add_btn.setMinimumHeight(32)
-        self.add_btn.clicked.connect(self._open_add_dialog)
-
-        summary_layout.addWidget(self.total_lbl)
-        summary_layout.addWidget(_vline())
-        summary_layout.addWidget(self.vehicle_lbl)
-        summary_layout.addStretch()
-        summary_layout.addWidget(self.add_btn)
-        outer.addWidget(summary_bar)
-
-        # ── Details breakdown ─────────────────────────────────────────────
-        self.details_widget = QWidget()
-        details_layout = QHBoxLayout(self.details_widget)
-        details_layout.setContentsMargins(8, 0, 8, 8)
-
-        self.foundation_lbl = QLabel("Foundation: -")
-        self.sub_lbl = QLabel("Sub-Structure: -")
-        self.super_lbl = QLabel("Super-Structure: -")
-        self.misc_lbl = QLabel("Misc: -")
-
-        for lbl in [self.foundation_lbl, self.sub_lbl, self.super_lbl, self.misc_lbl]:
-            details_layout.addWidget(lbl)
-            details_layout.addWidget(_vline())
-
-        details_layout.addStretch()
-        outer.addWidget(self.details_widget)
-
-        outer.addWidget(_hline())
-
-        # ── Scroll area for vehicle cards ─────────────────────────────────
+        # ── Scroll area: summary card, then the delivery cards ───────────
+        # The summary scrolls with the list instead of staying pinned on top.
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.NoFrame)
+        page = QWidget()
+        page_layout = QVBoxLayout(page)
+        page_layout.setSpacing(16)
+        scroll.setWidget(page)
+        outer.addWidget(scroll)
 
+        # ── Summary card: total + Add, line, category totals ─────────────
+        summary = QFrame()
+        summary.setObjectName("transportSummary")
+        summary_layout = QVBoxLayout(summary)
+        summary_layout.setContentsMargins(20, 16, 20, 16)
+        summary_layout.setSpacing(14)
+
+        top = QHBoxLayout()
+        total_col = QVBoxLayout()
+        total_col.setSpacing(2)
+        total_col.addWidget(_named_label("Total transport emissions", "statLabel"))
+        self.total_lbl = _named_label("- kgCO₂e", "summaryTotal")
+        total_col.addWidget(self.total_lbl)
+        self.vehicle_lbl = _named_label("- vehicles", "statLabel")
+        total_col.addWidget(self.vehicle_lbl)
+        top.addLayout(total_col)
+        top.addStretch()
+
+        self.add_btn = QPushButton("+ Add Delivery")
+        self.add_btn.setMinimumHeight(32)
+        self.add_btn.clicked.connect(self._open_add_dialog)
+        top.addWidget(self.add_btn, 0, Qt.AlignVCenter)
+        summary_layout.addLayout(top)
+
+        summary_layout.addWidget(_hline())
+
+        cats, (
+            self.foundation_lbl,
+            self.sub_lbl,
+            self.super_lbl,
+            self.misc_lbl,
+        ) = _stat_grid([
+            ("Foundation", "- kgCO₂e"),
+            ("Sub-Structure", "- kgCO₂e"),
+            ("Super-Structure", "- kgCO₂e"),
+            ("Misc", "- kgCO₂e"),
+        ])
+        summary_layout.addLayout(cats)
+        page_layout.addWidget(summary)
+
+        page_layout.addWidget(_named_label("Deliveries", "deliveriesHeading"))
+
+        # ── Delivery cards (rebuilt by on_refresh) ───────────────────────
         self.container = QWidget()
         self.container_layout = QVBoxLayout(self.container)
+        self.container_layout.setContentsMargins(0, 0, 0, 0)
         self.container_layout.setSpacing(8)
-        scroll.setWidget(self.container)
-        outer.addWidget(scroll)
+        page_layout.addWidget(self.container, 1)
 
     # ── Refresh ──────────────────────────────────────────────────────────
 
@@ -527,20 +558,17 @@ class TransportEmissions(QWidget):
         self.container_layout.addStretch()
 
         # Update summary
-        self.total_lbl.setText(
-            f"<b>Total Transport Emissions:</b> {fmt_comma(total_emission)} kgCO₂e"
+        self.total_lbl.setText(f"{fmt_comma(total_emission)} kgCO₂e")
+        self.vehicle_lbl.setText(
+            f"{active_count} vehicle" + ("" if active_count == 1 else "s")
         )
-        self.vehicle_lbl.setText(f"Vehicles: {active_count}")
-        self.foundation_lbl.setText(
-            f"Foundation: {fmt_comma(cat_totals.get('Foundation', 0))}"
-        )
-        self.sub_lbl.setText(
-            f"Sub-Structure: {fmt_comma(cat_totals.get('Sub-Structure', 0))}"
-        )
-        self.super_lbl.setText(
-            f"Super-Structure: {fmt_comma(cat_totals.get('Super-Structure', 0))}"
-        )
-        self.misc_lbl.setText(f"Misc: {fmt_comma(cat_totals.get('Misc', 0))}")
+        for lbl, cat in (
+            (self.foundation_lbl, "Foundation"),
+            (self.sub_lbl, "Sub-Structure"),
+            (self.super_lbl, "Super-Structure"),
+            (self.misc_lbl, "Misc"),
+        ):
+            lbl.setText(f"{fmt_comma(cat_totals.get(cat, 0))} kgCO₂e")
 
     # ── Actions ──────────────────────────────────────────────────────────
 
