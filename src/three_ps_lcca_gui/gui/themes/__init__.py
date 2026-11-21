@@ -206,12 +206,12 @@ def _derive_compat_tokens(raw: dict[str, str], state: dict[str, float]) -> dict[
     These are tokens that aren't 1:1 mappings of the base palette.
     """
 
-    def _alpha(key: str, state_name: str) -> str:
-        """Return `key` colour at `state_name` opacity as #AARRGGBB."""
+    def _alpha(key: str, state_name: str | float) -> str:
+        """Return `key` colour at `state_name` opacity (or a 0-1 number) as #AARRGGBB."""
         hex_color = raw.get(key, "")
         if not hex_color:
             return ""
-        alpha = state.get(state_name, 0.0)
+        alpha = state_name if isinstance(state_name, float) else state.get(state_name, 0.0)
         c = QColor(hex_color)
         aa = round(alpha * 255)
         return f"#{aa:02x}{c.red():02x}{c.green():02x}{c.blue():02x}"
@@ -258,6 +258,7 @@ def _derive_compat_tokens(raw: dict[str, str], state: dict[str, float]) -> dict[
         "text-on-primary":     text_on_primary,
         "error":               raw.get("danger", ""),
         "icon-muted":          raw.get("text_disabled", ""),
+        "text-header":         _alpha("text_secondary", 0.75),  # faded table headers
     })
 
     # Add centralized font weights and sizes

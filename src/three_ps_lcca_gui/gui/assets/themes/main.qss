@@ -437,6 +437,8 @@ QTreeView::branch {
    rounded corners; none at the bottom so a footer row can follow */
 QTableView {
     border: none;
+    background-color: $base;
+    color: $text;
     gridline-color: $border-faint;  /* lines between cells, barely there */
     margin: $radius-lg $radius-lg 0px;
 }
@@ -453,16 +455,38 @@ QTableView#columnStylePinned {
     background-color: $base;
 }
 
+/* the header sits on the card colour; a firmer line under it sets it apart
+   from the rows */
+QHeaderView {
+    background-color: $base;
+    border: none;
+}
+
 QHeaderView::section {
-    padding: 4px 8px;
-    background-color: $window;
+    padding: 6px 8px;
+    background-color: $base;
+    color: $text-header;          /* faded: secondary text at 75% */
+    font-weight: $weight-medium;  /* theme.py FW_MEDIUM */
     border: none;
     border-right: 1px solid $border-faint;
-    border-bottom: 1px solid $border-faint;
+    border-bottom: 1px solid $border-subtle;
+}
+
+/* the last column has no neighbour to divide from */
+QHeaderView::section:horizontal:last {
+    border-right: none;
+}
+
+/* top-left square where the row and column headers meet */
+QTableCornerButton::section {
+    background-color: $base;
+    border: none;
+    border-right: 1px solid $border-faint;
+    border-bottom: 1px solid $border-subtle;
 }
 
 QTableView::item {
-    padding: 0px 8px;
+    padding: 6px 8px;
 }
 
 /* inputs placed in cells (TableSpinBox etc.) are part of the cell, not form
@@ -519,7 +543,20 @@ QPushButton#cardFooter {
     font-weight: $weight-semibold;
 }
 
-QPushButton#cardFooter:hover   { background-color: $primary-hover; }
+/* ••• "more actions" button (TableCard.set_menu): flat until hovered,
+   no dropdown arrow - the dots already say it opens a menu */
+QFrame#tableCard QToolButton {
+    background-color: transparent;
+    border: none;
+    border-radius: $radius-md;
+    color: $text_secondary;
+    font-weight: $weight-bold;
+}
+QFrame#tableCard QToolButton:hover   { background-color: $surface; color: $text; }
+QFrame#tableCard QToolButton:pressed { background-color: $surface_pressed; color: $text; }
+QFrame#tableCard QToolButton::menu-indicator { image: none; width: 0px; }
+
+QPushButton#cardFooter:hover  { background-color: $primary-hover; }
 QPushButton#cardFooter:pressed { background-color: $primary-active; }
 QPushButton#cardFooter:disabled { color: $text_disabled; }
 
