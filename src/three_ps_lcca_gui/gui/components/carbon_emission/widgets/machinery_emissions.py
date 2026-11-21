@@ -48,6 +48,7 @@ from ...utils.display_format import fmt, fmt_comma, DECIMAL_PLACES
 from ...utils.icons import make_icon
 from ...utils.table_widgets import (
     BaseActionDelegate,
+    TableCard,
     TooltipTableMixin,
     WordWrapHeaderView,
     fit_to_contents,
@@ -374,7 +375,9 @@ class _DetailedTable(QWidget):
         self._table.cellChanged.connect(self._on_cell_changed)
         self._table.cellDoubleClicked.connect(self._open_edit_dialog)
         fit_to_contents(self._table)
-        layout.addWidget(self._table)
+        card = TableCard(self._table, "Equipment")
+        card.count_rows()
+        layout.addWidget(card)
 
         # Action buttons: paint and handle clicks in the last column
         action_col = len(self.HEADERS) - 1

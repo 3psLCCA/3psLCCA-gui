@@ -17,12 +17,12 @@ from three_ps_lcca_gui.gui.themes import get_token, theme_manager
 from three_ps_lcca_gui.gui.theme import FS_SECTION
 
 from ...base_widget import ScrollableForm
-from ...utils.form_builder.form_definitions import FieldDef, Section
+from ...utils.form_builder.form_definitions import FieldDef
 from ...utils.form_builder.form_builder import build_form, make_section_header
 from ...utils.remarks_editor import RemarksEditor
 from ...utils.display_format import fmt
 from ...utils.table_widgets import (
-    EditableCellDelegate, TableDoubleSpinBox, TooltipTableMixin, fit_to_contents,
+    EditableCellDelegate, TableCard, TableDoubleSpinBox, TooltipTableMixin, fit_to_contents,
 )
 
 from ...utils.validation_helpers import confirm_clear_all
@@ -285,7 +285,6 @@ class TrafficEmissions(ScrollableForm):
         build_form(
             self,
             [
-                Section("Calculation Mode"),
                 FieldDef("mode", "Select Mode", "", "combo", options=_MODES, combo_placeholder=""),
             ],
         )
@@ -322,20 +321,12 @@ class TrafficEmissions(ScrollableForm):
 
         self._reroute_label = QLabel("-")
         calc_layout.addRow("Reroute Distance (from Traffic Data):", self._reroute_label)
-        for widget in make_section_header("Vehicle Emission Factors"):
-            calc_layout.addRow(widget)
 
         self._emissions_table = _EmissionsTable(
             on_change=self._on_field_changed,
             on_total_changed=self._refresh_total,
         )
-
-        table_container = QWidget()
-        table_layout = QHBoxLayout(table_container)
-        table_layout.setContentsMargins(0, 0, 0, 0)
-        table_layout.addWidget(self._emissions_table)
-
-        calc_layout.addRow(table_container)
+        calc_layout.addRow(TableCard(self._emissions_table, "Vehicle Emission Factors"))
 
         total_banner = QGroupBox()
         banner_layout = QHBoxLayout(total_banner)

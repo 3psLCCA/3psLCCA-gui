@@ -34,7 +34,8 @@ from ..utils.wpi_manager import WPIManager, WPIProfile
 from .wpi_table import _WPITable
 from .wpi_selector import _WPISelector
 from ..utils.table_widgets import (
-    EditableCellDelegate, TableDoubleSpinBox, TableSpinBox, TooltipTableMixin, fit_to_contents,
+    EditableCellDelegate, TableCard, TableDoubleSpinBox, TableSpinBox, TooltipTableMixin,
+    fit_to_contents,
 )
 from three_ps_lcca_gui.gui.themes import get_token
 
@@ -652,10 +653,8 @@ class TrafficData(ScrollableForm):
         india_layout.setFormAlignment(Qt.AlignTop | Qt.AlignLeft)
         india_layout.setVerticalSpacing(8)
 
-        for widget in make_section_header("Vehicle Traffic Data"):
-            india_layout.addRow(widget)
         self._vehicle_table = _VehicleTrafficTable(on_change=self._on_field_changed)
-        india_layout.addRow(self._vehicle_table)
+        india_layout.addRow(TableCard(self._vehicle_table, "Vehicle Traffic Data"))
 
         self._force_free_flow = QCheckBox("Force free-flow conditions off-peak")
         self._force_free_flow.setChecked(True)
@@ -671,10 +670,8 @@ class TrafficData(ScrollableForm):
         self.severity_major.valueChanged.connect(self._on_severity_changed)
         self.severity_fatal.valueChanged.connect(self._on_severity_changed)
 
-        for widget in make_section_header("Peak Hour Distribution"):
-            india_layout.addRow(widget)
         self._peak_table = _PeakHoursTable(on_change=self._on_field_changed)
-        india_layout.addRow(self._peak_table)
+        india_layout.addRow(TableCard(self._peak_table, "Peak Hour Distribution"))
 
         if hasattr(self, "alternate_road_carriageway"):
             self.alternate_road_carriageway.currentIndexChanged.connect(
@@ -685,7 +682,7 @@ class TrafficData(ScrollableForm):
             self._peak_table.rebuild(self.num_peak_hours.value())
 
         # ── WPI section (India only) ──────────────────────────────────────────
-        for widget in make_section_header("Wholesale Price Index (WPI) Adjustment Factors"):
+        for widget in make_section_header("Wholesale Price Index (WPI)"):
             india_layout.addRow(widget)
 
         # Unlisted warning (shown if any DB entries failed integrity on load)
@@ -718,7 +715,7 @@ class TrafficData(ScrollableForm):
         self._wpi_table = _WPITable(strict_read_only=True)
         self._wpi_table.data_changed.connect(self._on_field_changed)
         self._wpi_table.verticalHeader().sectionResized.connect(self._shrink_stack_to_current)
-        india_layout.addRow(self._wpi_table)
+        india_layout.addRow(TableCard(self._wpi_table, "Adjustment Factors"))
 
         if DEV:
             _print_btn = QPushButton("Print WPI Data")
