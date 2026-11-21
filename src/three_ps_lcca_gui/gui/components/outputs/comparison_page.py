@@ -72,7 +72,7 @@ from .helper_functions.lifecycle_summary import compute_all_summaries
 from .helper_functions.lcc_colors import COLORS as LCC_PALETTE
 from .lcc_data import _get, _MASTER_ROWS, BREAKDOWN_STAGES
 from .lcc_plot import _VerticalTextDelegate, LCCBreakdownTable, LCCDetailsTable
-from three_ps_lcca_gui.gui.components.utils.table_widgets import item_text_rect
+from three_ps_lcca_gui.gui.components.utils.table_widgets import item_text_rect, wrapped_text_size
 from .plots_helper.plot_utils import ChartToolbar, WheelForwarder
 from .table_export import attach_table_context_menu, create_export_button
 
@@ -1409,8 +1409,8 @@ class _ItemTickDelegate(QStyledItemDelegate):
     _TICK_GAP = 6  # tick to text
 
     def sizeHint(self, option, index):
-        # Qt's size for the text (style padding included) plus the tick
-        base = super().sizeHint(option, index)
+        # Qt's size, text measured in the width left after the padding and the tick
+        base = wrapped_text_size(self, option, index, self._TICK_W + self._TICK_GAP)
         return QSize(base.width() + self._TICK_W + self._TICK_GAP, base.height())
 
     def paint(self, painter, option, index):

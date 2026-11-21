@@ -11,6 +11,7 @@ Exports:
     TableLineEdit           - QLineEdit styled for table cells
     fit_to_contents         - let Qt size a table from its labels and rows
     item_text_rect          - the style's text rect for a cell (QSS padding included)
+    wrapped_text_size       - a cell's size with wrapped text measured where it is painted
     TableCard               - a table in a rounded box with a heading row and "+ Add" row
 """
 from PySide6.QtWidgets import (
@@ -59,6 +60,29 @@ def item_text_rect(delegate: QStyledItemDelegate, option, index) -> QRect:
     delegate.initStyleOption(opt, index)
     style = opt.widget.style() if opt.widget else QApplication.style()
     return style.subElementRect(QStyle.SE_ItemViewItemText, opt, opt.widget)
+
+
+def wrapped_text_size(delegate: QStyledItemDelegate, option, index, inset_left=0) -> QSize:
+    """Qt's size for a cell, with wrapped text measured at the width it is painted
+    in (item_text_rect, less ``inset_left``). Qt measures at the full cell width,
+    ignoring the QSS ``::item`` padding, so a row could come out a line short."""
+    base = QStyledItemDelegate.sizeHint(delegate, option, index)
+    opt = QStyleOptionViewItem(option)
+    delegate.initStyleOption(opt, index)
+    if not (opt.features & QStyleOptionViewItem.WrapText) or not opt.text or option.rect.width() <= 0:
+        return base
+    rect = item_text_rect(delegate, option, index)
+    text_h = opt.fontMetrics.boundingRect(
+        QRect(0, 0, max(rect.width() - inset_left, 1), 1_000_000), Qt.TextWordWrap, opt.text
+    ).height()
+    return QSize(base.width(), max(base.height(), text_h + option.rect.height() - rect.height()))
+
+
+class WrapTextDelegate(QStyledItemDelegate):
+    """Default cell painting; row height from wrapped_text_size."""
+
+    def sizeHint(self, option, index):
+        return wrapped_text_size(self, option, index)
 
 
 class WordWrapHeaderView(QHeaderView):
@@ -516,6 +540,8 @@ def fit_to_contents(table):
     table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
     table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
     table.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+    if type(table.itemDelegate()) is QStyledItemDelegate:  # Qt's default, not a custom one
+        table.setItemDelegate(WrapTextDelegate(table))
 
 
 # ---------------------------------------------------------------------------
