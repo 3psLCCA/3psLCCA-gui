@@ -22,7 +22,6 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QTimer
 
 from .transport_dialog import TransportDialog
-from PySide6.QtGui import QColor
 from ...utils.definitions import STRUCTURE_CHUNKS, UNIT_DIMENSION
 from ...utils.table_widgets import TooltipTableMixin, WordWrapHeaderView, fit_to_contents
 from ...utils.display_format import fmt, fmt_comma
@@ -374,9 +373,8 @@ class VehicleCard(QGroupBox):
                 for c in range(2, 6):
                     table.setItem(row, c, self._item("-", Qt.AlignCenter))
                 label = "In Trash" if status == "trashed" else "Removed"
+                # no cell colour: the "✕ In Trash" / "✕ Removed" text says it
                 warn_item = self._item(f"✕ {label}", Qt.AlignCenter)
-                warn_item.setForeground(QColor(get_token("")))
-                warn_item.setBackground(QColor(get_token("warning")))
                 table.setItem(row, 6, warn_item)
         return table
 
