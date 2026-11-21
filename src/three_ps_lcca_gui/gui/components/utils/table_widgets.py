@@ -11,7 +11,6 @@ Exports:
     TableLineEdit           - QLineEdit styled for table cells
     fit_to_contents         - let Qt size a table from its labels and rows
     item_text_rect          - the style's text rect for a cell (QSS padding included)
-    FrozenActionColumn      - Action column pinned over a table's right edge
     TableCard               - a table in a rounded box with a heading row and "+ Add" row
 """
 from PySide6.QtWidgets import (
@@ -31,13 +30,11 @@ from PySide6.QtWidgets import (
     QStyleOptionHeader,
     QStyleOptionViewItem,
     QStyle,
-    QTableWidget,
-    QTableWidgetItem,
     QToolButton,
     QToolTip,
     QVBoxLayout,
 )
-from PySide6.QtCore import Qt, QObject, QSize, QRect, QEvent, QModelIndex, Signal
+from PySide6.QtCore import Qt, QObject, QSize, QRect, QEvent
 from PySide6.QtGui import QPainter, QColor
 from shiboken6 import isValid
 from three_ps_lcca_gui.gui.assets.themes.table_style import COL_MIN_ROLE
@@ -519,124 +516,6 @@ def fit_to_contents(table):
     table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
     table.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Minimum)
     table.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-
-
-# ---------------------------------------------------------------------------
-# Floating Action column
-# ---------------------------------------------------------------------------
-
-
-class FrozenActionColumn(QTableWidget):
-    """One-column "Action" table pinned over the right edge of a main table.
-
-    Follows Qt's Frozen Column pattern: the overlay is a child of the main
-    table and is kept in step with it through signals, so it never scrolls
-    sideways and its rows always line up.
-
-    - Vertical scrolling is linked both ways.
-    - Row heights follow the main table's ``sectionResized`` signal.
-    - The header height follows the main header's ``geometriesChanged``.
-
-    The width is Qt's: the wider of the header label and the delegate's
-    buttons, both measured by the style. ``widthChanged`` tells the main
-    table, which keeps that much free on the right (a placeholder column
-    and/or ``setViewportMargins``) so no value sits under the overlay. Its
-    rows are never shorter than the action delegate's buttons.
-    """
-
-    widthChanged = Signal(int)
-
-    def __init__(self, parent_table: QTableWidget, title: str = "Action"):
-        super().__init__(parent_table)
-        self.setObjectName("actionColumn")  # main.qss: #actionColumn
-        self._parent_table = parent_table
-        self._width = 0
-
-        # Set the header here: main.py's filter swaps a plain header later,
-        # after reposition() has fixed its height, which left the Action
-        # header and rows out of line with the main table.
-        self.setHorizontalHeader(WordWrapHeaderView(Qt.Horizontal))
-        self.setColumnCount(1)
-        hdr_item = QTableWidgetItem(title)
-        hdr_item.setTextAlignment(Qt.AlignCenter | Qt.AlignVCenter)
-        self.setHorizontalHeaderItem(0, hdr_item)
-
-        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.setFocusPolicy(Qt.NoFocus)
-        self.setSelectionMode(QTableWidget.NoSelection)
-        self.setFrameShape(QTableWidget.NoFrame)
-
-        self.verticalHeader().setVisible(False)
-        self.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
-
-        main_bar, own_bar = parent_table.verticalScrollBar(), self.verticalScrollBar()
-        main_bar.valueChanged.connect(own_bar.setValue)
-        own_bar.valueChanged.connect(main_bar.setValue)
-        parent_table.verticalHeader().sectionResized.connect(self._on_row_resized)
-        parent_table.horizontalHeader().geometriesChanged.connect(self._on_header_changed)
-
-    def setItemDelegateForColumn(self, column, delegate):
-        super().setItemDelegateForColumn(column, delegate)
-        # main-table rows must fit the buttons this delegate paints
-        btn_h = delegate.sizeHint(QStyleOptionViewItem(), QModelIndex()).height()
-        self._parent_table.verticalHeader().setMinimumSectionSize(btn_h)
-        self.update_width()
-
-    # ---- rows ----------------------------------------------------------
-    def _on_row_resized(self, row: int, _old: int, new: int):
-        if row < self.rowCount():
-            self.setRowHeight(row, new)
-
-    def sync_row_heights(self):
-        p = self._parent_table
-        for r in range(min(self.rowCount(), p.rowCount())):
-            self.setRowHeight(r, p.rowHeight(r))
-
-    def add_row(self, data=None):
-        """Append a row; ``data`` (default: the row index) goes in UserRole."""
-        row = self.rowCount()
-        self.insertRow(row)
-        p = self._parent_table
-        if row < p.rowCount():
-            self.setRowHeight(row, p.rowHeight(row))
-        item = QTableWidgetItem()
-        item.setData(Qt.UserRole, row if data is None else data)
-        item.setFlags(Qt.ItemIsEnabled)
-        self.setItem(row, 0, item)
-
-    def clear_rows(self):
-        self.setRowCount(0)
-
-    # ---- geometry ------------------------------------------------------
-    def _on_header_changed(self):
-        # The header still emits while the main table is being deleted.
-        if isValid(self) and isValid(self._parent_table):
-            self.reposition()
-
-    def update_width(self) -> int:
-        """Take Qt's width for the column; tell the main table if it changed."""
-        d = self.itemDelegateForColumn(0)
-        btn_w = d.sizeHint(QStyleOptionViewItem(), QModelIndex()).width() if d else 0
-        w = max(self.horizontalHeader().sectionSizeFromContents(0).width(), btn_w)
-        if w != self._width:
-            self._width = w
-            self.widthChanged.emit(w)
-        return w
-
-    def reposition(self):
-        """Sit on the right edge, header level with the main header."""
-        self.update_width()
-        p = self._parent_table
-        hdr_h = p.horizontalHeader().height()
-        self.horizontalHeader().setFixedHeight(hdr_h)
-        vp = p.viewport()
-        # a floating child sits outside any layout, so it is placed by hand;
-        # contentsRect is Qt's area inside the table's frame and QSS margin
-        self.setGeometry(p.contentsRect().right() + 1 - self._width, vp.y() - hdr_h,
-                         self._width, vp.height() + hdr_h)
-        self.raise_()
 
 
 # ---------------------------------------------------------------------------

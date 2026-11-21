@@ -23,7 +23,6 @@ from PySide6.QtWidgets import (
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
-    QHeaderView,
     QLabel,
     QLineEdit,
     QMessageBox,
@@ -32,12 +31,13 @@ from PySide6.QtWidgets import (
     QSizePolicy,
     QSpinBox,
     QStackedWidget,
+    QStyleOptionViewItem,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
     QWidget,
 )
-from PySide6.QtCore import Qt, QEvent, QRect
+from PySide6.QtCore import Qt, QEvent, QModelIndex
 from PySide6.QtGui import QFont
 
 from ...base_widget import ScrollableForm
@@ -48,10 +48,15 @@ from ...utils.display_format import fmt, fmt_comma, DECIMAL_PLACES
 from ...utils.icons import make_icon
 from ...utils.table_widgets import (
     BaseActionDelegate,
-    FrozenActionColumn,
     TooltipTableMixin,
     WordWrapHeaderView,
     fit_to_contents,
+)
+from three_ps_lcca_gui.gui.assets.themes.column_style import (
+    apply_column_style,
+    pin_last_column,
+    pinned_view,
+    refit,
 )
 from ...utils.validation_helpers import freeze_widgets, confirm_clear_all
 
@@ -216,9 +221,7 @@ _LUMPSUM_KEYS = [
 
 
 class _ActionDelegate(BaseActionDelegate):
-    """Paints circular Edit and Delete buttons in the frozen action column."""
-
-    BTN_GAP = 8
+    """Paints circular Edit and Delete buttons in the table's Action column."""
 
     def __init__(self, table, detail_table):
         super().__init__(table)
@@ -227,35 +230,9 @@ class _ActionDelegate(BaseActionDelegate):
             (make_icon("edit"), (46, 204, 113), "edit", "Edit"),
             (make_icon("trash", color=get_token("danger")), (231, 76, 60), "delete", "Remove row"),
         ]
-        # Also watch the frozen table widget itself so Leave clears hover
-        # even when the cursor exits via the frame/header rather than the viewport.
-        table.setMouseTracking(True)
-        table.installEventFilter(self)
-
-    def eventFilter(self, obj, event):
-        # Clear hover when the mouse leaves the entire frozen column widget.
-        try:
-            vp = self._table.viewport()
-        except RuntimeError:
-            return False
-        if obj is self._table and event.type() == QEvent.Leave:
-            self._set_hovered(-1, -1)
-            return False
-        # Delegate standard viewport hover tracking to the base class.
-        return super().eventFilter(obj, event)
 
     def _get_btns_for_row(self, row) -> list[tuple]:
         return [(icon, hover_rgb, tooltip) for icon, hover_rgb, _, tooltip in self._btns]
-
-    def _btn_rects(self, cell_rect, n):
-        """Center all buttons horizontally within the cell."""
-        total_w = n * self.BTN_SIZE + (n - 1) * self.BTN_GAP
-        x0 = cell_rect.x() + (cell_rect.width() - total_w) // 2
-        y = cell_rect.y() + (cell_rect.height() - self.BTN_SIZE) // 2
-        return [
-            QRect(x0 + i * (self.BTN_SIZE + self.BTN_GAP), y, self.BTN_SIZE, self.BTN_SIZE)
-            for i in range(n)
-        ]
 
     def editorEvent(self, event, model, option, index):
         if self._frozen:
@@ -370,8 +347,7 @@ class _DetailedTable(QWidget):
         ("EF\n(kg CO₂e/unit)",  Qt.AlignLeft   | Qt.AlignVCenter),  # 5
         ("Consumption",         Qt.AlignLeft   | Qt.AlignVCenter),  # 6
         ("Emissions\n(kg CO₂e)", Qt.AlignLeft   | Qt.AlignVCenter),  # 7
-        ("Action",              Qt.AlignCenter | Qt.AlignVCenter),  # 8 hidden - frozen overlay
-        ("",                    Qt.AlignCenter | Qt.AlignVCenter),  # 9 placeholder - reserves the Action width
+        ("Action",              Qt.AlignCenter | Qt.AlignVCenter),  # 8  buttons, pinned to the right edge
     ]
     def __init__(self, on_change, parent=None):
         super().__init__(parent)
@@ -384,42 +360,34 @@ class _DetailedTable(QWidget):
 
         # Table - Qt sizes it from its rows (fit_to_contents)
         self._table = _MachineryTable(0, len(self.HEADERS))
-        self._table.setHorizontalHeader(WordWrapHeaderView(Qt.Horizontal))  # before the overlay syncs to it
+        self._table.setHorizontalHeader(WordWrapHeaderView(Qt.Horizontal))
         for col, (label, align) in enumerate(self.HEADERS):
             item = QTableWidgetItem(label)
             item.setTextAlignment(align)
             self._table.setHorizontalHeaderItem(col, item)
-        # Name and source share the spare width; number columns fit contents
-        hh = self._table.horizontalHeader()
-        hh.setSectionResizeMode(QHeaderView.ResizeToContents)
-        hh.setSectionResizeMode(0, QHeaderView.Stretch)
-        hh.setSectionResizeMode(1, QHeaderView.Stretch)
-        hh.setStretchLastSection(False)
-        hh.setSectionResizeMode(8, QHeaderView.Fixed)
-        self._table.setColumnWidth(8, 0)
-        self._table.setColumnHidden(8, True)
-        hh.setSectionResizeMode(9, QHeaderView.Fixed)
         self._table.verticalHeader().setVisible(False)
         self._table.setEditTriggers(QTableWidget.NoEditTriggers)
         self._table.setSelectionMode(QTableWidget.SingleSelection)
         self._table.setSelectionBehavior(QTableWidget.SelectRows)
 
         self._table.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
-        self._table.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self._table.cellChanged.connect(self._on_cell_changed)
         self._table.cellDoubleClicked.connect(self._open_edit_dialog)
-        self._table.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         fit_to_contents(self._table)
         layout.addWidget(self._table)
 
-        self._frozen_col = FrozenActionColumn(self._table)
-        self._frozen_col.widthChanged.connect(self._reserve_action_width)
-        self._frozen_col.setMouseTracking(True)            # hover on the buttons
-        self._frozen_col.viewport().setMouseTracking(True)
-        self._action_delegate = _ActionDelegate(self._frozen_col, self)
-        self._frozen_col.setItemDelegateForColumn(0, self._action_delegate)
-        self._frozen_col.show()
-        self._frozen_col.raise_()
+        # Action buttons: paint and handle clicks in the last column
+        action_col = len(self.HEADERS) - 1
+        self._action_delegate = _ActionDelegate(self._table, self)
+        self._table.setItemDelegateForColumn(action_col, self._action_delegate)
+        btn_h = self._action_delegate.sizeHint(QStyleOptionViewItem(), QModelIndex()).height()
+        self._table.verticalHeader().setMinimumSectionSize(btn_h)  # rows fit the buttons
+
+        # widths from the header labels (assets/themes/column_style.py).
+        # The table scrolls sideways itself, with Action pinned to its right edge.
+        apply_column_style(self._table)
+        pin_last_column(self._table)
+        self._action_delegate.track(pinned_view(self._table))
 
         # Subtotals
         sub_layout = QHBoxLayout()
@@ -464,30 +432,11 @@ class _DetailedTable(QWidget):
     # ── Height management ─────────────────────────────────────────────────
 
     def _refresh_table_height(self):
-        """Row count changed: let the table re-report its content height so the
-        layout re-fits it, then move the frozen action-column overlay to match."""
+        """Row count changed: re-fit columns, rows and the pinned Action column,
+        and let the table re-report its content height to the layout."""
+        refit(self._table)
         self._table.updateGeometry()
         self.updateGeometry()
-        if hasattr(self, "_frozen_col"):
-            self._frozen_col.reposition()
-            self._frozen_col.sync_row_heights()
-
-    def _reserve_action_width(self, w: int):
-        # placeholder col and right margin keep content out of the overlay zone
-        self._table.setColumnWidth(9, w)
-        self._table.setViewportMargins(0, 0, w, 0)
-
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        if not hasattr(self, "_frozen_col"):
-            return
-        self._frozen_col.reposition()
-        self._frozen_col.sync_row_heights()
-
-    def showEvent(self, event):
-        super().showEvent(event)
-        if hasattr(self, "_frozen_col"):
-            self._frozen_col.reposition()
 
     # ── Row management ────────────────────────────────────────────────────
 
@@ -552,10 +501,8 @@ class _DetailedTable(QWidget):
         action_item.setData(Qt.UserRole, row_idx)
         action_item.setFlags(Qt.ItemIsEnabled)
         self._table.setItem(row_idx, 8, action_item)
-        self._table.setItem(row_idx, 9, QTableWidgetItem())
 
         self._table.blockSignals(False)
-        self._frozen_col.add_row()
         self._refresh_table_height()
         self._recalculate()
 
@@ -596,7 +543,6 @@ class _DetailedTable(QWidget):
         if not (0 <= row_idx < self._table.rowCount()):
             return
         self._table.removeRow(row_idx)
-        self._frozen_col.removeRow(row_idx)
         self._refresh_table_height()
         self._recalculate()
 
@@ -619,7 +565,6 @@ class _DetailedTable(QWidget):
             if not confirm_clear_all(self):
                 return
         self._table.setRowCount(0)
-        self._frozen_col.setRowCount(0)
         self._cached_total = 0.0
         self._refresh_table_height()
         self._recalculate()

@@ -441,9 +441,8 @@ QTableView {
     margin: $radius-lg $radius-lg 0px;
 }
 
-/* the frozen Action column sits inside its table's margin already,
+/* the pinned Action column sits inside its table's margin already,
    so it must not add its own */
-QTableView#actionColumn,
 QTableView#columnStylePinned {
     margin: 0px;
 }
