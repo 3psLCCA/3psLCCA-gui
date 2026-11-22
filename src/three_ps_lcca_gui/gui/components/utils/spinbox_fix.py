@@ -8,7 +8,7 @@ editor to the padding defined in main.qss (6px 12px, 1px border, 18px buttons).
 Table-cell spin boxes handle this themselves (see table_widgets._FitEditorMixin).
 """
 
-from PySide6.QtCore import QObject, QEvent
+from PySide6.QtCore import QObject, QEvent, QTimer
 from PySide6.QtWidgets import QAbstractSpinBox
 
 _SIDE = 13      # 1px border + 12px padding (matches main.qss)
@@ -31,7 +31,9 @@ class SpinBoxFitFilter(QObject):
             and isinstance(obj, QAbstractSpinBox)
             and type(obj).__name__ not in ("TableSpinBox", "TableDoubleSpinBox")
         ):
-            _fit(obj)
+            # Defer: the filter runs before QAbstractSpinBox's own resizeEvent,
+            # which would lay the editor out again at x=0.
+            QTimer.singleShot(0, obj, lambda: _fit(obj))
         return False
 
 
