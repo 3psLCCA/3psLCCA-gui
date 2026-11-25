@@ -174,7 +174,7 @@ class StructureSummaryWidget(ItemsByTabView):
         top = QHBoxLayout()
         total_col = QVBoxLayout()
         total_col.setSpacing(2)
-        caption = QLabel("Grand total")
+        caption = QLabel("Initial Construction Cost")
         caption.setFont(font(FS_SM))
         caption.setStyleSheet(f"color: {muted};")
         self.total_lbl = QLabel()
@@ -225,7 +225,7 @@ class StructureSummaryWidget(ItemsByTabView):
         icon = QLabel()
         # at the screen's scale, so it stays sharp on 125% / 150% displays
         icon.setPixmap(make_icon("download", color=base).pixmap(QSize(16, 16), self.devicePixelRatioF()))
-        label = QLabel("Export BOQ")
+        label = QLabel("Export Priced BOQ")
         label.setFont(font(FS_MD, FW_SEMIBOLD))
         label.setStyleSheet(f"color: {base};")
         self.fmt_badge = QLabel()
