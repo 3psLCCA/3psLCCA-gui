@@ -140,12 +140,26 @@ def test_existing_rows_count_as_warnings(preview):
     assert "(2 ✗)" in preview.tabs.tabText(0)  # errors win over warnings
 
 
-def test_tinted_rows_keep_the_theme_text_colour(preview):
+def _status(tbl, row):
+    item = tbl.item(row, _col("_issues"))
+    return item.text(), item.data(ei._STATE_ROLE)
+
+
+def test_problem_rows_show_a_status_pill_not_a_tint(preview):
     tbl = _block(preview, "Excavation")._tbl
-    for row in (0, 2):  # warning row, error row
+    assert _status(tbl, 0) == ("Name exists", "warn")
+    assert _status(tbl, 1) == ("", "")  # fine: no pill
+    assert _status(tbl, 2) == ("Missing Rate", "error")
+    for row in range(3):
         item = tbl.item(row, _col("name"))
-        assert item.background().style() != Qt.NoBrush
+        assert item.background().style() == Qt.NoBrush
         assert item.data(Qt.ForegroundRole) is None
+
+
+def test_status_is_the_first_column_after_the_tick_box(preview):
+    tbl = _block(preview, "Excavation")._tbl
+    assert _col("_issues") == ei._CB_COL + 1
+    assert tbl.horizontalHeaderItem(_col("_issues")).text() == "Status"
 
 
 def test_fixing_rows_updates_tab_and_footer(preview, qapp):
@@ -178,7 +192,7 @@ def test_renaming_to_an_existing_name_marks_and_unticks_it(preview, qapp):
 
     tbl.item(1, _col("name")).setText("Fresh name")  # and away again
     qapp.processEvents()
-    assert tbl.item(1, _col("_issues")).text() == "OK"
+    assert _status(tbl, 1) == ("", "")
     assert "Warnings: 1" in _text(preview._summary_lbl)
 
 

@@ -41,8 +41,8 @@ from typing import Any
 
 import pandas as pd
 
-from PySide6.QtCore import Qt, QEvent, QTimer, Signal
-from PySide6.QtGui import QColor, QBrush, QDoubleValidator
+from PySide6.QtCore import Qt, QEvent, QRect, QSize, QTimer, Signal
+from PySide6.QtGui import QColor, QBrush, QDoubleValidator, QPainter
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -58,7 +58,9 @@ from PySide6.QtWidgets import (
     QPushButton,
     QScrollArea,
     QSizePolicy,
+    QStyle,
     QStyledItemDelegate,
+    QStyleOptionViewItem,
     QTabWidget,
     QTableWidget,
     QTableWidgetItem,
@@ -67,7 +69,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtWidgets import QButtonGroup, QRadioButton, QGroupBox
 from three_ps_lcca_gui.gui.themes import get_token
-from three_ps_lcca_gui.gui.theme import SP2, SP3, SP4
+from three_ps_lcca_gui.gui.theme import SP1, SP2, SP3, SP4
 from .widgets.material_dialog import build_excel_snapshot
 import sys
 from ..utils.unit_resolver import (
@@ -80,6 +82,7 @@ from ..utils.table_widgets import TableCard, fit_to_contents
 from PySide6.QtWidgets import QPlainTextEdit
 import traceback
 import json
+import re
 import datetime as _dt
 
 # ---------------------------------------------------------------------------
@@ -687,6 +690,7 @@ def _validate_for_engine(
 
 # (internal_field, header_label, numeric_only)
 IMPORT_COLUMNS: list[tuple[str, str, bool]] = [
+    ("_issues", "Status", False),  # first: the reason sits beside the tick box
     ("src_id", "ID", False),
     ("name", "Name *", False),
     ("quantity", "Quantity", True),
@@ -699,11 +703,10 @@ IMPORT_COLUMNS: list[tuple[str, str, bool]] = [
     ("carbon_emission_src", "Carbon EF Source", False),
     ("scrap_rate", "Scrap Rate", True),
     ("recovery_pct", "Recovery %", True),
-    ("_issues", "Issues", False),
 ]
 
 # Free-text columns share the spare width; the rest fit their contents
-_STRETCH_FIELDS = {"name", "rate_src", "carbon_emission_src", "_issues"}
+_STRETCH_FIELDS = {"name", "rate_src", "carbon_emission_src"}
 
 # Col 0 is the selection checkbox; all IMPORT_COLUMNS data starts at col 1
 _CB_COL = 0
@@ -714,6 +717,88 @@ _ISSUES_COL = (
     next(i for i, (f, _, _n) in enumerate(IMPORT_COLUMNS) if f == "_issues")
     + _DATA_START
 )
+
+
+# Status cell: "error" / "warn" decides the pill colour, "" draws no pill
+_STATE_ROLE = Qt.UserRole + 2
+
+_FIELD_LABEL = {f: lbl.rstrip(" *") for f, lbl, _n in IMPORT_COLUMNS}
+
+# warning message start -> short pill text
+_SHORT_WARNINGS = (
+    ("Unknown unit", "Unknown unit"),
+    ("Rate is negative", "Negative rate"),
+    ("Rate is zero", "Zero rate"),
+    ("carbon_emission provided", "No carbon unit"),
+    ("Carbon emission factor is zero", "Zero carbon EF"),
+    ("CID#ID", "Duplicate ID"),
+    ("Component '", "Merged component"),
+)
+
+
+def _short_issue(msg: str) -> str:
+    """A few words for the pill; the full message stays in the tooltip."""
+    m = re.match(r"Missing required field: '(\w+)'", msg)
+    if m:
+        return f"Missing {_FIELD_LABEL.get(m[1], m[1])}"
+    m = re.match(r"'(\w+)' must be a number", msg)
+    if m:
+        return f"{_FIELD_LABEL.get(m[1], m[1])} not a number"
+    for start, text in _SHORT_WARNINGS:
+        if msg.startswith(start):
+            return text
+    return msg[:30]
+
+
+def _status(record: dict) -> tuple[str, str]:
+    """(pill text, state) for a row; ("", "") when it has no problem.
+    Errors win over warnings, warnings over an existing name."""
+    errs = record.get("_errors") or []
+    warns = record.get("_warnings") or []
+    if errs:
+        return (_short_issue(errs[0]) if len(errs) == 1 else f"{len(errs)} errors"), "error"
+    if warns:
+        return (_short_issue(warns[0]) if len(warns) == 1 else f"{len(warns)} warnings"), "warn"
+    if record.get("_duplicate_name"):
+        return "Name exists", "warn"
+    return "", ""
+
+
+class _StatusPillDelegate(QStyledItemDelegate):
+    """Status column: the row's problem as a rounded pill in the danger or
+    warning colours; nothing for a row that is fine."""
+
+    # same fills the rows used to be tinted with
+    _COLORS = {"error": ("danger", "cell-invalid-bg"), "warn": ("warning", "cell-warn-bg")}
+
+    def paint(self, painter, option, index):
+        opt = QStyleOptionViewItem(option)
+        self.initStyleOption(opt, index)
+        text, opt.text = opt.text, ""  # cell background only; the pill is the text
+        style = opt.widget.style() if opt.widget else QApplication.style()
+        style.drawControl(QStyle.CE_ItemViewItem, opt, painter, opt.widget)
+
+        colors = self._COLORS.get(index.data(_STATE_ROLE))
+        if not text or not colors:
+            return
+        fg, bg = colors
+        fm = opt.fontMetrics
+        pill = QRect(0, 0, fm.horizontalAdvance(text) + 2 * SP2, fm.height() + SP1)
+        pill.moveCenter(opt.rect.center())
+        pill.moveLeft(opt.rect.left() + SP2)  # the cell's left padding
+        radius = pill.height() / 2
+        painter.save()
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(QColor(get_token(bg)))
+        painter.drawRoundedRect(pill, radius, radius)
+        painter.setPen(QColor(get_token(fg)))
+        painter.drawText(pill, Qt.AlignCenter, text)
+        painter.restore()
+
+    def sizeHint(self, option, index):
+        size = super().sizeHint(option, index)
+        return QSize(size.width() + 2 * SP2, size.height())  # pill's own padding
 
 
 # ---------------------------------------------------------------------------
@@ -730,6 +815,7 @@ class _CellDelegate(QStyledItemDelegate):
 
     def createEditor(self, parent, option, index):
         editor = QLineEdit(parent)
+        editor.setObjectName("importCellEditor")  # opaque in main.qss
         if self._numeric:
             validator = QDoubleValidator(editor)
             validator.setNotation(QDoubleValidator.StandardNotation)
@@ -796,6 +882,9 @@ class ImportComponentTable(QTableWidget):
         _numeric_delegate = _CellDelegate(numeric=True, parent=self)
         for col, (field, _, numeric) in enumerate(IMPORT_COLUMNS):
             if field == "_issues":
+                self.setItemDelegateForColumn(
+                    col + _DATA_START, _StatusPillDelegate(self)
+                )
                 continue
             actual_col = col + _DATA_START
             self.setItemDelegateForColumn(
@@ -839,22 +928,7 @@ class ImportComponentTable(QTableWidget):
         warns = record.get("_warnings", [])
         is_dup = bool(record.get("_duplicate_name")) and not bool(errs)
         has_error = bool(errs)
-        has_warn = (bool(warns) or is_dup) and not has_error
-        
-        # Use theme-aware alpha-blended backgrounds
-        color = QColor(get_token("cell-invalid-bg")) if has_error else (QColor(get_token("cell-warn-bg")) if has_warn else None)
-
-        # Short label shown in the Issues cell
-        if errs:
-            issues_short = f"{len(errs)} error(s)" if len(errs) > 1 else errs[0][:60]
-        elif warns:
-            issues_short = (
-                f"{len(warns)} warning(s)" if len(warns) > 1 else warns[0][:60]
-            )
-        elif is_dup:
-            issues_short = "Name exists"
-        else:
-            issues_short = "OK"
+        status, state = _status(record)  # pill in the Status cell; rows are not tinted
 
         # Full detail shown as tooltip on hover
         all_issues = errs + warns
@@ -885,14 +959,12 @@ class ImportComponentTable(QTableWidget):
         for col, (field, _, _numeric) in enumerate(IMPORT_COLUMNS):
             actual_col = col + _DATA_START
             if field == "_issues":
-                item = QTableWidgetItem(issues_short)
+                item = QTableWidgetItem(status)
+                item.setData(_STATE_ROLE, state)
                 item.setFlags(item.flags() & ~Qt.ItemIsEditable)
             else:
                 item = QTableWidgetItem(str(record.get(field, "") or ""))
                 item.setData(Qt.UserRole, field)
-
-            if color is not None:
-                item.setBackground(QBrush(color))
 
             if tooltip:
                 item.setToolTip(tooltip)
@@ -949,37 +1021,23 @@ class ImportComponentTable(QTableWidget):
 
         errs = record.get("_errors", [])
         warns = record.get("_warnings", [])
-        is_dup = bool(record.get("_duplicate_name")) and not bool(errs)
         has_error = bool(errs)
-        has_warn = (bool(warns) or is_dup) and not has_error
-
-        if errs:
-            issues_short = f"{len(errs)} error(s)" if len(errs) > 1 else errs[0][:60]
-        elif warns:
-            issues_short = (
-                f"{len(warns)} warning(s)" if len(warns) > 1 else warns[0][:60]
-            )
-        elif is_dup:
-            issues_short = "Name exists"
-        else:
-            issues_short = "OK"
+        status, state = _status(record)
 
         all_issues = errs + warns
         tooltip = "\n".join(f"• {m}" for m in all_issues) if all_issues else ""
-        
-        # Use theme-aware alpha-blended backgrounds
-        color = QColor(get_token("cell-invalid-bg")) if has_error else (QColor(get_token("cell-warn-bg")) if has_warn else None)
 
         self.blockSignals(True)
         for col in range(self.columnCount()):
             if col == _CB_COL:
-                continue  # never recolour the checkbox cell
+                continue
             it = self.item(table_row, col)
             if it:
-                it.setBackground(QBrush(color) if color is not None else QBrush())
                 it.setToolTip(tooltip)
-        if self.item(table_row, _ISSUES_COL):
-            self.item(table_row, _ISSUES_COL).setText(issues_short)
+        status_item = self.item(table_row, _ISSUES_COL)
+        if status_item:
+            status_item.setText(status)
+            status_item.setData(_STATE_ROLE, state)
         # If the row gained an error, disable its checkbox; if fixed, re-enable
         cb = self.item(table_row, _CB_COL)
         if cb:

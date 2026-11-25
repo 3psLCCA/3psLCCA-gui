@@ -17,7 +17,7 @@ from three_ps_lcca_gui.gui import themes  # noqa: E402
 from three_ps_lcca_gui.gui.components.structure import excel_importer as ei  # noqa: E402
 
 # Table columns per spec (0 = tick box)
-CB, ID, NAME, QTY, UNIT, RATE, ISSUES = 0, 1, 2, 3, 4, 5, 13
+CB, ISSUES, ID, NAME, QTY, UNIT, RATE = 0, 1, 2, 3, 4, 5, 6
 
 H = ["CID#ID", "CID#Name", "CID#Quantity", "CID#Unit", "CID#Rate", "CID#Component"]
 NUMERIC = ("rate", "quantity", "carbon_emission", "conversion_factor",
@@ -870,7 +870,7 @@ class TestWarningsAndTabs:
         assert f["Errors"] == 1 and f["Warnings"] == 0
         assert f["Valid"] == 1
 
-    def test_tinted_rows_have_background_and_no_forced_foreground(self, make):
+    def test_problem_rows_have_status_and_no_tint_or_forced_foreground(self, make):
         w = make({FOUND: [H + ["CID#Bogus"], good(1, "", ) + ["x"], good(2, "B") + ["y"], good(3, "C")]},
                  existing={"str_foundation": {"Excavation": [item("C")]}})
         t = block(w, FOUND, "Excavation")._tbl
@@ -880,7 +880,8 @@ class TestWarningsAndTabs:
                 if it is None:
                     continue
                 assert it.data(Qt.ForegroundRole) is None, (r, c)
-            assert t.item(r, NAME).background().style() != Qt.NoBrush, r
+            assert t.item(r, NAME).background().style() == Qt.NoBrush, r
+            assert t.item(r, ISSUES).data(ei._STATE_ROLE) in ("error", "warn"), r
 
     def test_clean_rows_no_forced_foreground(self, make):
         w = make({FOUND: [H, good(1, "A")]})
@@ -889,11 +890,12 @@ class TestWarningsAndTabs:
             if t.item(0, c) is not None:
                 assert t.item(0, c).data(Qt.ForegroundRole) is None
 
-    def test_tint_follows_edit(self, make, qapp):
+    def test_status_follows_edit(self, make, qapp):
         w = make({FOUND: [H, good(1, "A")]})
         t = block(w, FOUND, "Excavation")._tbl
         edit(qapp, t, 0, RATE, "zzz")
-        assert t.item(0, NAME).background().style() != Qt.NoBrush
+        assert t.item(0, ISSUES).data(ei._STATE_ROLE) == "error"
+        assert t.item(0, NAME).background().style() == Qt.NoBrush
         assert t.item(0, NAME).data(Qt.ForegroundRole) is None
 
 
