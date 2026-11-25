@@ -97,6 +97,13 @@ QSS_RADII = {
     "radius-xl": f"{RADIUS_XL}px",
 }
 
+# Centralized button height tokens for QSS substitution
+QSS_BUTTONS = {
+    "btn-sm": f"{BTN_SM}px",
+    "btn-md": f"{BTN_MD}px",
+    "btn-lg": f"{BTN_LG}px",
+}
+
 # ── Table column minimum widths ────────────────────────────────────────────
 # Each column type gets its own floor, because a rate, a unit and a material
 # name need very different widths. Each floor is a character count times

@@ -719,6 +719,24 @@ QPushButton#fabButton:hover   { background-color: $warning; border-color: $text-
 QPushButton#fabButton:pressed { background-color: $warning; border-color: $text-on-primary; }
 QPushButton#fabButton:disabled { background-color: $border-subtle; color: $text_disabled; }
 
+/* ── Split button: Export Priced BOQ | format (summary.py) ───────────────── */
+/* Standard button height (theme.py BTN_MD); no vertical padding or border,
+   so the height is exactly $btn-md, like btn_primary */
+QPushButton#exportBtn, QPushButton#exportMenuBtn {
+    background-color: $warning;
+    border: none;
+    border-radius: 0;   /* inner corners square: the two halves meet flat */
+    padding: 0;         /* Export: its inner layout's margins space the label */
+    min-height: $btn-md;
+    max-height: $btn-md;
+}
+QPushButton#exportBtn     { border-top-left-radius: $radius-lg;  border-bottom-left-radius: $radius-lg;  border-right: none; }
+QPushButton#exportMenuBtn { border-top-right-radius: $radius-lg; border-bottom-right-radius: $radius-lg; border-left: 1px solid $text-on-primary; padding: 0 12px; }
+/* solid darker shades (the shared hover fill is a see-through surface colour) */
+QPushButton#exportBtn:hover,   QPushButton#exportMenuBtn:hover   { background-color: $warning-hover; }
+QPushButton#exportBtn:pressed, QPushButton#exportMenuBtn:pressed { background-color: $warning-pressed; }
+QPushButton#exportBtn:disabled, QPushButton#exportMenuBtn:disabled { background-color: $border-subtle; border-color: $border-subtle; }
+
 /* ── per_or_val: [ % | INR ] toggle beside the number box ──
    Height comes from the shared input rule at the top. */
 QPushButton#povSeg {

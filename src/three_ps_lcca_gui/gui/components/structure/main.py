@@ -591,11 +591,10 @@ class StructureTabView(QWidget):
         if not path.endswith(fmt["ext"]):
             path += fmt["ext"]
 
-        self.download_btn.setEnabled(False)
-        self.download_btn.setText("Exporting…")
+        self._set_exporting(True)
+        QApplication.processEvents()  # show "Exporting…" before the export blocks
         try:
             if boq and fmt["ext"] == ".pdf":
-                QApplication.processEvents()
                 export_boq_pdf(self.controller, path)
                 msg = "Bill of Quantities exported."
             elif boq:
@@ -604,8 +603,7 @@ class StructureTabView(QWidget):
             else:
                 total, sheets = export_all_chunks(self.controller.engine, path, fmt)
                 msg = f"{total} row(s) exported across {len(sheets)} sheet(s)."
-            self.download_btn.setEnabled(True)
-            self.download_btn.setText("  Export")
+            self._set_exporting(False)
             QMessageBox.information(
                 self, "Export Complete", f"{msg}\n\nFile saved to:\n{path}"
             )
@@ -613,9 +611,15 @@ class StructureTabView(QWidget):
             if boq and os.path.exists(path):
                 QDesktopServices.openUrl(QUrl.fromLocalFile(path))
         except Exception as exc:
-            self.download_btn.setEnabled(True)
-            self.download_btn.setText("  Export")
+            self._set_exporting(False)
             QMessageBox.critical(self, "Export Error", str(exc))
+
+    def _set_exporting(self, busy: bool):
+        """Both Export buttons (toolbar and Summary) disabled and
+        reading "Exporting…" while an export runs."""
+        self.download_btn.setEnabled(not busy)
+        self.download_btn.setText("Exporting…" if busy else "  Export")
+        self.summary_tab.set_exporting(busy)
 
     def freeze(self, frozen: bool = True):
         freeze_widgets(frozen, self.excel_btn)

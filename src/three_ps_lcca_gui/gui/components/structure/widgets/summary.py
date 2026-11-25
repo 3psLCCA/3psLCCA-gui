@@ -15,7 +15,7 @@ from three_ps_lcca_gui.gui.themes import get_token
 from three_ps_lcca_gui.gui.styles import font
 from three_ps_lcca_gui.gui.theme import (
     FS_DISP, FS_MD, FS_SM, FW_BOLD, FW_SEMIBOLD,
-    BTN_MD, RADIUS_LG, RADIUS_SM, SP1, SP2, SP4, SP5, SP6,
+    RADIUS_SM, SP2, SP4, SP5,
 )
 from ...utils.display_format import fmt_comma, fmt_pct
 from ...utils.icons import make_icon
@@ -150,15 +150,18 @@ class StructureSummaryWidget(ItemsByTabView):
         "Super-Structure and Miscellaneous tabs."
     )
     TABLE_OPTIONS = {"read_only": True}
+    EXPORT_TEXT = "Export Priced BOQ"
+    EXPORTING_TEXT = "Exporting…"
 
     export_requested = Signal(str)  # file extension, e.g. ".xlsx"
     open_requested = Signal(str, str, int)  # tab name, component, data index
 
     def __init__(self, controller=None):
+        self._has_items = False
+        self._exporting = False
         super().__init__(controller)
 
         text, muted = get_token("text"), get_token("text_secondary")
-        self.header_row.setContentsMargins(0, 0, 0, 0)
         card = QFrame()
         card.setObjectName("summaryCard")
         card.setStyleSheet(
@@ -170,7 +173,7 @@ class StructureSummaryWidget(ItemsByTabView):
         card_col.setContentsMargins(20, 18, 20, 18)
         card_col.setSpacing(0)
 
-        # Grand total on the left, the split Export button on the right
+        # Initial construction cost on the left, the split Export button on the right
         top = QHBoxLayout()
         total_col = QVBoxLayout()
         total_col.setSpacing(2)
@@ -183,7 +186,7 @@ class StructureSummaryWidget(ItemsByTabView):
         total_col.addWidget(caption)
         total_col.addWidget(self.total_lbl)
         top.addLayout(total_col, 1)
-        top.addLayout(self._build_export_button(), 0)  # centred on caption + total
+        top.addWidget(self._build_export_button(), 0, Qt.AlignVCenter)
         card_col.addLayout(top)
         card_col.addSpacing(14)
 
@@ -196,64 +199,61 @@ class StructureSummaryWidget(ItemsByTabView):
         card_col.addSpacing(8)
         card_col.addWidget(self.legend)
 
-        self.header_row.addWidget(card)
+        # Card scrolls with the tables: put it above the table container,
+        # inside the scroll area (the rebuild only clears the container)
+        page = QWidget()
+        page_col = QVBoxLayout(page)  # its margins frame the card and tables alike
+        self.container_layout.setContentsMargins(0, 0, 0, 0)
+        page_col.addWidget(card)
+        page_col.addWidget(self.scroll.takeWidget())
+        self.scroll.setWidget(page)
 
     def _build_export_button(self):
-        """Split button: the main part exports in the last-used format,
-        the arrow opens a menu to pick another one."""
-        base = get_token("base")
-        green = QColor(get_token("success"))
-        if QColor(base).lightness() > 128:  # light theme: white text needs a darker green
-            green = green.darker(135)
-        btn_css = (
-            f"QPushButton {{ background-color: {green.name()}; color: {base}; border: none;"
-            f" border-radius: 0px; padding: 0px;"
-            f" min-height: {BTN_MD}px; max-height: {BTN_MD}px; }}"  # QSS overrides setFixedHeight
-            f"QPushButton:hover {{ background-color: {green.lighter(112).name()}; }}"
-            f"QPushButton:disabled {{ background-color: {get_token('success', 'disabled')}; }}"
-        )
+        """Split button (main.qss: #exportBtn, #exportMenuBtn): the main part
+        exports in the last-used format, the arrow opens a menu to pick
+        another one."""
+        on_fill = get_token("text-on-primary")
+
+        split_w = QWidget()
+        split = QHBoxLayout(split_w)
+        split.setContentsMargins(0, 0, 0, 0)
+        split.setSpacing(0)
 
         self.export_btn = QPushButton()
+        self.export_btn.setObjectName("exportBtn")
         self.export_btn.setCursor(Qt.PointingHandCursor)
         self.export_btn.setToolTip("Export the Bill of Quantities")
-        self.export_btn.setStyleSheet(
-            btn_css + f"QPushButton {{ border-top-left-radius: {RADIUS_LG}px; border-bottom-left-radius: {RADIUS_LG}px; }}"
-        )
         inner = QHBoxLayout(self.export_btn)
         inner.setContentsMargins(SP5, 0, SP4, 0)
         inner.setSpacing(SP2)
         icon = QLabel()
         # at the screen's scale, so it stays sharp on 125% / 150% displays
-        icon.setPixmap(make_icon("download", color=base).pixmap(QSize(16, 16), self.devicePixelRatioF()))
-        label = QLabel("Export Priced BOQ")
+        icon.setPixmap(make_icon("download", color=on_fill).pixmap(QSize(16, 16), self.devicePixelRatioF()))
+        self._export_label = label = QLabel(self.EXPORT_TEXT)
         label.setFont(font(FS_MD, FW_SEMIBOLD))
-        label.setStyleSheet(f"color: {base};")
+        label.setStyleSheet(f"color: {on_fill}; background: transparent;")
         self.fmt_badge = QLabel()
         self.fmt_badge.setAlignment(Qt.AlignCenter)
-        self.fmt_badge.setFixedHeight(SP6)
         self.fmt_badge.setStyleSheet(
-            f"color: {green.name()}; background-color: {base}; border-radius: {RADIUS_SM}px;"
-            f" padding: 0px {SP2}px;"
+            f"color: {get_token('warning')}; background-color: {on_fill}; border-radius: {RADIUS_SM}px;"
+            f" padding: 2px {SP2}px;"
         )
         self.fmt_badge.setFont(font(FS_SM, FW_BOLD))
         for w in (icon, label, self.fmt_badge):
             w.setAttribute(Qt.WA_TransparentForMouseEvents)
             inner.addWidget(w, 0, Qt.AlignVCenter)
-        self.export_btn.setFixedHeight(BTN_MD)
         self.export_btn.clicked.connect(lambda: self.export_requested.emit(self._fmt))
 
-        self._chevrons = {n: make_icon(n, color=base) for n in ("expand-more", "expand-less")}
+        self._chevrons = {n: make_icon(n, color=on_fill) for n in ("expand-more", "expand-less")}
         self.fmt_btn = QPushButton()
+        self.fmt_btn.setObjectName("exportMenuBtn")
         self.fmt_btn.setIcon(self._chevrons["expand-more"])
         self.fmt_btn.setIconSize(QSize(18, 18))
         self.fmt_btn.setCursor(Qt.PointingHandCursor)
         self.fmt_btn.setToolTip("Choose the export format")
-        self.fmt_btn.setFixedSize(BTN_MD + SP1, BTN_MD)
-        self.fmt_btn.setStyleSheet(
-            btn_css + f"QPushButton {{ border-top-right-radius: {RADIUS_LG}px; border-bottom-right-radius: {RADIUS_LG}px;"
-            f" border-left: 1px solid {green.darker(125).name()}; }}"
-        )
         self.fmt_btn.clicked.connect(self._show_menu)
+        split.addWidget(self.export_btn)
+        split.addWidget(self.fmt_btn)
 
         # Format menu: "EXPORT AS", one row per format, a footer note
         self._menu = QMenu(self)
@@ -292,13 +292,7 @@ class StructureSummaryWidget(ItemsByTabView):
         except Exception:
             saved = ""
         self._set_fmt(saved if saved in self._fmt_rows else ".xlsx")
-
-        split = QHBoxLayout()
-        split.setSpacing(0)
-        split.setAlignment(Qt.AlignVCenter)
-        split.addWidget(self.export_btn)
-        split.addWidget(self.fmt_btn)
-        return split
+        return split_w
 
     def _show_menu(self):
         """Open the format menu right-aligned under the split button."""
@@ -373,6 +367,16 @@ class StructureSummaryWidget(ItemsByTabView):
         ))
         self.share_bar.setVisible(bool(shares))
         self.legend.setVisible(bool(shares))
-        has_items = any(rows_by_chunk.values())
-        self.export_btn.setEnabled(has_items)
-        self.fmt_btn.setEnabled(has_items)
+        self._has_items = any(rows_by_chunk.values())
+        self._update_export_enabled()
+
+    def set_exporting(self, busy: bool):
+        """While an export runs: button disabled and reads "Exporting…"."""
+        self._exporting = busy
+        self._export_label.setText(self.EXPORTING_TEXT if busy else self.EXPORT_TEXT)
+        self._update_export_enabled()
+
+    def _update_export_enabled(self):
+        on = self._has_items and not self._exporting
+        self.export_btn.setEnabled(on)
+        self.fmt_btn.setEnabled(on)

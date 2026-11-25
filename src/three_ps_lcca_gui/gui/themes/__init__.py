@@ -248,6 +248,9 @@ def _derive_compat_tokens(raw: dict[str, str], state: dict[str, float]) -> dict[
         "sidebar-sel":         _alpha("primary", "pressed"),
         "cell-invalid-bg":     _alpha("danger",  "pressed"),
         "cell-warn-bg":        _alpha("warning", "pressed"),
+        # solid shades for a button filled with warning (alphas would see through)
+        "warning-hover":       QColor(raw.get("warning", "#000000")).darker(110).name(),
+        "warning-pressed":     QColor(raw.get("warning", "#000000")).darker(125).name(),
         "warn-bg":             _alpha("warning", "pressed"),  # warning callout fill
         "warn-edge":           _alpha("warning", "hover"),    # warning callout border
         "cell-editable-bg":    _alpha("primary", "hover"),
@@ -262,10 +265,11 @@ def _derive_compat_tokens(raw: dict[str, str], state: dict[str, float]) -> dict[
     })
 
     # Add centralized font weights and sizes
-    from three_ps_lcca_gui.gui.theme import QSS_WEIGHTS, QSS_FONTS, QSS_RADII
+    from three_ps_lcca_gui.gui.theme import QSS_WEIGHTS, QSS_FONTS, QSS_RADII, QSS_BUTTONS
     tokens.update(QSS_WEIGHTS)
     tokens.update(QSS_FONTS)
     tokens.update(QSS_RADII)
+    tokens.update(QSS_BUTTONS)
     
     # Add URL-encoded versions of all color tokens for safe use in SVG data URIs
     # e.g., $primary-url will be %23RRGGBB
