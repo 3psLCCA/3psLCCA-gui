@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
     QMenu,
     QWidgetAction,
     QToolTip,
+    QStyle,
 )
 from PySide6.QtCore import Qt, Signal, QPoint, QRectF, QSize
 from PySide6.QtGui import QColor, QPainter, QPen
@@ -161,6 +162,12 @@ class StructureSummaryWidget(ItemsByTabView):
         self._exporting = False
         super().__init__(controller)
 
+        # same width as the tab pages (manager.py): Qt's default side margin,
+        # and the scrollbar's room kept so the cards don't change width
+        side = self.style().pixelMetric(QStyle.PM_LayoutLeftMargin)
+        self.layout.setContentsMargins(side, 8, side, 0)
+        self.scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
+
         text, muted = get_token("text"), get_token("text_secondary")
         card = QFrame()
         card.setObjectName("summaryCard")
@@ -203,6 +210,7 @@ class StructureSummaryWidget(ItemsByTabView):
         # inside the scroll area (the rebuild only clears the container)
         page = QWidget()
         page_col = QVBoxLayout(page)  # its margins frame the card and tables alike
+        page_col.setSpacing(SP4)  # same gap as between the table cards
         self.container_layout.setContentsMargins(0, 0, 0, 0)
         page_col.addWidget(card)
         page_col.addWidget(self.scroll.takeWidget())

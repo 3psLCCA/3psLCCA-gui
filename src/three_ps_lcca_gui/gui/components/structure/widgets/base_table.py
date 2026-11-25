@@ -169,8 +169,8 @@ class StructureTableWidget(TooltipTableMixin, QTableWidget):
         ]
         for col, label in enumerate(_headers):
             item = QTableWidgetItem(label)
-            # Work name sits left over its text; the other headings are centred
-            item.setTextAlignment(_L if col == 0 else Qt.AlignCenter)
+            # Work name and Component sit left over their text; the rest are centred
+            item.setTextAlignment(_L if col in (0, 7) else Qt.AlignCenter)
             self.setHorizontalHeaderItem(col, item)
 
         self.setColumnHidden(2, True)

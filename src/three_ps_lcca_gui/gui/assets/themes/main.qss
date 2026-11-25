@@ -531,6 +531,13 @@ QLabel#cardCount {
     color: $text_secondary;
 }
 
+/* heading row is one small button tall, with or without the ••• button */
+QFrame#tableCard QLabel#cardTitle,
+QFrame#tableCard QLabel#cardCount,
+QFrame#tableCard QLabel#cardTotal {
+    min-height: $btn-sm;
+}
+
 QPushButton#cardFooter {
     background-color: transparent;
     border: none;
