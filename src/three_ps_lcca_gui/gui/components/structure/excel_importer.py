@@ -67,7 +67,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtWidgets import QButtonGroup, QRadioButton, QGroupBox
 from three_ps_lcca_gui.gui.themes import get_token
-from three_ps_lcca_gui.gui.theme import FS_MD, FS_SM
+from three_ps_lcca_gui.gui.theme import SP3
 from .widgets.material_dialog import build_excel_snapshot
 import sys
 from ..utils.unit_resolver import (
@@ -157,25 +157,12 @@ FALLBACK_CHUNK = "str_misc"
 
 # No OK_COLOR - default background is left untouched (inherits theme)
 
-_DARK_TEXT = QColor("#000000")
-_LIGHT_TEXT = QColor("#ffffff")
-
-
 def _is_warning(record: dict) -> bool:
     """A row painted as a warning: no errors, and a warning or a name that
     already exists in the project (same test the table uses to tint it)."""
     if record.get("_errors"):
         return False
     return bool(record.get("_warnings")) or bool(record.get("_duplicate_name"))
-
-
-def _text_color(bg: QColor) -> QColor:
-    """Return dark or light text so it contrasts against *bg*."""
-    # Perceived luminance (0-255)
-    lum = 0.299 * bg.red() + 0.587 * bg.green() + 0.114 * bg.blue()
-    if lum > 128:
-        return QColor(_DARK_TEXT)
-    return QColor(_LIGHT_TEXT)
 
 
 # ---------------------------------------------------------------------------
@@ -1098,11 +1085,8 @@ class ComponentBlock(QGroupBox):
         self, comp_name: str, comp_rows: list[dict], is_uncat: bool = False, parent=None
     ):
         super().__init__(comp_name, parent)
-        self.setStyleSheet(
-            f"QGroupBox {{ font-weight: bold; font-size: {FS_MD}pt; color: {get_token('text_disabled')}; }}"
-            if is_uncat
-            else f"QGroupBox {{ font-weight: bold; font-size: {FS_MD}pt; }}"
-        )
+        self.setObjectName("importComponent")  # main.qss
+        self.setProperty("uncat", is_uncat)
 
         bl = QVBoxLayout(self)
         bl.setContentsMargins(4, 12, 4, 4)
@@ -1116,13 +1100,12 @@ class ComponentBlock(QGroupBox):
 
         self._chk = QCheckBox("Select all")
         self._chk.setTristate(True)  # tristate for visual only; click logic below
-        self._chk.setStyleSheet(f"font-weight: normal; font-size: {FS_SM}pt;")
         hl.addWidget(self._chk)
 
         hl.addStretch()
 
         self._count_lbl = QLabel()
-        self._count_lbl.setStyleSheet(f"font-size: {FS_SM}pt; color: {get_token('text_secondary')};")
+        self._count_lbl.setObjectName("cardCount")
         hl.addWidget(self._count_lbl)
 
         bl.addWidget(hdr)
@@ -1135,7 +1118,7 @@ class ComponentBlock(QGroupBox):
         self._empty_lbl = QLabel(
             "All rows hidden by filter (missing/zero Name, Quantity, Rate, or Unit)."
         )
-        self._empty_lbl.setStyleSheet(f"color: {get_token('text_disabled')}; font-style: italic; padding: 4px;")
+        self._empty_lbl.setObjectName("importEmpty")
         self._empty_lbl.setVisible(False)
         bl.addWidget(self._empty_lbl)
 
@@ -1223,25 +1206,24 @@ class SheetPreviewWidget(QWidget):
         # EC2: sheet had headers but no data rows
         if not rows:
             lbl = QLabel("This sheet has no data rows.")
-            lbl.setStyleSheet(f"color: {get_token('text_disabled')}; font-style: italic; padding: 12px;")
+            lbl.setObjectName("importEmpty")
+            outer.setContentsMargins(SP3, SP3, SP3, SP3)
             outer.addWidget(lbl)
             return
 
         # ── Sheet-level select-all header ─────────────────────────────────
         sheet_hdr = QWidget()
-        sheet_hdr.setStyleSheet("background: transparent;")
         shl = QHBoxLayout(sheet_hdr)
         shl.setContentsMargins(6, 4, 6, 4)
         shl.setSpacing(8)
 
         self._sheet_chk = QCheckBox("Select all in sheet")
         self._sheet_chk.setTristate(True)
-        self._sheet_chk.setStyleSheet(f"font-size: {FS_SM}pt;")
         shl.addWidget(self._sheet_chk)
         shl.addStretch()
 
         self._sheet_count_lbl = QLabel()
-        self._sheet_count_lbl.setStyleSheet(f"font-size: {FS_SM}pt; color: {get_token('text_secondary')};")
+        self._sheet_count_lbl.setObjectName("cardCount")
         shl.addWidget(self._sheet_count_lbl)
 
         outer.addWidget(sheet_hdr)
@@ -1282,7 +1264,6 @@ class SheetPreviewWidget(QWidget):
                 divider = QFrame()
                 divider.setFrameShape(QFrame.HLine)
                 divider.setFrameShadow(QFrame.Sunken)
-                divider.setStyleSheet(f"color: {get_token('border-subtle')};")
                 cl.addWidget(divider)
 
             block = ComponentBlock(comp_name, comp_rows, is_uncat=is_uncat)
@@ -1426,10 +1407,8 @@ class DuplicateComponentDialog(QDialog):
         btn_row = QHBoxLayout()
         ok_btn = QPushButton("Continue")
         ok_btn.setDefault(True)
-        ok_btn.setMinimumHeight(34)
         ok_btn.clicked.connect(self.accept)
         cancel_btn = QPushButton("Cancel")
-        cancel_btn.setMinimumHeight(34)
         cancel_btn.clicked.connect(self.reject)
         btn_row.addStretch()
         btn_row.addWidget(cancel_btn)
@@ -1450,7 +1429,7 @@ def _build_metadata_tab(metadata: list[dict]) -> QWidget:
 
     if not metadata:
         lbl = QLabel("No metadata entries.")
-        lbl.setStyleSheet(f"color: {get_token('text_disabled')}; font-style: italic;")
+        lbl.setObjectName("importEmpty")
         outer.addWidget(lbl)
         outer.addStretch()
         return w
@@ -1463,10 +1442,9 @@ def _build_metadata_tab(metadata: list[dict]) -> QWidget:
 
         key_lbl = QLabel(f"<b>{entry.get('key', '')}</b>")
         key_lbl.setFixedWidth(160)
-        key_lbl.setStyleSheet(f"font-size: {FS_MD}pt;")
 
         val_lbl = QLabel(entry.get("value", "") or "-")
-        val_lbl.setStyleSheet(f"font-size: {FS_MD}pt; color: {get_token('text_secondary')};")
+        val_lbl.setObjectName("statLabel")
 
         row_l.addWidget(key_lbl)
         row_l.addWidget(val_lbl, stretch=1)
@@ -1517,11 +1495,11 @@ class ImportPreviewWindow(QDialog):
 
         info = QLabel(
             "<b>Double-click</b> a cell to edit.  "
-            "<span style='color:#c0392b'>■</span> Red = errors (cannot import).  "
-            "<span style='color:#d68910'>■</span> Yellow = warnings."
+            f"<span style='color:{get_token('danger')}'>■</span> Red = errors (cannot import).  "
+            f"<span style='color:{get_token('warning')}'>■</span> Yellow = warnings."
         )
         info.setWordWrap(True)
-        info.setStyleSheet(f"font-size: {FS_SM}pt; color: #555;")
+        info.setObjectName("statLabel")
         top_bar.addWidget(info, stretch=1)
 
         # Global select-all checkbox
@@ -1534,7 +1512,7 @@ class ImportPreviewWindow(QDialog):
         top_bar.addWidget(self._select_all_chk)
 
         self._select_all_count_lbl = QLabel()
-        self._select_all_count_lbl.setStyleSheet(f"font-size: {FS_SM}pt; color: #777;")
+        self._select_all_count_lbl.setObjectName("cardCount")
         top_bar.addWidget(self._select_all_count_lbl)
 
         top_bar.addSpacing(16)
@@ -1564,21 +1542,22 @@ class ImportPreviewWindow(QDialog):
             if rec.get("_duplicate_name")
         )
         if _dup_count:
+            # same callout as the transport warnings (#warnBox in main.qss)
             warn_frame = QFrame()
-            warn_frame.setFrameShape(QFrame.StyledPanel)
-            warn_frame.setStyleSheet(
-                f"background:{get_token('warning')}; border-radius:4px; padding:2px;"
-            )
+            warn_frame.setObjectName("warnBox")
             warn_layout = QHBoxLayout(warn_frame)
-            warn_layout.setContentsMargins(10, 6, 10, 6)
+            warn_layout.setContentsMargins(10, 8, 10, 8)
+            warn_layout.setSpacing(8)
+            warn_icon = QLabel("!")
+            warn_icon.setObjectName("warnIcon")
+            warn_layout.addWidget(warn_icon, 0, Qt.AlignTop)
             warn_lbl = QLabel(
-                f"⚠  <b>{_dup_count} row(s)</b> in this file already exist in the "
+                f"<b>{_dup_count} row(s)</b> in this file already exist in the "
                 f"project (matched by name &amp; component, case-insensitive). "
                 f"They are <b>unchecked by default</b> - check them to overwrite."
             )
             warn_lbl.setWordWrap(True)
-            warn_lbl.setStyleSheet(f"color:{_text_color(QColor(get_token('warning'))).name()}; background:transparent;")
-            warn_layout.addWidget(warn_lbl)
+            warn_layout.addWidget(warn_lbl, 1)
             root.addWidget(warn_frame)
 
         # ── Tabs - one per sheet ─────────────────────────────────────────────
@@ -1601,14 +1580,12 @@ class ImportPreviewWindow(QDialog):
 
         # ── Summary label ────────────────────────────────────────────────────
         self._summary_lbl = QLabel()
-        self._summary_lbl.setStyleSheet(f"font-size: {FS_SM}pt;")
         root.addWidget(self._summary_lbl)
 
         # ── Buttons ──────────────────────────────────────────────────────────
         btn_row = QHBoxLayout()
 
         self._import_valid_btn = QPushButton("Import Rows")
-        self._import_valid_btn.setMinimumHeight(34)
         self._import_valid_btn.setToolTip(
             "Import selected rows - error rows are always skipped, warnings are included"
         )
@@ -1679,9 +1656,9 @@ class ImportPreviewWindow(QDialog):
 
         self._summary_lbl.setText(
             f"Total rows: <b>{total}</b>  |  "
-            f"<span style='color:#c0392b'>Errors: {errs}</span>  |  "
-            f"<span style='color:#d68910'>Warnings: {warns}</span>  |  "
-            f"<span style='color:#1a7a43'>Valid: {valid}</span>  |  "
+            f"<span style='color:{get_token('danger')}'>Errors: {errs}</span>  |  "
+            f"<span style='color:{get_token('warning')}'>Warnings: {warns}</span>  |  "
+            f"<span style='color:{get_token('success')}'>Valid: {valid}</span>  |  "
             f"<b>Selected: {sel}</b>"
         )
 

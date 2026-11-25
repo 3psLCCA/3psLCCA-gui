@@ -268,15 +268,13 @@ QAbstractItemView::indicator:hover {
 QCheckBox::indicator:checked,
 QGroupBox::indicator:checked,
 QAbstractItemView::indicator:checked {
-    background-color: $primary;
-    border-color: $primary;
+    background-color: $primary;   /* keeps the unticked border */
 }
 
 QCheckBox::indicator:checked:hover,
 QGroupBox::indicator:checked:hover,
 QAbstractItemView::indicator:checked:hover {
     background-color: $primary-hover;
-    border-color: $primary-hover;
 }
 
 QCheckBox::indicator:disabled,
@@ -586,6 +584,19 @@ QFrame#warnBox {
 QLabel#warnIcon {
     color: $warning;
     font-weight: $weight-bold;
+}
+
+/* ── Excel Import Preview (structure/excel_importer.py) ─────────────────── */
+/* counts reuse #cardCount, the duplicate-rows banner reuses #warnBox */
+QGroupBox#importComponent {
+    font-size: $font-size-md;
+    font-weight: $weight-bold;
+}
+QGroupBox#importComponent[uncat="true"] { color: $text_disabled; }
+
+QLabel#importEmpty {
+    color: $text_disabled;
+    font-style: italic;
 }
 
 /* ── Scrollbar ──────────────────────────────────────────────────────────── */
