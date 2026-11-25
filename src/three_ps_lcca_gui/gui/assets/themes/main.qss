@@ -439,6 +439,10 @@ QTableView {
     color: $text;
     gridline-color: $border-faint;  /* lines between cells, barely there */
     margin: $radius-lg $radius-lg 0px;
+    /* a selected row gets the sidebar's soft tint, not solid primary; the
+       delegates paint from the palette, so ::item:selected would not reach them */
+    selection-background-color: $sidebar-sel;
+    selection-color: $text;
 }
 
 /* the pinned Action column sits inside its table's margin already,
@@ -514,7 +518,7 @@ QTableView QLineEdit:disabled {
 QTableView QSpinBox[rowSelected="true"],
 QTableView QDoubleSpinBox[rowSelected="true"],
 QTableView QLineEdit[rowSelected="true"] {
-    color: $text-on-primary;
+    color: $text;
 }
 
 /* the import preview edits cells with Qt's own editor, drawn over the cell's
