@@ -161,6 +161,14 @@ _DARK_TEXT = QColor("#000000")
 _LIGHT_TEXT = QColor("#ffffff")
 
 
+def _is_warning(record: dict) -> bool:
+    """A row painted as a warning: no errors, and a warning or a name that
+    already exists in the project (same test the table uses to tint it)."""
+    if record.get("_errors"):
+        return False
+    return bool(record.get("_warnings")) or bool(record.get("_duplicate_name"))
+
+
 def _text_color(bg: QColor) -> QColor:
     """Return dark or light text so it contrasts against *bg*."""
     # Perceived luminance (0-255)
@@ -764,6 +772,8 @@ class ImportComponentTable(QTableWidget):
         super().__init__(parent)
         self.component_name = component_name
         self._rows = rows
+        # set by ImportPreviewWindow: record -> name already in the project?
+        self.name_exists = None
 
         # Col 0 = checkbox; cols 1..N = IMPORT_COLUMNS
         self.setColumnCount(len(IMPORT_COLUMNS) + _DATA_START)
@@ -832,6 +842,7 @@ class ImportComponentTable(QTableWidget):
         self.blockSignals(False)
         self._update_height()
         self.updateGeometry()
+        self.selection_changed.emit()  # rows exist now: refresh the counts
 
     def _append_record(self, record: dict, rows_idx: int):
         row = self.rowCount()
@@ -895,7 +906,6 @@ class ImportComponentTable(QTableWidget):
 
             if color is not None:
                 item.setBackground(QBrush(color))
-                item.setForeground(QBrush(_text_color(color)))
 
             if tooltip:
                 item.setToolTip(tooltip)
@@ -928,6 +938,7 @@ class ImportComponentTable(QTableWidget):
         # synthetic sheet name "_" overwrite them with the fallback chunk.
         saved_chunk = record.get("_chunk_key")
         saved_fallback = record.get("_is_fallback_chunk")
+        saved_component = record.get("component")
         record["_errors"] = []
         record["_warnings"] = []
         verify_schema({record.get("component", "_"): [record]})
@@ -936,6 +947,18 @@ class ImportComponentTable(QTableWidget):
             record["_chunk_key"] = saved_chunk
         if saved_fallback is not None:
             record["_is_fallback_chunk"] = saved_fallback
+        # ...and the component: re-checked as an unknown "sheet" it would
+        # become "<component> - <component>" and import into a new component
+        if saved_component is not None:
+            record["component"] = saved_component
+
+        # the name may have been edited: check it against the project again
+        was_dup = bool(record.get("_duplicate_name"))
+        if self.name_exists is not None:
+            record["_duplicate_name"] = (
+                not record.get("_errors") and self.name_exists(record)
+            )
+        became_dup = record.get("_duplicate_name") and not was_dup
 
         errs = record.get("_errors", [])
         warns = record.get("_warnings", [])
@@ -966,12 +989,7 @@ class ImportComponentTable(QTableWidget):
                 continue  # never recolour the checkbox cell
             it = self.item(table_row, col)
             if it:
-                if color is not None:
-                    it.setBackground(QBrush(color))
-                    it.setForeground(QBrush(_text_color(color)))
-                else:
-                    it.setBackground(QBrush())
-                    it.setForeground(QBrush())
+                it.setBackground(QBrush(color) if color is not None else QBrush())
                 it.setToolTip(tooltip)
         if self.item(table_row, _ISSUES_COL):
             self.item(table_row, _ISSUES_COL).setText(issues_short)
@@ -983,6 +1001,9 @@ class ImportComponentTable(QTableWidget):
                 cb.setCheckState(Qt.Unchecked)
             else:
                 cb.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
+                if became_dup:
+                    # like on open: an existing name is only overwritten when ticked
+                    cb.setCheckState(Qt.Unchecked)
         self.blockSignals(False)
         self.selection_changed.emit()
 
@@ -1052,7 +1073,7 @@ class ImportComponentTable(QTableWidget):
         return sum(1 for r in self._rows if r.get("_errors"))
 
     def warn_count(self) -> int:
-        return sum(1 for r in self._rows if r.get("_warnings") and not r.get("_errors"))
+        return sum(1 for r in self._rows if _is_warning(r))
 
 
 # ---------------------------------------------------------------------------
@@ -1529,36 +1550,11 @@ class ImportPreviewWindow(QDialog):
         root.addLayout(top_bar)
 
         # ── Pre-mark rows whose name already exists in the engine ────────────
-        _chunk_cache: dict[str, dict] = {}
-        _engine = (
-            getattr(getattr(manager, "controller", None), "engine", None)
-            if manager
-            else None
-        )
-        if _engine:
-            for _rows in parsed.values():
-                for rec in _rows:
-                    if rec.get("_errors"):
-                        continue  # already invalid - skip
-                    _chunk_key = rec.get("_chunk_key", FALLBACK_CHUNK)
-                    _comp = rec.get("component", "").strip()
-                    _name = rec.get("name", "").strip().lower()
-                    if not _name or not _comp:
-                        continue
-                    if _chunk_key not in _chunk_cache:
-                        try:
-                            _chunk_cache[_chunk_key] = (
-                                _engine.fetch_chunk(_chunk_key) or {}
-                            )
-                        except Exception:
-                            _chunk_cache[_chunk_key] = {}
-                    _taken = {
-                        item.get("values", {}).get("material_name", "").strip().lower()
-                        for item in _chunk_cache[_chunk_key].get(_comp, [])
-                        if not item.get("state", {}).get("in_trash", False)
-                    }
-                    if _name in _taken:
-                        rec["_duplicate_name"] = True
+        self._chunk_cache: dict[str, dict] = {}
+        for _rows in parsed.values():
+            for rec in _rows:
+                if not rec.get("_errors") and self._name_exists(rec):
+                    rec["_duplicate_name"] = True
 
         # ── Overwrite warning banner (shown only when duplicates exist) ───────
         _dup_count = sum(
@@ -1592,6 +1588,8 @@ class ImportPreviewWindow(QDialog):
         for sheet_name, rows in parsed.items():
             widget = SheetPreviewWidget(rows)
             widget.selection_changed.connect(self._on_selection_changed)
+            for block in widget._component_blocks.values():
+                block._tbl.name_exists = self._name_exists  # re-checked on edit
             self._sheet_tables[sheet_name] = widget
 
             tab_label = self._tab_label(sheet_name, rows)
@@ -1605,9 +1603,7 @@ class ImportPreviewWindow(QDialog):
         self._summary_lbl = QLabel()
         self._summary_lbl.setStyleSheet(f"font-size: {FS_SM}pt;")
         root.addWidget(self._summary_lbl)
-        self._refresh_summary()
 
-        print("[IPW] G. done")
         # ── Buttons ──────────────────────────────────────────────────────────
         btn_row = QHBoxLayout()
 
@@ -1622,7 +1618,29 @@ class ImportPreviewWindow(QDialog):
         btn_row.addWidget(self._import_valid_btn)
         root.addLayout(btn_row)
 
+        self._refresh_summary()  # after the button exists, so its label is set too
+
     # -- helpers --------------------------------------------------------------
+
+    def _name_exists(self, rec: dict) -> bool:
+        """True when the project already has this name in the row's component
+        (case-insensitive, trashed items ignored)."""
+        engine = getattr(getattr(self._manager, "controller", None), "engine", None)
+        chunk_key = rec.get("_chunk_key", FALLBACK_CHUNK)
+        comp = rec.get("component", "").strip()
+        name = rec.get("name", "").strip().lower()
+        if engine is None or not name or not comp:
+            return False
+        if chunk_key not in self._chunk_cache:
+            try:
+                self._chunk_cache[chunk_key] = engine.fetch_chunk(chunk_key) or {}
+            except Exception:
+                self._chunk_cache[chunk_key] = {}
+        return any(
+            item.get("values", {}).get("material_name", "").strip().lower() == name
+            for item in self._chunk_cache[chunk_key].get(comp, [])
+            if not item.get("state", {}).get("in_trash", False)
+        )
 
     def _on_qty_filter_changed(self, enabled: bool):
         for widget in self._sheet_tables.values():
@@ -1646,7 +1664,7 @@ class ImportPreviewWindow(QDialog):
         errs = sum(1 for r in rows if r.get("_errors"))
         if errs:
             return f"{sheet_name} ({errs} ✗)"
-        warns = sum(1 for r in rows if r.get("_warnings"))
+        warns = sum(1 for r in rows if _is_warning(r))
         if warns:
             return f"{sheet_name} ({warns} ⚠)"
         return sheet_name
@@ -1667,9 +1685,16 @@ class ImportPreviewWindow(QDialog):
             f"<b>Selected: {sel}</b>"
         )
 
+        # Tab labels follow the rows, so fixing a row by editing updates them
+        for sheet_name, widget in self._sheet_tables.items():
+            self.tabs.setTabText(
+                self.tabs.indexOf(widget), self._tab_label(sheet_name, self._parsed[sheet_name])
+            )
+
         # Update import button label
         if hasattr(self, "_import_valid_btn"):
             self._import_valid_btn.setText(f"Import {sel} Row{'s' if sel != 1 else ''}")
+            self._import_valid_btn.setEnabled(sel > 0)
 
         # Update top-level select-all checkbox
         if hasattr(self, "_select_all_chk"):
