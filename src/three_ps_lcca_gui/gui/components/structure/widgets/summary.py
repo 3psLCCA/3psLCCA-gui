@@ -30,8 +30,6 @@ BOQ_CHOICES = [
     (".pdf", "PDF", "#ef4444", "PDF document", "Print-ready for submission"),
 ]
 
-CURRENCY_SYMBOLS = {"INR": "₹", "USD": "$", "EUR": "€", "GBP": "£", "JPY": "¥"}
-
 # one colour per tab for the share bar, readable on light and dark
 TAB_COLORS = {
     "str_foundation": "#22c55e",
@@ -359,13 +357,13 @@ class StructureSummaryWidget(ItemsByTabView):
     def _refreshed(self, rows_by_chunk):
         totals = {c: self._sum(rows) for c, rows in rows_by_chunk.items()}
         grand_total = sum(totals.values())
-        sym = CURRENCY_SYMBOLS.get(self._currency(), "")
-        self.total_lbl.setText(sym + fmt_comma(grand_total))
+        cur = self._currency()  # short code, e.g. INR
+        self.total_lbl.setText(f"{cur} {fmt_comma(grand_total)}".strip())
 
         shares = [(c, t / grand_total) for c, t in totals.items() if t > 0] if grand_total > 0 else []
         self.share_bar.set_parts([
             (f, QColor(TAB_COLORS[c]),
-             f"{TAB_NAMES[c]} \u00b7 {fmt_pct(f * 100)}%<br><b>{sym}{fmt_comma(totals[c])}</b>")
+             f"{TAB_NAMES[c]} \u00b7 {fmt_pct(f * 100)}%<br><b>{cur} {fmt_comma(totals[c])}</b>")
             for c, f in shares
         ])
         self.legend.setText("&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;".join(
