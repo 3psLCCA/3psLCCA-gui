@@ -111,8 +111,8 @@ def test_counts_once_rows_are_filled(preview):
     assert preview._select_all_chk.checkState() == Qt.PartiallyChecked
     sheet = preview._sheet_tables["CAT#Foundation"]
     assert sheet._sheet_count_lbl.text() == "(2 / 3 selected)"
-    assert _block(preview, "Excavation")._count_lbl.text() == "(1 / 2 selected)"
-    assert _block(preview, "Pile")._count_lbl.text() == "(1 / 1 selected)"
+    assert _block(preview, "Excavation")._count_lbl.text() == "·  1 / 2 selected"
+    assert _block(preview, "Pile")._count_lbl.text() == "·  1 / 1 selected"
 
 
 def test_import_button_follows_selection(preview, qapp):

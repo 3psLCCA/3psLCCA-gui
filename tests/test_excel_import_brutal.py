@@ -87,7 +87,8 @@ def footer(w):
 
 
 def frac(lbl):
-    m = re.fullmatch(r"\((\d+) / (\d+)(?: selected)?\)", lbl.text().strip())
+    # "(3 / 5 selected)", or "·  3 / 5 selected" in a card heading
+    m = re.fullmatch(r"(?:\(|·\s*)(\d+) / (\d+)(?: selected)?\)?", lbl.text().strip())
     assert m, f"bad counter text {lbl.text()!r}"
     return int(m.group(1)), int(m.group(2))
 
@@ -765,8 +766,8 @@ class TestInitialState:
         assert w._select_all_count_lbl.text() == "(5 / 5)"
         assert w._select_all_chk.checkState() == Qt.Checked
         assert frac(w._sheet_tables[FOUND]._sheet_count_lbl) == (3, 3)
-        assert block(w, FOUND, "Excavation")._count_lbl.text() == "(2 / 2 selected)"
-        assert block(w, FOUND, "Pile")._count_lbl.text() == "(1 / 1 selected)"
+        assert block(w, FOUND, "Excavation")._count_lbl.text() == "·  2 / 2 selected"
+        assert block(w, FOUND, "Pile")._count_lbl.text() == "·  1 / 1 selected"
         assert_consistent(w)
 
     def test_initial_footer(self, make):
@@ -1034,7 +1035,7 @@ class TestSelection:
         w = make(std_sheets())
         t = block(w, FOUND, "Excavation")._tbl
         tick(qapp, t, 0, False)
-        assert block(w, FOUND, "Excavation")._count_lbl.text() == "(1 / 2 selected)"
+        assert block(w, FOUND, "Excavation")._count_lbl.text() == "·  1 / 2 selected"
         assert block(w, FOUND, "Excavation")._chk.checkState() == Qt.PartiallyChecked
         assert w._sheet_tables[FOUND]._sheet_chk.checkState() == Qt.PartiallyChecked
         assert w._select_all_chk.checkState() == Qt.PartiallyChecked

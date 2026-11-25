@@ -587,12 +587,8 @@ QLabel#warnIcon {
 }
 
 /* ── Excel Import Preview (structure/excel_importer.py) ─────────────────── */
-/* counts reuse #cardCount, the duplicate-rows banner reuses #warnBox */
-QGroupBox#importComponent {
-    font-size: $font-size-md;
-    font-weight: $weight-bold;
-}
-QGroupBox#importComponent[uncat="true"] { color: $text_disabled; }
+/* each component is a #tableCard; the duplicate-rows banner reuses #warnBox */
+QFrame#tableCard[uncat="true"] QLabel#cardTitle { color: $text_disabled; }
 
 QLabel#importEmpty {
     color: $text_disabled;

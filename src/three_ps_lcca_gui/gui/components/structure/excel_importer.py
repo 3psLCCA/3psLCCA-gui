@@ -67,7 +67,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtWidgets import QButtonGroup, QRadioButton, QGroupBox
 from three_ps_lcca_gui.gui.themes import get_token
-from three_ps_lcca_gui.gui.theme import SP3
+from three_ps_lcca_gui.gui.theme import SP2, SP3, SP4
 from .widgets.material_dialog import build_excel_snapshot
 import sys
 from ..utils.unit_resolver import (
@@ -76,7 +76,7 @@ from ..utils.unit_resolver import (
 )
 from ..utils.unit_resolver import get_known_units as _gku
 from ..utils.unit_resolver import get_unit_info
-from ..utils.table_widgets import fit_to_contents
+from ..utils.table_widgets import TableCard, fit_to_contents
 from PySide6.QtWidgets import QPlainTextEdit
 import traceback
 import json
@@ -1068,15 +1068,14 @@ class ImportComponentTable(QTableWidget):
 # ---------------------------------------------------------------------------
 
 
-class ComponentBlock(QGroupBox):
+class ComponentBlock(TableCard):
     """
-    A styled group box for one component.
+    One component's rows in a table card, like the Construction Works tables:
 
-    Visual layout (inside the group box):
-        ┌─ Component Name ──────────────────────────────┐
-        │  [☑ Select all]          (3 / 5 selected)     │  ← inner header
-        │  ImportComponentTable                          │
-        └───────────────────────────────────────────────┘
+        ┌────────────────────────────────────────────────┐
+        │  Component Name  ·  3 / 5 selected  [☑ Select all] │  ← heading row
+        │  ImportComponentTable                           │
+        └────────────────────────────────────────────────┘
     """
 
     selection_changed = Signal()
@@ -1084,41 +1083,23 @@ class ComponentBlock(QGroupBox):
     def __init__(
         self, comp_name: str, comp_rows: list[dict], is_uncat: bool = False, parent=None
     ):
-        super().__init__(comp_name, parent)
-        self.setObjectName("importComponent")  # main.qss
-        self.setProperty("uncat", is_uncat)
+        self._tbl = ImportComponentTable(comp_name, comp_rows)
+        super().__init__(self._tbl, comp_name, parent)
+        self.setProperty("uncat", is_uncat)  # main.qss greys the title
+        self._count_lbl = self.count_lbl
 
-        bl = QVBoxLayout(self)
-        bl.setContentsMargins(4, 12, 4, 4)
-        bl.setSpacing(4)
-
-        # ── Inner header row: checkbox + count label ──────────────────────
-        hdr = QWidget()
-        hl = QHBoxLayout(hdr)
-        hl.setContentsMargins(2, 0, 2, 0)
-        hl.setSpacing(6)
-
+        # select-all sits at the end of the card's heading row
         self._chk = QCheckBox("Select all")
         self._chk.setTristate(True)  # tristate for visual only; click logic below
-        hl.addWidget(self._chk)
-
-        hl.addStretch()
-
-        self._count_lbl = QLabel()
-        self._count_lbl.setObjectName("cardCount")
-        hl.addWidget(self._count_lbl)
-
-        bl.addWidget(hdr)
-
-        # ── Table ─────────────────────────────────────────────────────────
-        self._tbl = ImportComponentTable(comp_name, comp_rows)
-        bl.addWidget(self._tbl)
+        self._head.addWidget(self._chk)
+        bl = self.layout()
 
         # ── Empty placeholder (shown when filter hides everything) ────────
         self._empty_lbl = QLabel(
             "All rows hidden by filter (missing/zero Name, Quantity, Rate, or Unit)."
         )
         self._empty_lbl.setObjectName("importEmpty")
+        self._empty_lbl.setContentsMargins(SP3, SP2, SP3, SP2)
         self._empty_lbl.setVisible(False)
         bl.addWidget(self._empty_lbl)
 
@@ -1143,7 +1124,7 @@ class ComponentBlock(QGroupBox):
     def _update_chk(self):
         sel = self._tbl.selected_count()
         total = self._tbl.selectable_count()
-        self._count_lbl.setText(f"({sel} / {total} selected)")
+        self.set_count(f"{sel} / {total} selected")
         self._chk.blockSignals(True)
         if total == 0 or sel == 0:
             self._chk.setCheckState(Qt.Unchecked)
@@ -1246,7 +1227,7 @@ class SheetPreviewWidget(QWidget):
         container = QWidget()
         container.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         cl = QVBoxLayout(container)
-        cl.setSpacing(10)
+        cl.setSpacing(SP4)  # gap between table cards, as on the tab pages
         cl.setContentsMargins(4, 4, 4, 4)
         scroll.setWidget(container)
         outer.addWidget(scroll, stretch=1)
