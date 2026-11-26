@@ -116,6 +116,10 @@ V3_PREAMBLE = [
     cmd("DeclareUnicodeCharacter", "2082", r"\textsubscript{2}"),
     cmd("DeclareUnicodeCharacter", "2013", "--"),
     cmd("DeclareUnicodeCharacter", "2014", "--"),
+    # maths signs have no text glyph: without these, a name like
+    # "Depth ≤3m" (in the SOR databases) stops pdflatex
+    cmd("DeclareUnicodeCharacter", "2264", r"\ensuremath{\leq}"),
+    cmd("DeclareUnicodeCharacter", "2265", r"\ensuremath{\geq}"),
 
     # ── Global table defaults ─────────────────────────────────────────────────
     cmd("setlength", r"\tabcolsep", "4pt"),
