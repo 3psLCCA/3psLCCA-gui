@@ -756,6 +756,7 @@ class TrafficData(ScrollableForm):
         main_form.addRow(self._remarks)
 
         btn_row = QHBoxLayout()
+        btn_row.setContentsMargins(0, 0, 0, 0)  # line up with the fields
         btn_clear = QPushButton("Clear All")
         btn_clear.setObjectName("formActionBtn")
         btn_clear.clicked.connect(self.clear_all)
