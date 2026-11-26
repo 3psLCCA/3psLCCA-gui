@@ -213,10 +213,11 @@ class GeneralInfo(ScrollableForm):
         btn_layout.setContentsMargins(0, 10, 0, 10)
 
         self.btn_clear_all = QPushButton("Clear All")
-        self.btn_clear_all.setMinimumHeight(35)
+        self.btn_clear_all.setObjectName("formActionBtn")
         self.btn_clear_all.clicked.connect(self.clear_all)
 
-        btn_layout.addWidget(self.btn_clear_all)
+        btn_layout.addWidget(self.btn_clear_all, 1)  # half the row: button + equal empty stretch
+        btn_layout.addStretch(1)
         self.form.addRow(btn_row)
 
         # ── Load Profile button inline with Assessing Organization header ──

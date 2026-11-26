@@ -297,9 +297,10 @@ class RickeWidget(ScrollableForm):
         btn_layout = QHBoxLayout(btn_row)
         btn_layout.setContentsMargins(0, 10, 0, 10)
         self._btn_clear = QPushButton("Clear All")
-        self._btn_clear.setMinimumHeight(35)
+        self._btn_clear.setObjectName("formActionBtn")
         self._btn_clear.clicked.connect(self._clear_all)
-        btn_layout.addWidget(self._btn_clear)
+        btn_layout.addWidget(self._btn_clear, 1)  # half the row: button + equal empty stretch
+        btn_layout.addStretch(1)
         self.form.addRow(btn_row)
 
         self._populate_iso3()

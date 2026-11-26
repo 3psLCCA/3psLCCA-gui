@@ -346,11 +346,13 @@ class TrafficEmissions(ScrollableForm):
         calc_layout.addRow(total_banner)
 
         self.btn_defaults = QPushButton("Load Default Factors")
-        self.btn_defaults.setFixedWidth(160)
-        self.btn_defaults.setMinimumHeight(30)
+        self.btn_defaults.setObjectName("formActionBtn")
         self.btn_defaults.clicked.connect(self._on_load_defaults)
-        self.btn_defaults.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-        calc_layout.addRow(self.btn_defaults)
+        defaults_row = QHBoxLayout()
+        defaults_row.setContentsMargins(0, 0, 0, 0)
+        defaults_row.addWidget(self.btn_defaults, 1)  # half the row: button + equal empty stretch
+        defaults_row.addStretch(1)
+        calc_layout.addRow(defaults_row)
 
         self._stack.addWidget(calc_widget)  # index 0
 
@@ -383,11 +385,12 @@ class TrafficEmissions(ScrollableForm):
         # Clear All
         self.btn_clear = QPushButton("Clear All")
         btn_clear = self.btn_clear
-        btn_clear.setMinimumHeight(35)
+        btn_clear.setObjectName("formActionBtn")
         btn_clear.clicked.connect(self.clear_all)
 
         btn_row = QHBoxLayout()
-        btn_row.addWidget(btn_clear)
+        btn_row.addWidget(btn_clear, 1)  # half the row: button + equal empty stretch
+        btn_row.addStretch(1)
         btn_widget = QWidget()
         btn_widget.setLayout(btn_row)
         btn_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)

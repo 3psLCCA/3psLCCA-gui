@@ -80,11 +80,11 @@ class Demolition(ScrollableForm):
         btn_layout.setContentsMargins(0, 10, 0, 10)
 
         self.btn_load_suggested = QPushButton("Load Suggested Values")
-        self.btn_load_suggested.setMinimumHeight(35)
+        self.btn_load_suggested.setObjectName("formActionBtn")
         self.btn_load_suggested.clicked.connect(self.load_suggested_values)
 
         self.btn_clear_all = QPushButton("Clear All")
-        self.btn_clear_all.setMinimumHeight(35)
+        self.btn_clear_all.setObjectName("formActionBtn")
         self.btn_clear_all.clicked.connect(self.clear_all)
 
         btn_layout.addWidget(self.btn_load_suggested)

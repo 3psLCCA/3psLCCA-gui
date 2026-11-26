@@ -757,16 +757,16 @@ class TrafficData(ScrollableForm):
 
         btn_row = QHBoxLayout()
         btn_clear = QPushButton("Clear All")
-        btn_clear.setMinimumHeight(35)
+        btn_clear.setObjectName("formActionBtn")
         btn_clear.clicked.connect(self.clear_all)
-        btn_row.addWidget(btn_clear)
+        btn_row.addWidget(btn_clear, 1)  # half the row: button + equal empty stretch
+        btn_row.addStretch(1)
 
-        btn_validate = QPushButton("Validate this page")
-        btn_validate.setMinimumHeight(35)
-        btn_validate.setFixedWidth(160)
-        btn_validate.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-        btn_validate.clicked.connect(self._on_validate_clicked)
-        btn_row.addWidget(btn_validate)
+        # Validate button hidden for now
+        # btn_validate = QPushButton("Validate this page")
+        # btn_validate.setObjectName("formActionBtn")
+        # btn_validate.clicked.connect(self._on_validate_clicked)
+        # btn_row.addWidget(btn_validate)
 
         btn_widget = QWidget()
         btn_widget.setLayout(btn_row)

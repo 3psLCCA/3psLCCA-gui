@@ -570,7 +570,7 @@ QPushButton#cardFooter:pressed { background-color: $primary-active; color: $text
 QPushButton#cardFooter:disabled { color: $text_disabled; }
 
 /* ── Transport emissions (transport_emissions.py) ───────────────────────── */
-/* category totals card; each delivery is a #tableCard (table_widgets.TableCard) */
+/* category totals card (also on Material Emissions); each delivery is a #tableCard (table_widgets.TableCard) */
 QFrame#transportSummary {
     background-color: $base;
     border: 1px solid $border-faint;
@@ -736,6 +736,14 @@ QPushButton#fabButton[collapsed="true"] { font-size: 20px; padding: 0 0 2px 0; t
 QPushButton#fabButton:hover   { background-color: $warning; border-color: $text-on-primary; }
 QPushButton#fabButton:pressed { background-color: $warning; border-color: $text-on-primary; }
 QPushButton#fabButton:disabled { background-color: $border-subtle; color: $text_disabled; }
+
+/* ── Form action buttons: Load Suggested Values, Load Defaults, Clear All,
+   Validate this page. Shared button look, standard height ($btn-md). ───── */
+QPushButton#formActionBtn {
+    padding: 0 16px;
+    min-height: $btn-md;
+    max-height: $btn-md;
+}
 
 /* ── Split button: Export Priced BOQ | format (summary.py) ───────────────── */
 /* Standard button height (theme.py BTN_MD); no vertical padding or border,
