@@ -4,6 +4,9 @@ from pylatex import LongTable, MultiColumn, NoEscape
 from pylatex.utils import bold, italic, escape_latex
 
 from ..gui.components.utils.common_requested_data import get_chunk, get_currency
+from ..gui.components.structure.material_flags import (
+    db_label, material_db_key, material_flag, report_databases,
+)
 from ..gui.components.utils.definitions import STRUCTURE_CHUNKS, UNIT_DISPLAY
 from .SETTINGS import DECIMAL_PLACES_FOR_LATEX
 from .common_code import latex_layout, longtable_head
@@ -15,12 +18,16 @@ _BOTTOMRULE = NoEscape(r"\bottomrule")
 _N_COLS     = 6
 _COL_SPEC = latex_layout("structure_work")
 
+# report mark per material_flag() result, set as a superscript after the name
+# together with the database number (see material_flags.report_databases)
 _SOURCE_MARK = {
     "db":             "",
-    "manual":         r"$^{\#}$",
-    "db_modified":    r"$^{\S}$",
-    "excel":          r"$^{\dagger}$",
-    "excel_modified": r"$^{\ddagger}$",
+    "manual":         r"\#",
+    "db_modified":    r"\S",
+    "excel":          r"\dagger",
+    "excel_modified": r"\ddagger",
+    "custom_db":          r"\P",
+    "custom_db_modified": r"\|",
 }
 
 
@@ -180,17 +187,38 @@ def collect_for_recycling(all_chunks: dict) -> tuple[defaultdict, defaultdict]:
 
 # ── Structure work table (private) ────────────────────────────────────────────
 
-def _legend(currency: str) -> NoEscape:
+def report_databases_of(all_chunks: dict) -> list:
+    """Databases used in the structure data, in the order the reports list
+    the materials (category, component, item): the same numbers in every report."""
+    items = [item
+             for chunk_id, _ in STRUCTURE_CHUNKS
+             for comp_items in (all_chunks.get(chunk_id) or {}).values()
+             for item in (comp_items or [])]
+    return report_databases(items)
+
+
+def _legend(currency: str, databases: list = ()) -> NoEscape:
+    """Mark legend; with databases, also names them: numbered when two or
+    more, otherwise the one database."""
     cur = escape_latex(currency)
-    return NoEscape(
+    text = (
         r"\par\smallskip\footnotesize"
         rf" All rates and totals in {cur}.\quad"
         r"\textemdash\,Database value (default);\quad"
         r"$^{\#}$\,Manually entered;\quad"
         r"$^{\S}$\,Modified from database;\quad"
         r"$^{\dagger}$\,Imported from Excel;\quad"
-        r"$^{\ddagger}$\,Imported from Excel and modified"
+        r"$^{\ddagger}$\,Imported from Excel and modified;\quad"
+        r"$^{\P}$\,From custom database;\quad"
+        r"$^{\|}$\,Modified from custom database"
     )
+    if len(databases) == 1:
+        text += r"\par Database: " + escape_latex(db_label(databases[0]))
+    elif databases:
+        text += r"\par Databases: " + r";\quad ".join(
+            rf"$^{{{n}}}$\," + escape_latex(db_label(key))
+            for n, key in enumerate(databases, 1))
+    return NoEscape(text)
 
 
 def _fmt(val):
@@ -199,11 +227,18 @@ def _fmt(val):
     return f"{val:,.{DECIMAL_PLACES_FOR_LATEX}f}"
 
 
-def _mat_cell(name: str, source: str):
-    mark = _SOURCE_MARK.get(source, "")
+def _mat_cell(name: str, source: str, number: int | None = None):
+    """Material name with its mark and, if given, its database number."""
     if not name:
         return _CENTER_DASH
-    return NoEscape(escape_latex(name) + mark)
+    sup = r"\,".join(s for s in (_SOURCE_MARK.get(source, ""), str(number or "")) if s)
+    return NoEscape(escape_latex(name) + (rf"$^{{{sup}}}$" if sup else ""))
+
+
+def _db_number(item: dict, databases: list) -> int | None:
+    """The item's database number, or None (one database, Excel or manual)."""
+    key = material_db_key(item)
+    return databases.index(key) + 1 if len(databases) > 1 and key in databases else None
 
 
 def _padded_text(value):
@@ -212,7 +247,8 @@ def _padded_text(value):
     return NoEscape(r"\hspace{0.35em}" + escape_latex(str(value)))
 
 
-def _structure_table(chunk: dict, caption: str, label: str, currency: str) -> str:
+def _structure_table(chunk: dict, caption: str, label: str, currency: str,
+                     databases: list = ()) -> str:
     headers = ["Material", "Quantity", "Unit", "Rate/Unit", "Rate Source", f"Total ({currency})"]
 
     table = LongTable(_COL_SPEC)
@@ -254,13 +290,13 @@ def _structure_table(chunk: dict, caption: str, label: str, currency: str) -> st
             if item.get("state", {}).get("in_trash"):
                 continue
             v      = item.get("values", {})
-            source = item.get("meta", {}).get("source", "db")
+            source = material_flag(item)
             qty    = v.get("quantity")
             rate   = v.get("rate")
             total  = (qty * rate) if (qty is not None and rate is not None) else None
 
             table.add_row([
-                _mat_cell(v.get("material_name", ""), source),
+                _mat_cell(v.get("material_name", ""), source, _db_number(item, databases)),
                 _fmt(qty),
                 UNIT_DISPLAY.get(v.get("unit", ""), v.get("unit")) or _CENTER_DASH,
                 _fmt(rate),
@@ -268,7 +304,7 @@ def _structure_table(chunk: dict, caption: str, label: str, currency: str) -> st
                 _fmt(total),
             ])
 
-    return table.dumps() + "\n" + str(_legend(currency))
+    return table.dumps() + "\n" + str(_legend(currency, databases))
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
@@ -276,6 +312,7 @@ def _structure_table(chunk: dict, caption: str, label: str, currency: str) -> st
 def structure_work_data_to_latex(controller=None) -> str:
     currency   = get_currency()
     all_chunks = get_all_structure_chunks()
+    databases  = report_databases_of(all_chunks)
 
     tables = []
     for chunk_id, label in STRUCTURE_CHUNKS:
@@ -286,6 +323,7 @@ def structure_work_data_to_latex(controller=None) -> str:
             "str_misc":            ("Structure Work Data: Miscellaneous",   "tab:str_misc"),
         }
         caption, tab_label = captions[chunk_id]
-        tables.append(_structure_table(all_chunks[chunk_id], caption, tab_label, currency))
+        tables.append(_structure_table(all_chunks[chunk_id], caption, tab_label, currency,
+                                       databases))
 
     return "\n\n".join(tables)

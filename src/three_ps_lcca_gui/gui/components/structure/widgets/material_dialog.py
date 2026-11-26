@@ -44,7 +44,7 @@ from ...utils.unit_resolver import (
 )
 from ...utils.input_fields.add_material import FIELD_DEFINITIONS
 from ...utils.form_builder.form_builder import _PLACEHOLDER
-from ...utils.unit_resolver import get_unit_info as _get_unit_info_impl
+from ...utils.unit_resolver import get_unit_info as _get_unit_info_impl, suggest_cf
 from ...utils.doc_link import doc_inline, doc_label
 from ..registry.material_catalog import list_databases
 from ..registry.search_engine import MaterialSearchEngine, AdvancedSearchEngine, _component_matches
@@ -496,6 +496,103 @@ def _validate_item(item: dict) -> bool:
     return True
 
 
+def _num(value):
+    """A number from a field's text (or a number); None when blank or not a number."""
+    if value is None or str(value).strip() == "":
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def name_key(name) -> str:
+    """A material name as duplicate checks compare it: case and spacing
+    ignored ("  Abc   def " is "abc def"); the saved name is not changed."""
+    return " ".join(str(name or "").split()).lower()
+
+
+def _field_text(value) -> str:
+    """A stored value as field text, in full: 0 stays "0", 12.345 is not rounded."""
+    if value is None:
+        return ""
+    if isinstance(value, float):
+        return str(int(value)) if value.is_integer() else repr(value)
+    return str(value).strip()
+
+
+def check_material(
+    name, unit, quantity, rate, carbon_on, carbon_den, emission, conversion,
+    recycle_on, scrap, recovery,
+) -> list[tuple[str, str, str, str | None]]:
+    """The Add Material rules, in the order the dialog asks them.
+
+    Each problem is (level, title, message, turns_off):
+      "error"   - cannot be saved
+      "warning" - saved only if the user continues; *turns_off* names the
+                  section ("carbon" / "recycle") that is then left out
+    Shared by MaterialDialog and the Excel import, so both check the same.
+    """
+    problems = []
+    if not str(name or "").strip():
+        problems.append(("error", "Validation Error", "Material Name is required.", None))
+    if not str(unit or "").strip():
+        problems.append(("error", "Validation Error", "Please select a unit.", None))
+    if (_num(quantity) or 0) <= 0:
+        problems.append(("error", "Validation Error", "Quantity must be greater than zero.", None))
+
+    if str(rate if rate is not None else "").strip() == "":
+        problems.append(("error", "Validation Error", "Rate (unit cost) is required.", None))
+    else:
+        rate_val = _num(rate) or 0
+        if rate_val < 0:
+            problems.append(("error", "Validation Error", "Rate cannot be negative.", None))
+        elif rate_val == 0:
+            problems.append(("warning", "Rate",
+                             "Rate (unit cost) is 0 - this material will contribute no cost.", None))
+
+    if carbon_on:
+        if not str(carbon_den or "").strip():
+            problems.append(("error", "Validation Error",
+                             "Please select a unit for the emission factor denominator.", None))
+        ef, cf = _num(emission), _num(conversion)
+        if ef is None or ef <= 0:
+            problems.append(("warning", "Emission Factor",
+                             "Emission factor is 0 or blank - carbon cost will be skipped.", "carbon"))
+        elif cf is None or cf <= 0:
+            if suggest_cf(unit or "", carbon_den or "") != 1.0:
+                # different units cannot be compared without a factor
+                problems.append(("error", "Validation Error",
+                                 "Conversion factor is required when the material unit "
+                                 "and the carbon unit differ.", None))
+            else:
+                problems.append(("warning", "Conversion Factor",
+                                 "Conversion factor is 0 or blank - carbon cost will be skipped.", "carbon"))
+        else:
+            _, mat_dim = _get_unit_info_impl(unit or "")
+            _, den_dim = _get_unit_info_impl(carbon_den or "")
+            if mat_dim != den_dim and abs(cf - 1.0) < 1e-6:
+                problems.append(("warning", "Check Conversion Factor",
+                                 f"Unit mismatch: material is {mat_dim}, carbon unit is {den_dim}.\n"
+                                 "Conversion factor is 1.0 - is this correct?", None))
+
+    if recycle_on:
+        scrap_val, recovery_val = _num(scrap), _num(recovery)
+        if (recovery_val or 0) > 100:
+            problems.append(("error", "Validation Error", "Recovery percentage cannot exceed 100%.", None))
+        scrap_none = scrap_val is None or scrap_val <= 0
+        recovery_none = recovery_val is None or recovery_val <= 0
+        if scrap_none and recovery_none:
+            detail = (
+                "Both scrap rate and recovery percentage are blank"
+                if scrap_val is None and recovery_val is None
+                else "Both scrap rate and recovery percentage are zero or blank"
+            )
+            problems.append(("warning", "Recyclability",
+                             f"{detail} - recyclability will be excluded.", "recycle"))
+    return problems
+
+
 def build_excel_snapshot(values_dict: dict) -> dict:
     """
     Build a complete snapshot from an Excel-imported values_dict.
@@ -770,6 +867,7 @@ class MaterialDialog(QDialog):
         country: str = None,
         sor_db_key: str = None,
         search_cat: dict = None,
+        show_sor_info: bool = True,  # False: no "Suggestions from" row (Excel import)
     ):
         super().__init__(parent)
         self.is_edit = data is not None
@@ -780,10 +878,6 @@ class MaterialDialog(QDialog):
         self._sor_item = None
         self._sor_filled_name = None  # name that triggered the last autofill
         self._sor_filling = False
-        self._is_modified_by_user = False
-        # Seed True when re-opening an already-modified item so _compute_action returns _modified
-        _existing_source = (data.get("meta", {}).get("source", "") if data else "")
-        self._is_customized = _existing_source in ("db_modified", "excel_modified", "custom_db_modified")
         self._pre_allow_edit_source = None  # saved when "Allow editing" is checked
         self._sor_carbon_available = True  # False when SOR has no carbon data
         self._db_original = {}  # immutable snapshot of DB values at suggestion time
@@ -805,12 +899,13 @@ class MaterialDialog(QDialog):
 
         v = data.get("values", {}) if self.is_edit else {}
         s = data.get("state", {}) if self.is_edit else {}
-        # Restore the immutable DB snapshot saved when this material was first added.
-        # "db_original" is the canonical meta key; "db_snapshot" is accepted as a
-        # legacy alias so old project files still load correctly.
+        # The snapshot saved when this material was first added. Its "action"
+        # (internal_db, custom_db, excel) is where the material came from;
+        # no snapshot means it was typed in by hand.
         _meta = data.get("meta", {}) if data else {}
         self._meta = _meta
-        self._db_original = _meta.get("db_original") or _meta.get("db_snapshot") or {}
+        self._db_original = _meta.get("db_original") or {}
+        _origin = self._db_original.get("action", "")
 
         # Migrate any custom units embedded in old project data → global DB
         _migrate_embedded_custom_units(v)
@@ -841,7 +936,7 @@ class MaterialDialog(QDialog):
         self._sor_db_key = (sor_db_key or "").strip()
 
         # ── Active SOR info label ─────────────────────────────────────────
-        if not (emissions_only or recyclability_only):
+        if show_sor_info and not (emissions_only or recyclability_only):
             sor_info_row = QHBoxLayout()
             sor_info_row.setContentsMargins(0, 0, 0, 0)
             sor_info_row.setSpacing(4)
@@ -957,8 +1052,7 @@ class MaterialDialog(QDialog):
         qty_col = QVBoxLayout()
         qty_col.setSpacing(3)
         qty_col.addWidget(_lbl("Quantity *", "quantity"))
-        qty_val = v.get("quantity", "")
-        self.qty_in = QLineEdit("" if not qty_val else fmt(qty_val))
+        self.qty_in = QLineEdit(_field_text(v.get("quantity")))
         self.qty_in.setPlaceholderText("e.g. 100")
         self.qty_in.setMinimumHeight(32)
         self.qty_in.setValidator(dbl)
@@ -983,9 +1077,8 @@ class MaterialDialog(QDialog):
 
         rate_col = QVBoxLayout()
         rate_col.setSpacing(3)
-        rate_col.addWidget(_lbl("Rate (Unit Cost)", "rate"))
-        rate_val = v.get("rate", "")
-        self.rate_in = QLineEdit("" if not rate_val else str(rate_val))
+        rate_col.addWidget(_lbl("Rate (Unit Cost) *", "rate"))
+        self.rate_in = QLineEdit(_field_text(v.get("rate")))
         self.rate_in.setPlaceholderText("e.g. 4500")
         self.rate_in.setMinimumHeight(32)
         self.rate_in.setValidator(dbl)
@@ -1017,7 +1110,7 @@ class MaterialDialog(QDialog):
 
         # Authoritative check: DB/excel source with no carbon data disables the checkbox,
         # BUT only when allow_edit is not already enabled (user may have unlocked it).
-        _is_db_source = _meta.get("source", "") in ("db", "excel")
+        _is_db_source = _origin in ("internal_db", "excel")
         _values_carbon = v.get("carbon_emission")
         _allow_edit_saved = s.get("allow_edit_checked", False)
         _db_has_no_carbon = _is_db_source and _values_carbon in MaterialDialog._DB_NA and not _allow_edit_saved
@@ -1056,8 +1149,7 @@ class MaterialDialog(QDialog):
         ef_col = QVBoxLayout()
         ef_col.setSpacing(3)
         ef_col.addWidget(_lbl("Emission (kgCO₂e)", "carbon_emission"))
-        ef_val = v.get("carbon_emission", "")
-        self.carbon_em_in = QLineEdit("" if not ef_val else str(ef_val))
+        self.carbon_em_in = QLineEdit(_field_text(v.get("carbon_emission")))
         self.carbon_em_in.setPlaceholderText("e.g. 0.179")
         self.carbon_em_in.setMinimumHeight(32)
         self.carbon_em_in.setValidator(dbl)
@@ -1112,8 +1204,7 @@ class MaterialDialog(QDialog):
         self.cf_prefix_lbl.setStyleSheet(f"color: {get_token('text_secondary')}; font-size: {FS_MD}pt;")
         cf_input_row.addWidget(self.cf_prefix_lbl)
 
-        cf_val = v.get("conversion_factor", "")
-        self.conv_factor_in = QLineEdit("" if not cf_val else str(cf_val))
+        self.conv_factor_in = QLineEdit(_field_text(v.get("conversion_factor")))
         self.conv_factor_in.setPlaceholderText("e.g. 2400")
         self.conv_factor_in.setMinimumHeight(32)
         self.conv_factor_in.setMaximumWidth(120)
@@ -1161,8 +1252,7 @@ class MaterialDialog(QDialog):
         scrap_col = QVBoxLayout()
         scrap_col.setSpacing(3)
         scrap_col.addWidget(_lbl("Scrap Rate (unit cost)", "scrap_rate"))
-        scrap_val = v.get("scrap_rate", "")
-        self.scrap_in = QLineEdit("" if not scrap_val else fmt(scrap_val))
+        self.scrap_in = QLineEdit(_field_text(v.get("scrap_rate")))
         self.scrap_in.setPlaceholderText("e.g. 50")
         self.scrap_in.setMinimumHeight(32)
         self.scrap_in.setValidator(dbl)
@@ -1172,8 +1262,8 @@ class MaterialDialog(QDialog):
         recov_col = QVBoxLayout()
         recov_col.setSpacing(3)
         recov_col.addWidget(_lbl("Recovery after Demolition (%)", "post_demolition_recovery_percentage"))
-        recov_val = v.get("post_demolition_recovery_percentage", "")
-        self.recycling_perc_in = QLineEdit("" if not recov_val else fmt(recov_val))
+        self.recycling_perc_in = QLineEdit(
+            _field_text(v.get("post_demolition_recovery_percentage")))
         self.recycling_perc_in.setPlaceholderText("e.g. 90")
         self.recycling_perc_in.setMinimumHeight(32)
         perc_v = QDoubleValidator(0.0, 100.0, DECIMAL_PLACES_CUSTOM)
@@ -1309,45 +1399,14 @@ class MaterialDialog(QDialog):
         self.conv_factor_in.textChanged.connect(self._update_formula_preview)
         self.qty_in.textChanged.connect(self._update_formula_preview)
 
-        for _w in (
-            self.name_in,
-            self.id_in,
-            self.qty_in,
-            self.rate_in,
-            self.src_in,
-            self.carbon_em_in,
-            self.carbon_src_in,
-            self.conv_factor_in,
-            self.scrap_in,
-            self.recycling_perc_in,
-        ):
-            _w.textChanged.connect(self._on_field_manually_changed)
-        self.unit_in.currentIndexChanged.connect(self._on_field_manually_changed)
-        self.carbon_denom_cb.currentIndexChanged.connect(self._on_field_manually_changed)
-        self.carbon_chk.toggled.connect(self._on_field_manually_changed)
-        self.recycle_chk.toggled.connect(self._on_field_manually_changed)
-
         self._update_cf()
         self._ui_ready = True
 
         # ── Re-apply DB lock when editing a previously SOR-filled material ──
-        _src = (data.get("meta", {}).get("source", "") if data else "") or (
-            self._db_original  # already decoded above
-        ).get("action", "user_added")
-        if self.is_edit and _src in (
-            "internal_db",
-            "custom_db",
-            "excel",
-            "excel_modified",
-            "db",
-            "db_modified",
-            "custom_db_modified",
-        ):
-            mat_name = v.get("material_name", "")
-            # Try to restore the SOR item from the saved snapshot first, fallback to suggestions
-            self._sor_item = self._db_original if self._db_original else self._suggestions.get(mat_name)
-            self._sor_filled_name = mat_name  # Prevents immediate reset/re-autofill on open
-            if _src in ("excel", "excel_modified"):
+        if self.is_edit and _origin in ("internal_db", "custom_db", "excel"):
+            self._sor_item = self._db_original
+            self._sor_filled_name = v.get("material_name", "")  # no re-autofill on open
+            if _origin == "excel":
                 self._allow_edit_chk.setText("Allow editing Excel-imported values")
             self._allow_edit_chk.setEnabled(True)
             # Restore checkbox + lock state directly from what was saved
@@ -1468,9 +1527,7 @@ class MaterialDialog(QDialog):
 
         # Name no longer matches the autofilled suggestion → clear stale DB values.
         if self._ui_ready and self._sor_item is not None and q != self._sor_filled_name:
-            if self.is_edit or self._db_original.get("action") == "excel":
-                self._is_customized = True
-            else:
+            if not (self.is_edit or self._db_original.get("action") == "excel"):
                 self._reset_sor_state()
         if self._active_completer is None:
             return
@@ -1502,7 +1559,6 @@ class MaterialDialog(QDialog):
             self._sor_filling = False
         self._sor_item = None
         self._sor_filled_name = None
-        self._is_customized = False
         self._db_original = {}
         self._user_edited_snapshot = {}
         self._lock_autofilled_fields(False)
@@ -1609,6 +1665,18 @@ class MaterialDialog(QDialog):
         self.carbon_denom_cb.setEnabled(not lock)
         self.carbon_src_in.setReadOnly(lock)
         self.conv_factor_in.setReadOnly(lock)
+        # An Excel row's name, quantity and recycling also came from the
+        # file, so the Excel lock covers every input.
+        # (The emissions/recyclability-only dialogs keep their own read-only set.)
+        if self._db_original.get("action") == "excel" and not (
+            self.emissions_only or self.recyclability_only
+        ):
+            self.name_in.setReadOnly(lock)
+            self.qty_in.setReadOnly(lock)
+            self.scrap_in.setReadOnly(lock)
+            self.recycling_perc_in.setReadOnly(lock)
+            self.carbon_chk.setEnabled(not lock)
+            self.recycle_chk.setEnabled(not lock)
 
     def _on_allow_edit_toggled(self, checked: bool):
         """Unlock autofilled fields when checked; restore values and re-lock when unchecked."""
@@ -1638,7 +1706,6 @@ class MaterialDialog(QDialog):
                 self.src_in.clear()
                 self.carbon_src_in.clear()
                 self._sor_filling = False
-            self._is_modified_by_user = True
             self._sor_carbon_available = True
             self.carbon_chk.setEnabled(True)
         else:
@@ -1669,10 +1736,7 @@ class MaterialDialog(QDialog):
                         if idx >= 0:
                             self.unit_in.setCurrentIndex(idx)
 
-                    rate = item.get("rate", "")
-                    self.rate_in.setText(
-                        fmt(rate) if rate not in ("", None) else ""
-                    )
+                    self.rate_in.setText(_field_text(item.get("rate")))
 
                     src = item.get("rate_src", "")
                     self.src_in.setText(
@@ -1691,7 +1755,7 @@ class MaterialDialog(QDialog):
                     carbon_available = carbon not in ("", None) and denom not in ("", None)
                     self._sor_carbon_available = carbon_available
                     if carbon_available:
-                        self.carbon_em_in.setText(fmt(carbon))
+                        self.carbon_em_in.setText(_field_text(carbon))
                         didx = _resolve_unit_code(denom, self.carbon_denom_cb)
                         if didx >= 0:
                             self.carbon_denom_cb.setCurrentIndex(didx)
@@ -1706,15 +1770,23 @@ class MaterialDialog(QDialog):
 
                     cf = item.get("conversion_factor")
                     self.conv_factor_in.setText(
-                        fmt(cf) if cf not in ("", None, 0, 0.0) else ""
+                        "" if cf in (0, 0.0) else _field_text(cf)
                     )
 
                     self.recycle_chk.setChecked(False)
                     self.recycle_chk.setEnabled(True)
+
+                    if item.get("action") == "excel":
+                        # every value came from the file: put all of them back
+                        self.name_in.setText(item.get("name") or "")
+                        self.qty_in.setText(item.get("quantity") or "")
+                        scrap = item.get("scrap_rate") or ""
+                        recovery = item.get("recovery_pct") or ""
+                        self.scrap_in.setText(scrap)
+                        self.recycling_perc_in.setText(recovery)
+                        self.recycle_chk.setChecked(bool(scrap or recovery))
                 finally:
                     self._sor_filling = False
-                self._is_customized = False
-                self._is_modified_by_user = False
                 self._update_cf()
             else:
                 # No DB suggestion - restore the sources saved at check time, or the originals
@@ -1730,8 +1802,6 @@ class MaterialDialog(QDialog):
                 if restore_carbon_src:
                     self.carbon_src_in.setText(restore_carbon_src)
                 self._sor_filling = False
-                self._is_customized = False
-                self._is_modified_by_user = False
 
         self._lock_autofilled_fields(not checked)
 
@@ -1768,13 +1838,6 @@ class MaterialDialog(QDialog):
             )
         except Exception as e:
             QMessageBox.critical(self, "Save Failed", str(e))
-
-    def _on_field_manually_changed(self):
-        if not self._sor_filling and (
-            self._sor_item is not None
-            or self._db_original.get("action") == "excel"
-        ):
-            self._is_customized = True
 
     # ── Suggestion auto-fill ──────────────────────────────────────────────
 
@@ -1848,7 +1911,6 @@ class MaterialDialog(QDialog):
 
             self._sor_item = item
             self._sor_filled_name = name
-            self._is_customized = False
 
             # Snapshot original DB values (written once; never overwritten on re-open).
             # Store the full item so every field is available for modification detection.
@@ -1873,7 +1935,6 @@ class MaterialDialog(QDialog):
         self._allow_edit_chk.blockSignals(False)
         self._allow_edit_chk.setEnabled(True)
         self._lock_autofilled_fields(True)
-        self._is_modified_by_user = False
 
     # ── Unit model helpers ────────────────────────────────────────────────
 
@@ -1938,7 +1999,8 @@ class MaterialDialog(QDialog):
         cb = QComboBox()
         cb.setMinimumHeight(30)
         cb.setModel(self._build_full_unit_model())
-        idx = cb.findData(current_unit)
+        # aliases (cum, rmt, MT...) and unknown units resolve like DB units do
+        idx = _resolve_unit_code(current_unit, cb)
         if idx >= 0:
             cb.setCurrentIndex(idx)
         return cb
@@ -2158,130 +2220,34 @@ class MaterialDialog(QDialog):
     # ── Validation ────────────────────────────────────────────────────────
 
     def validate_and_accept(self):
-        if not self.name_in.text().strip():
-            QMessageBox.critical(self, "Validation Error", "Material Name is required.")
-            return
-
-        if self.unit_in.currentData() == _PLACEHOLDER:
-            QMessageBox.critical(self, "Validation Error", "Please select a unit.")
-            return
-
-        try:
-            qty = float(self.qty_in.text() or 0)
-        except ValueError:
-            qty = 0
-        if qty <= 0:
-            QMessageBox.critical(
-                self, "Validation Error", "Quantity must be greater than zero."
-            )
-            return
-
-        _rate_text = self.rate_in.text().strip()
-        if not _rate_text:
-            QMessageBox.critical(self, "Validation Error", "Rate (unit cost) is required.")
-            return
-        try:
-            rate = float(_rate_text)
-        except ValueError:
-            rate = 0
-        if rate < 0:
-            QMessageBox.critical(self, "Validation Error", "Rate cannot be negative.")
-            return
-        if rate == 0:
+        unit = self.unit_in.currentData()
+        den = self.carbon_denom_cb.currentData()
+        problems = check_material(
+            name=self.name_in.text(),
+            unit="" if unit == _PLACEHOLDER else unit,
+            quantity=self.qty_in.text(),
+            rate=self.rate_in.text(),
+            carbon_on=self.carbon_chk.isChecked(),
+            carbon_den="" if den == _PLACEHOLDER else den,
+            emission=self.carbon_em_in.text(),
+            conversion=self.conv_factor_in.text(),
+            recycle_on=self.recycle_chk.isChecked(),
+            scrap=self.scrap_in.text(),
+            recovery=self.recycling_perc_in.text(),
+        )
+        for level, title, message, turns_off in problems:
+            if level == "error":
+                QMessageBox.critical(self, title, message)
+                return
             reply = QMessageBox.warning(
-                self,
-                "Rate",
-                "Rate (unit cost) is 0 - this material will contribute no cost.\n\nContinue?",
+                self, title, f"{message}\n\nContinue?",
                 QMessageBox.Yes | QMessageBox.No,
             )
             if reply == QMessageBox.No:
                 return
-
-        if self.carbon_chk.isChecked() and self.carbon_denom_cb.currentData() == _PLACEHOLDER:
-            QMessageBox.critical(
-                self, "Validation Error", "Please select a unit for the emission factor denominator."
-            )
-            return
-
-        if self.carbon_chk.isChecked():
-            _ef_text = self.carbon_em_in.text().strip()
-            _cf_text = self.conv_factor_in.text().strip()
-            ef = float(_ef_text) if _ef_text else None
-            cf = float(_cf_text) if _cf_text else None
-
-            if ef is None or ef <= 0:
-                reply = QMessageBox.warning(
-                    self,
-                    "Emission Factor",
-                    "Emission factor is 0 or blank - carbon cost will be skipped.\n\nContinue?",
-                    QMessageBox.Yes | QMessageBox.No,
-                )
-                if reply == QMessageBox.No:
-                    return
+            if turns_off == "carbon":
                 self.carbon_chk.setChecked(False)
-            elif cf is None or cf <= 0:
-                reply = QMessageBox.warning(
-                    self,
-                    "Conversion Factor",
-                    "Conversion factor is 0 or blank - carbon cost will be skipped.\n\nContinue?",
-                    QMessageBox.Yes | QMessageBox.No,
-                )
-                if reply == QMessageBox.No:
-                    return
-                self.carbon_chk.setChecked(False)
-            else:
-                mat_code = self.unit_in.currentData() or ""
-                denom_code = self.carbon_denom_cb.currentData() or ""
-                _, mat_dim = self._get_unit_info(mat_code)
-                _, denom_dim = self._get_unit_info(denom_code)
-                if mat_dim != denom_dim and abs(cf - 1.0) < 1e-6:
-                    res = QMessageBox.warning(
-                        self,
-                        "Check Conversion Factor",
-                        f"Unit mismatch: material is {mat_dim}, carbon unit is {denom_dim}.\nConversion factor is 1.0 - is this correct?\n\nContinue?",
-                        QMessageBox.Yes | QMessageBox.No,
-                    )
-                    if res == QMessageBox.No:
-                        return
-
-        if self.recycle_chk.isChecked():
-            _scrap_text   = self.scrap_in.text().strip()
-            _recycle_text = self.recycling_perc_in.text().strip()
-            try:
-                scrap = float(_scrap_text) if _scrap_text else None
-            except ValueError:
-                scrap = None
-            try:
-                recycle = float(_recycle_text) if _recycle_text else None
-            except ValueError:
-                recycle = None
-
-            recycle_val = recycle or 0
-            if recycle_val > 100:
-                QMessageBox.critical(
-                    self, "Validation Error", "Recovery percentage cannot exceed 100%."
-                )
-                return
-
-            scrap_blank   = scrap is None
-            recycle_blank = recycle is None
-            scrap_zero    = scrap is not None and scrap <= 0
-            recycle_zero  = recycle is not None and recycle <= 0
-
-            if (scrap_blank or scrap_zero) and (recycle_blank or recycle_zero):
-                _detail = (
-                    "Both scrap rate and recovery percentage are blank"
-                    if scrap_blank and recycle_blank
-                    else "Both scrap rate and recovery percentage are zero or blank"
-                )
-                reply = QMessageBox.warning(
-                    self,
-                    "Recyclability",
-                    f"{_detail} - recyclability will be excluded.\n\nContinue?",
-                    QMessageBox.Yes | QMessageBox.No,
-                )
-                if reply == QMessageBox.No:
-                    return
+            elif turns_off == "recycle":
                 self.recycle_chk.setChecked(False)
 
         if self.is_edit:
@@ -2313,32 +2279,19 @@ class MaterialDialog(QDialog):
 
     # ── Output ────────────────────────────────────────────────────────────
 
-    def _compute_action(self) -> str:
-        """Determine source action for metadata.
-
-        Rules:
-          db + edited          → db_modified   (stays db_modified on re-edit)
-          excel + edited       → excel_modified (stays excel_modified on re-edit)
-          custom_db + edited   → custom_db_modified
-          anything unmodified  → original action
-        """
-        orig_action = self._db_original.get("action", "")
-        _modified = self._is_customized or self._is_modified_by_user
-
-        if orig_action == "excel":
-            return "excel_modified" if _modified else "excel"
-
-        if orig_action == "internal_db":
-            return "db_modified" if _modified else "internal_db"
-
-        if orig_action == "custom_db":
-            return "custom_db_modified" if _modified else "custom_db"
-
-        if self._sor_item:
-            is_custom = (self._db_original.get("db_key") or "").startswith("custom::")
-            return "custom_db" if is_custom else "internal_db"
-
-        return "user_added"
+    def _source(self) -> tuple:
+        """(meta source, source_db_key): where the material came from.
+        Whether it was changed since is worked out from db_original when the
+        report is made (material_flags.material_flag)."""
+        action = self._db_original.get("action", "")
+        raw_key = self._db_original.get("db_key", "")
+        if action == "excel":
+            return "excel", ""
+        if action == "internal_db":
+            return "db", raw_key
+        if action == "custom_db":
+            return "custom_db", raw_key.removeprefix("custom::")
+        return "manual", ""
 
     def get_values(self) -> dict:
         """Return material data as {values, meta, state}.
@@ -2356,21 +2309,7 @@ class MaterialDialog(QDialog):
         carbon_on = self.carbon_chk.isChecked()
         recycle_on = self.recycle_chk.isChecked()
 
-        action = self._compute_action()
-        if action in ("excel", "excel_modified"):
-            source = action
-            source_db_key = ""
-        elif action in ("internal_db", "db_modified"):
-            raw_key = self._db_original.get("db_key", "")
-            source = "db_modified" if action == "db_modified" else "db"
-            source_db_key = raw_key
-        elif action in ("custom_db", "custom_db_modified"):
-            raw_key = self._db_original.get("db_key", "")
-            source = "custom_db_modified" if action == "custom_db_modified" else "custom_db"
-            source_db_key = raw_key.removeprefix("custom::")
-        else:
-            source = "manual"
-            source_db_key = ""
+        source, source_db_key = self._source()
 
         _src_id   = self.id_in.text().strip() or None
         _rate_src = self.src_in.text().strip() or None

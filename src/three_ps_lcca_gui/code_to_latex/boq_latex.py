@@ -4,6 +4,7 @@ from pylatex import LongTable, NoEscape
 from pylatex.utils import bold
 
 from ..gui.components.utils.common_requested_data import get_currency
+from ..gui.components.structure.material_flags import material_flag
 from ..gui.components.utils.definitions import STRUCTURE_CHUNKS, UNIT_DISPLAY
 from ..gui.components.utils.display_format import to_number
 from .common_code import latex_layout, longtable_head
@@ -16,7 +17,8 @@ from .pdf_generation_v3.lcca_report_builder import (
 )
 from .pdf_generation_v3.sections.title_page import DISCLAIMER_BOQ, title_page
 from .structure_work_data_latex import (
-    _fmt, _legend, _mat_cell, get_all_structure_chunks, longtable_sections,
+    _db_number, _fmt, _legend, _mat_cell, get_all_structure_chunks, longtable_sections,
+    report_databases_of,
 )
 
 _N_COLS = 6
@@ -60,6 +62,7 @@ def boq_parts(controller=None) -> dict | None:
     """
     currency = get_currency()
     all_chunks = get_all_structure_chunks()
+    databases = report_databases_of(all_chunks)
     headers = ["Sr. No.", "Description of Item", "Unit", "Quantity",
                f"Rate ({currency})", f"Amount ({currency})"]
 
@@ -83,12 +86,13 @@ def boq_parts(controller=None) -> dict | None:
             n_items += len(items)
             for n, item in enumerate(items, 1):
                 v = item.get("values", {})
-                source = item.get("meta", {}).get("source", "db")
+                source = material_flag(item)
                 qty, rate = to_number(v.get("quantity")), to_number(v.get("rate"))
                 sub += qty * rate
                 rows.append([
                     f"{cat_no}.{comp_no}.{n}",
-                    _mat_cell(v.get("material_name", ""), source),
+                    _mat_cell(v.get("material_name", ""), source,
+                              _db_number(item, databases)),
                     UNIT_DISPLAY.get(v.get("unit", ""), v.get("unit")) or "",
                     _fmt(qty), _fmt(rate), _fmt(qty * rate),
                 ])
@@ -105,7 +109,7 @@ def boq_parts(controller=None) -> dict | None:
     grand = sum(t for _, t in totals)
     return {
         "tables": "\n\n".join(tables),
-        "legend": str(_legend(currency)),
+        "legend": str(_legend(currency, databases)),
         "summary": _summary_table(totals, grand, currency),
         "summary_plain": _summary_table(totals, grand, currency, captioned=False),
         "grand": grand,

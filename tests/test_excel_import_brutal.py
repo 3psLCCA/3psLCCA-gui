@@ -15,6 +15,7 @@ from PySide6.QtCore import Qt  # noqa: E402
 
 from three_ps_lcca_gui.gui import themes  # noqa: E402
 from three_ps_lcca_gui.gui.components.structure import excel_importer as ei  # noqa: E402
+from three_ps_lcca_gui.gui.components.structure.widgets import material_dialog as md  # noqa: E402
 
 # Table columns per spec (0 = tick box)
 CB, ISSUES, ID, NAME, QTY, UNIT, RATE = 0, 1, 2, 3, 4, 5, 6
@@ -100,9 +101,10 @@ def button_n(w):
 
 
 def tab_text(w, sheet):
+    shown = sheet.removeprefix("CAT#")  # tabs drop the "CAT#" prefix
     for i in range(w.tabs.count()):
         t = w.tabs.tabText(i)
-        if t == sheet or t.startswith(sheet + " ("):
+        if t == shown or t.startswith(shown + " ("):
             return t
     raise AssertionError(f"no tab for {sheet!r}: "
                          f"{[w.tabs.tabText(i) for i in range(w.tabs.count())]}")
@@ -176,9 +178,7 @@ def assert_consistent(w):
                 assert blk._chk.checkState() == expected_tri(sel, able), (sheet, comp)
             s_sel += sel
             s_able += able
-        assert frac(sw._sheet_count_lbl) == (s_sel, s_able), sheet
-        if s_able:
-            assert sw._sheet_chk.checkState() == expected_tri(s_sel, s_able), sheet
+        assert (sw.selected_count(), sw.selectable_count()) == (s_sel, s_able), sheet
         tot_sel += s_sel
         tot_able += s_able
     assert frac(w._select_all_count_lbl) == (tot_sel, tot_able)
@@ -628,14 +628,14 @@ class TestValidation:
     def test_clean_row_no_errors(self):
         assert self._one()["_errors"] == []
 
-    @pytest.mark.parametrize("field", ["name", "unit", "rate"])
+    @pytest.mark.parametrize("field", ["name", "unit", "rate", "quantity"])
     def test_required_missing(self, field):
         assert self._one(**{field: ""})["_errors"]
 
     def test_all_required_missing_multiple_errors(self):
         assert len(self._one(name="", unit="", rate="")["_errors"]) >= 3
 
-    @pytest.mark.parametrize("field", ["quantity", "src_id", "rate_src", "component",
+    @pytest.mark.parametrize("field", ["src_id", "rate_src", "component",
                                        "carbon_emission", "scrap_rate"])
     def test_optional_may_be_empty(self, field):
         assert self._one(**{field: ""})["_errors"] == []
@@ -648,7 +648,28 @@ class TestValidation:
     @pytest.mark.parametrize("field", NUMERIC)
     @pytest.mark.parametrize("ok", ["0", "0.0", "12", "12.5", "-3", "1e3", "0.0001"])
     def test_numeric_ok(self, field, ok):
-        assert self._one(**{field: ok})["_errors"] == [], (field, ok)
+        errs = self._one(**{field: ok})["_errors"]
+        assert not any("must be a number" in e for e in errs), (field, ok)
+
+    # the Add Material rules, exactly: refused -> error, asked -> warning
+    @pytest.mark.parametrize("fields, message", [
+        ({"quantity": "0"}, "Quantity must be greater than zero."),
+        ({"rate": "-3"}, "Rate cannot be negative."),
+        ({"carbon_emission": "12"}, "Please select a unit for the emission factor denominator."),
+        ({"recovery_pct": "101"}, "Recovery percentage cannot exceed 100%."),
+    ])
+    def test_add_material_refusals_are_errors(self, fields, message):
+        assert message in self._one(**fields)["_errors"]
+
+    @pytest.mark.parametrize("fields, start", [
+        ({"rate": "0"}, "Rate (unit cost) is 0"),
+        ({"carbon_emission": "0", "carbon_emission_units_den": "kg"}, "Emission factor is 0"),
+        ({"scrap_rate": "0"}, "Both scrap rate"),
+    ])
+    def test_add_material_questions_are_warnings(self, fields, start):
+        r = self._one(**fields)
+        assert r["_errors"] == []
+        assert any(w.startswith(start) for w in r["_warnings"])
 
     def test_errors_from_parse_preserved(self):
         r = ei.verify_schema({"CAT#Foundation": [rec(name="A", unit="m", rate="1",
@@ -765,7 +786,7 @@ class TestInitialState:
         # 5 valid rows: 3 on Foundation, 2 on Misc
         assert w._select_all_count_lbl.text() == "(5 / 5)"
         assert w._select_all_chk.checkState() == Qt.Checked
-        assert frac(w._sheet_tables[FOUND]._sheet_count_lbl) == (3, 3)
+        assert (w._sheet_tables[FOUND].selected_count(), w._sheet_tables[FOUND].selectable_count()) == (3, 3)
         assert block(w, FOUND, "Excavation")._count_lbl.text() == "·  2 / 2 selected"
         assert block(w, FOUND, "Pile")._count_lbl.text() == "·  1 / 1 selected"
         assert_consistent(w)
@@ -787,7 +808,7 @@ class TestInitialState:
 
     def test_tabs(self, make):
         w = make(std_sheets())
-        assert all_tabs(w) == [f"{FOUND} (2 ✗)", "CAT#Misc"]
+        assert all_tabs(w) == ["Foundation (2)", "Misc"]
 
     def test_metadata_tab_present_when_passed(self, make):
         w = make(std_sheets(), metadata=[{"key": "Source", "value": "SOR"}])
@@ -801,7 +822,7 @@ class TestInitialState:
     def test_one_tab_per_sheet_many(self, make):
         sheets = {f"CAT#S{i}": [H, good(i, f"M{i}")] for i in range(12)}
         w = make(sheets)
-        assert all_tabs(w) == list(sheets)
+        assert all_tabs(w) == [n.removeprefix("CAT#") for n in sheets]
         assert footer(w)["Total rows"] == 12
         assert_consistent(w)
 
@@ -823,7 +844,7 @@ class TestInitialState:
         assert not w._import_valid_btn.isEnabled()
         assert w._select_all_count_lbl.text() == "(0 / 0)"
         assert w._collect() == {} or all(not c for c in w._collect().values())
-        assert tab_text(w, FOUND) == f"{FOUND} (2 ✗)"
+        assert tab_text(w, FOUND) == "Foundation (2)"
 
     def test_single_row_button_singular(self, make):
         w = make({FOUND: [H, good(1, "Solo")]})
@@ -847,8 +868,8 @@ class TestWarningsAndTabs:
     def test_warning_only_tab(self, make):
         w = make({FOUND: [H + ["CID#Bogus"], good(1, "A") + ["x"], good(2, "B") + ["y"]],
                   "CAT#Misc": [H, good(3, "C")]})
-        assert tab_text(w, FOUND) == f"{FOUND} (2 ⚠)"
-        assert tab_text(w, "CAT#Misc") == "CAT#Misc"
+        assert tab_text(w, FOUND) == "Foundation (2)"
+        assert tab_text(w, "CAT#Misc") == "Misc"
         assert footer(w)["Warnings"] == 2
         assert footer(w)["Errors"] == 0
 
@@ -862,7 +883,7 @@ class TestWarningsAndTabs:
         w = make({FOUND: [H + ["CID#Bogus"], good(1, "", ) + ["x"], good(2, "B") + ["y"]]})
         f = footer(w)
         assert f["Errors"] == 1 and f["Warnings"] == 1
-        assert tab_text(w, FOUND) == f"{FOUND} (1 ✗)"
+        assert tab_text(w, FOUND) == "Foundation (2)"  # the count covers both
 
     def test_formula_row_errors_and_warnings(self, make):
         w = make({FOUND: [H, ["1", "A", "1", "m", "=5*2", "Exc"], good(2, "B")]})
@@ -917,7 +938,7 @@ class TestExisting:
         assert w._select_all_count_lbl.text() == "(2 / 3)"
         assert w._select_all_chk.checkState() == Qt.PartiallyChecked
         assert footer(w) == {"Total rows": 3, "Errors": 0, "Warnings": 1, "Valid": 3, "Selected": 2}
-        assert tab_text(w, FOUND) == f"{FOUND} (1 ⚠)"
+        assert tab_text(w, FOUND) == "Foundation (1)"
         assert_consistent(w)
 
     @pytest.mark.parametrize("stored", ["backfilling", "BACKFILLING", "BackFilling"])
@@ -933,7 +954,7 @@ class TestExisting:
         assert is_ticked(t, r)
         assert "Name exists" not in t.item(r, ISSUES).text()
         assert footer(w)["Warnings"] == 0
-        assert tab_text(w, FOUND) == FOUND
+        assert tab_text(w, FOUND) == "Foundation"
 
     def test_trash_and_live_copy_counts_as_existing(self, make):
         w = make(self.sheets(), existing={"str_foundation": {"Excavation": [
@@ -976,9 +997,11 @@ class TestExisting:
                 return True
         return False
 
-    def test_banner_shown_when_existing(self, make):
+    def test_existing_rows_get_a_pill_not_a_banner(self, make):
         w = make(self.sheets(), existing={"str_foundation": {"Excavation": [item("Backfilling")]}})
-        assert self._banner_visible(w)
+        assert not self._banner_visible(w)  # the per-row "Name exists" pill says it
+        t = block(w, FOUND, "Excavation")._tbl
+        assert t.item(0, ISSUES).text() == "Name exists"
 
     def test_no_banner_without_existing(self, make):
         w = make(self.sheets(), existing={"str_foundation": {"Excavation": [item("Other")]}})
@@ -1000,7 +1023,7 @@ class TestExisting:
                  existing={"str_foundation": {"Excavation": [item("Backfilling")]}})
         f = footer(w)
         assert f["Errors"] == 1 and f["Warnings"] == 0
-        assert tab_text(w, FOUND) == f"{FOUND} (1 ✗)"
+        assert tab_text(w, FOUND) == "Foundation (1)"
 
 
 class TestSelection:
@@ -1039,7 +1062,6 @@ class TestSelection:
         tick(qapp, t, 0, False)
         assert block(w, FOUND, "Excavation")._count_lbl.text() == "·  1 / 2 selected"
         assert block(w, FOUND, "Excavation")._chk.checkState() == Qt.PartiallyChecked
-        assert w._sheet_tables[FOUND]._sheet_chk.checkState() == Qt.PartiallyChecked
         assert w._select_all_chk.checkState() == Qt.PartiallyChecked
         assert w._import_valid_btn.text() == "Import 4 Rows"
         assert footer(w)["Selected"] == 4
@@ -1051,7 +1073,7 @@ class TestSelection:
         tick(qapp, t, 0, False)
         tick(qapp, t, 1, False)
         assert block(w, FOUND, "Excavation")._chk.checkState() == Qt.Unchecked
-        assert w._sheet_tables[FOUND]._sheet_chk.checkState() == Qt.PartiallyChecked
+        assert w._sheet_tables[FOUND].selected_count() == 1
         assert_consistent(w)
 
     def test_untick_whole_sheet(self, make, qapp):
@@ -1061,8 +1083,8 @@ class TestSelection:
             for r in range(t.rowCount()):
                 if is_tickable(t, r):
                     tick(qapp, t, r, False)
-        assert w._sheet_tables[FOUND]._sheet_chk.checkState() == Qt.Unchecked
-        assert w._sheet_tables["CAT#Misc"]._sheet_chk.checkState() == Qt.Checked
+        assert w._sheet_tables[FOUND].selected_count() == 0
+        assert w._sheet_tables["CAT#Misc"].selected_count() == 2
         assert w._select_all_chk.checkState() == Qt.PartiallyChecked
         assert_consistent(w) == (2, 5)
 
@@ -1087,19 +1109,18 @@ class TestSelection:
         assert flat_collected(w) == ["Primer"]
         assert_consistent(w)
 
-    @pytest.mark.parametrize("level", ["block", "sheet"])
-    def test_level_checkbox_click_consistent(self, make, qapp, level):
+    def test_level_checkbox_click_consistent(self, make, qapp):
         w = make(std_sheets())
         t = block(w, FOUND, "Excavation")._tbl
         tick(qapp, t, 0, False)  # make it partial
-        chk = block(w, FOUND, "Excavation")._chk if level == "block" else w._sheet_tables[FOUND]._sheet_chk
+        chk = block(w, FOUND, "Excavation")._chk
         for _ in range(4):
             chk.click()
             qapp.processEvents()
             assert_consistent(w)
             assert chk.checkState() in (Qt.Checked, Qt.Unchecked)  # never stays partial after a click
             # the other sheet is untouched
-            assert frac(w._sheet_tables["CAT#Misc"]._sheet_count_lbl) == (2, 2)
+            assert w._sheet_tables["CAT#Misc"].selected_count() == 2
 
     def test_block_click_from_partial_affects_only_block(self, make, qapp):
         w = make(std_sheets())
@@ -1126,7 +1147,7 @@ class TestLiveEdits:
         assert not is_ticked(t, 0) and not is_tickable(t, 0)
         f = footer(w)
         assert f["Errors"] == 3 and f["Valid"] == 4 and f["Selected"] == 4
-        assert tab_text(w, FOUND) == f"{FOUND} (3 ✗)"
+        assert tab_text(w, FOUND) == "Foundation (3)"
         assert w._import_valid_btn.text() == "Import 4 Rows"
         assert "Backfilling" not in flat_collected(w)
         assert t.item(0, ISSUES).text().strip()
@@ -1140,7 +1161,7 @@ class TestLiveEdits:
         edit(qapp, t, 0, col, val)
         assert footer(w)["Errors"] == 1
         assert not is_tickable(t, 0)
-        assert tab_text(w, FOUND) == f"{FOUND} (1 ✗)"
+        assert tab_text(w, FOUND) == "Foundation (1)"
         assert flat_collected(w) == ["B"]
         assert_consistent(w)
 
@@ -1150,11 +1171,11 @@ class TestLiveEdits:
         edit(qapp, t, 2, RATE, "250")
         assert is_tickable(t, 2)
         assert footer(w)["Errors"] == 1
-        assert tab_text(w, FOUND) == f"{FOUND} (1 ✗)"
+        assert tab_text(w, FOUND) == "Foundation (1)"
         p = block(w, FOUND, "Pile")._tbl
         edit(qapp, p, 1, QTY, "3")
         assert footer(w)["Errors"] == 0 and footer(w)["Valid"] == 7
-        assert tab_text(w, FOUND) == FOUND
+        assert tab_text(w, FOUND) == "Foundation"
         assert frac(w._select_all_count_lbl)[1] == 7
         assert_consistent(w)
 
@@ -1171,11 +1192,11 @@ class TestLiveEdits:
         t = block(w, FOUND, "Excavation")._tbl
         for _ in range(3):
             edit(qapp, t, 0, UNIT, "")
-            assert tab_text(w, FOUND) == f"{FOUND} (1 ✗)"
+            assert tab_text(w, FOUND) == "Foundation (1)"
             assert w._import_valid_btn.text() == "Import 0 Rows"
             assert not w._import_valid_btn.isEnabled()
             edit(qapp, t, 0, UNIT, "kg")
-            assert tab_text(w, FOUND) == FOUND
+            assert tab_text(w, FOUND) == "Foundation"
             assert footer(w)["Errors"] == 0
             assert_consistent(w)
 
@@ -1187,42 +1208,42 @@ class TestLiveEdits:
             tick(qapp, t, 0)
         assert flat_collected(w) == ["New name"]
 
-    def test_edit_negative_and_zero_numbers_not_errors(self, make, qapp):
+    def test_edit_zero_rate_warns_negative_rate_errors(self, make, qapp):
         w = make({FOUND: [H, good(1, "A")]})
         t = block(w, FOUND, "Excavation")._tbl
         edit(qapp, t, 0, RATE, "0")
         assert footer(w)["Errors"] == 0
         edit(qapp, t, 0, RATE, "-5")
-        assert footer(w)["Errors"] == 0
+        assert footer(w)["Errors"] == 1
 
     def test_rename_to_existing_becomes_warning(self, make, qapp):
         w = make({FOUND: [H, good(1, "A"), good(2, "B")]},
                  existing={"str_foundation": {"Excavation": [item("Existing")]}})
         t = block(w, FOUND, "Excavation")._tbl
-        assert tab_text(w, FOUND) == FOUND
+        assert tab_text(w, FOUND) == "Foundation"
         edit(qapp, t, 0, NAME, "EXISTING")
         assert "Name exists" in t.item(0, ISSUES).text()
         assert footer(w)["Warnings"] == 1
-        assert tab_text(w, FOUND) == f"{FOUND} (1 ⚠)"
+        assert tab_text(w, FOUND) == "Foundation (1)"
         assert_consistent(w)
 
     def test_rename_away_from_existing_clears_warning(self, make, qapp):
         w = make({FOUND: [H, good(1, "Existing")]},
                  existing={"str_foundation": {"Excavation": [item("existing")]}})
         t = block(w, FOUND, "Excavation")._tbl
-        assert tab_text(w, FOUND) == f"{FOUND} (1 ⚠)"
+        assert tab_text(w, FOUND) == "Foundation (1)"
         edit(qapp, t, 0, NAME, "Brand new")
         assert "Name exists" not in t.item(0, ISSUES).text()
         assert footer(w)["Warnings"] == 0
-        assert tab_text(w, FOUND) == FOUND
+        assert tab_text(w, FOUND) == "Foundation"
         assert_consistent(w)
 
     def test_two_sheets_tabs_independent(self, make, qapp):
         w = make(std_sheets())
         t = block(w, "CAT#Misc", "Finish")._tbl
         edit(qapp, t, 0, RATE, "bad")
-        assert tab_text(w, "CAT#Misc") == "CAT#Misc (1 ✗)"
-        assert tab_text(w, FOUND) == f"{FOUND} (2 ✗)"
+        assert tab_text(w, "CAT#Misc") == "Misc (1)"
+        assert tab_text(w, FOUND) == "Foundation (2)"
         assert footer(w)["Errors"] == 3
         assert_consistent(w)
 
@@ -1256,7 +1277,8 @@ class TestValidOnlyFilter:
     def test_on_hides_incomplete(self, make, qapp):
         w = make(self.sheets())
         self.set_filter(w, qapp, True)
-        assert self.visible_names(w, "Excavation") == ["Full"]
+        # rate 0 is only a question in Add Material, so that row is valid
+        assert self.visible_names(w, "Excavation") == ["Full", "ZeroRate"]
         assert self.visible_names(w, "Pile") == ["AllGoodPile"]
 
     def test_block_all_hidden_shows_placeholder(self, make, qapp):
@@ -1286,7 +1308,7 @@ class TestValidOnlyFilter:
         w = make(self.sheets())
         self.set_filter(w, qapp, True)
         sel_w, able_w = frac(w._select_all_count_lbl)
-        sheet_sum = sum(frac(sw._sheet_count_lbl)[0] for sw in w._sheet_tables.values())
+        sheet_sum = sum(sw.selected_count() for sw in w._sheet_tables.values())
         block_sum = sum(frac(b._count_lbl)[0] for _, _, b in blocks(w))
         assert sel_w == sheet_sum == block_sum == button_n(w) == footer(w)["Selected"]
         assert sel_w <= able_w
@@ -1380,3 +1402,124 @@ class TestCollect:
     def test_duplicate_names_within_import_both_collected(self, make):
         w = make({FOUND: [H, good(1, "Same"), good(2, "Same")]})
         assert flat_collected(w).count("Same") in (1, 2)
+
+
+# ═════════════════════ duplicate names ignore outer spaces ═════════════════
+
+_SPACED = ["   abc ", "abc", "abc   ", "\tabc", "ABC  "]
+_INNER = ["abc def", "   abc    def", "abc def ", "ABC\tdef", " abc   DEF  "]
+
+
+def _row_named(tbl, name):
+    for r in range(tbl.rowCount()):
+        if tbl.item(r, NAME).text().strip() == name.strip():
+            return r
+    raise AssertionError(f"row {name!r} not found")
+
+
+class TestDuplicateNameSpaces:
+    @pytest.mark.parametrize("in_file", _SPACED)
+    @pytest.mark.parametrize("in_project", _SPACED)
+    def test_preview_marks_name_exists(self, make, in_file, in_project):
+        w = make({FOUND: [H, good(1, in_file)]},
+                 existing={"str_foundation": {"Excavation": [item(in_project)]}})
+        t = block(w, FOUND, "Excavation")._tbl
+        r = _row_named(t, in_file)
+        assert "Name exists" in t.item(r, ISSUES).text()
+        assert not is_ticked(t, r)
+
+    @pytest.mark.parametrize("in_project", _SPACED)
+    def test_inner_spaces_still_differ(self, make, in_project):
+        w = make({FOUND: [H, good(1, "a bc")]},
+                 existing={"str_foundation": {"Excavation": [item(in_project)]}})
+        t = block(w, FOUND, "Excavation")._tbl
+        assert "Name exists" not in t.item(_row_named(t, "a bc"), ISSUES).text()
+
+    @staticmethod
+    def _emit(rows, existing=()):
+        data = {"str_foundation": {"Excavation": [item(n) for n in existing]}}
+        added = []
+
+        class Ctl:
+            engine = FakeEngine(data)
+
+        class Mgr:
+            controller = Ctl
+            chunk_name = "str_foundation"
+            on_refresh = staticmethod(lambda: None)
+            save_current_state = staticmethod(lambda: None)
+
+            def add_material(self, comp, values_dict):
+                added.append(values_dict["values"]["material_name"])
+
+        mats = []
+        for n in rows:
+            rec = {"name": n, "quantity": "10", "unit": "m3", "rate": "100",
+                   "component": "Excavation", "_chunk_key": "str_foundation"}
+            m = ei.record_to_material_dict(rec)
+            m["values"]["material_name"] = n          # keep the spaces as given
+            m.pop("_chunk_key", None)
+            m.pop("_component", None)
+            mats.append(m)
+        result = ei._emit_result({"str_foundation": {"Excavation": mats}}, manager=Mgr())
+        return result, added
+
+    @pytest.mark.parametrize("first", _SPACED)
+    @pytest.mark.parametrize("second", _SPACED)
+    def test_import_batch_keeps_only_the_first(self, first, second):
+        (imported, skipped, failures), added = self._emit([first, second])
+        assert (imported, skipped) == (1, 1)
+        assert added == [first]
+        assert "duplicate name in this import batch" in failures[0]
+
+    @pytest.mark.parametrize("in_file", _SPACED)
+    @pytest.mark.parametrize("in_project", _SPACED)
+    def test_import_skips_name_already_in_project(self, in_file, in_project):
+        (imported, skipped, failures), added = self._emit([in_file], existing=[in_project])
+        assert (imported, skipped, added) == (0, 1, [])
+        assert "already exists" in failures[0]
+
+
+class TestDuplicateNameInnerSpaces:
+    """Runs of spaces inside a name count as one space."""
+
+    @pytest.mark.parametrize("name", _SPACED)
+    def test_name_key_outer(self, name):
+        assert md.name_key(name) == "abc"
+
+    @pytest.mark.parametrize("name", _INNER)
+    def test_name_key_inner(self, name):
+        assert md.name_key(name) == "abc def"
+
+    @pytest.mark.parametrize("a,b", [("a bc", "abc"), ("abc def", "abcdef"),
+                                     ("abc def", "abc-def"), ("abc def", "abc de f")])
+    def test_real_differences_kept(self, a, b):
+        assert md.name_key(a) != md.name_key(b)
+
+    @pytest.mark.parametrize("name", [None, "", "   ", "\t\n"])
+    def test_blank(self, name):
+        assert md.name_key(name) == ""
+
+    @pytest.mark.parametrize("in_file", _INNER)
+    @pytest.mark.parametrize("in_project", _INNER)
+    def test_preview_marks_name_exists(self, make, in_file, in_project):
+        w = make({FOUND: [H, good(1, in_file)]},
+                 existing={"str_foundation": {"Excavation": [item(in_project)]}})
+        t = block(w, FOUND, "Excavation")._tbl
+        r = t.rowCount() - 1
+        assert "Name exists" in t.item(r, ISSUES).text()
+        assert not is_ticked(t, r)
+
+    @pytest.mark.parametrize("first", _INNER)
+    @pytest.mark.parametrize("second", _INNER)
+    def test_import_batch_keeps_only_the_first(self, first, second):
+        (imported, skipped, failures), added = TestDuplicateNameSpaces._emit([first, second])
+        assert (imported, skipped) == (1, 1)
+        assert added == [first]
+
+    @pytest.mark.parametrize("in_file", _INNER)
+    @pytest.mark.parametrize("in_project", _INNER)
+    def test_import_skips_name_already_in_project(self, in_file, in_project):
+        (imported, skipped, failures), added = TestDuplicateNameSpaces._emit(
+            [in_file], existing=[in_project])
+        assert (imported, skipped, added) == (0, 1, [])

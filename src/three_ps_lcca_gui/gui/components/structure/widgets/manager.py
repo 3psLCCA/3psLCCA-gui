@@ -23,7 +23,7 @@ import datetime
 import traceback
 
 from .base_table import StructureTableWidget, _make_msgbox
-from .material_dialog import MaterialDialog
+from .material_dialog import MaterialDialog, name_key
 from ...utils.definitions import UNIT_DISPLAY
 from ...utils.validation_helpers import freeze_widgets
 from ...utils.display_format import fmt, fmt_comma
@@ -468,7 +468,7 @@ class StructureManagerWidget(QWidget):
         """Return lowercased active material names for comp_name."""
         data = self.controller.engine.fetch_chunk(self.chunk_name) or {}
         return {
-            item.get("values", {}).get("material_name", "").strip().lower()
+            name_key(item.get("values", {}).get("material_name"))
             for item in data.get(comp_name, [])
             if not item.get("state", {}).get("in_trash", False)
         }
@@ -488,7 +488,7 @@ class StructureManagerWidget(QWidget):
             # print(f"[DUP CHECK] name='{name}'  name_lower='{name.lower()}'")
             # print(f"[DUP CHECK] existing names: {existing}")
             # print(f"[DUP CHECK] match={name.lower() in existing}")
-            if name.lower() in existing:
+            if name_key(name) in existing:
                 QMessageBox.warning(
                     self,
                     "Duplicate Name",

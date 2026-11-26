@@ -42,7 +42,7 @@ from typing import Any
 import pandas as pd
 
 from PySide6.QtCore import Qt, QEvent, QRect, QSize, QTimer, Signal
-from PySide6.QtGui import QColor, QBrush, QDoubleValidator, QPainter
+from PySide6.QtGui import QColor, QBrush, QPainter
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -51,9 +51,7 @@ from PySide6.QtWidgets import (
     QFrame,
     QGroupBox,
     QHBoxLayout,
-    QHeaderView,
     QLabel,
-    QLineEdit,
     QMessageBox,
     QPushButton,
     QScrollArea,
@@ -70,15 +68,19 @@ from PySide6.QtWidgets import (
 from PySide6.QtWidgets import QButtonGroup, QRadioButton, QGroupBox
 from three_ps_lcca_gui.gui.themes import get_token
 from three_ps_lcca_gui.gui.theme import SP1, SP2, SP3, SP4
-from .widgets.material_dialog import build_excel_snapshot
+from .widgets.material_dialog import (
+    MaterialDialog, build_excel_snapshot, check_material, _field_text, _num, name_key,
+)
+from .excel_exporter import _carbon_denom
 import sys
 from ..utils.unit_resolver import (
     get_unit_info as _gui,
     get_known_units as _gku,
 )
 from ..utils.unit_resolver import get_known_units as _gku
-from ..utils.unit_resolver import get_unit_info
+from ..utils.unit_resolver import get_unit_info, suggest_cf
 from ..utils.table_widgets import TableCard, fit_to_contents
+from three_ps_lcca_gui.gui.assets.themes.column_style import apply_column_style
 from PySide6.QtWidgets import QPlainTextEdit
 import traceback
 import json
@@ -130,7 +132,6 @@ CID_TO_INTERNAL: dict[str, str] = {
     "component": "component",
 }
 
-REQUIRED_FIELDS = {"name", "unit", "rate"}
 
 UNCATEGORISED = "Uncategorised"
 
@@ -302,6 +303,9 @@ def parse_excel(path: str) -> dict:
                     val = ""
                 record[field] = val
 
+            # the row as the file had it, untouched by validation or edits;
+            # record_to_material_dict compares against it on import
+            record["_original"] = {f: record[f] for f in col_map}
             rows.append(record)
 
         materials[sheet_name] = rows
@@ -408,12 +412,6 @@ def verify_schema(parsed: dict[str, list[dict]]) -> dict[str, list[dict]]:
                 # Recognised sheet with blank component → Uncategorised
                 record["component"] = UNCATEGORISED
 
-            # Required field check
-            for field in REQUIRED_FIELDS:
-                val = record.get(field, "")
-                if not val:
-                    errs.append(f"Missing required field: '{field}'")
-
             # Numeric type check
             for field in NUMERIC_FIELDS:
                 val = record.get(field, "")
@@ -445,35 +443,34 @@ def verify_schema(parsed: dict[str, list[dict]]) -> dict[str, list[dict]]:
                     if _known and unit.lower() not in _known:
                         warns.append(f"Unknown unit '{unit}' - verify before importing")
 
-            # EC8: rate = 0 warning
-            rate_str = record.get("rate", "")
-            if rate_str:
-                try:
-                    rate_val = float(rate_str)
-                    if rate_val < 0:
-                        warns.append("Rate is negative - please verify")
-                    elif rate_val == 0:
-                        warns.append("Rate is zero - verify this is intentional")
-                except ValueError:
-                    pass
-
-            # Carbon emission present but missing denominator
+            # the Add Material rules, exactly: what it refuses is an error,
+            # what it asks to continue with is a warning
             ef_str = record.get("carbon_emission", "")
             den = record.get("carbon_emission_units_den", "")
-            if ef_str and not den:
-                warns.append(
-                    "carbon_emission provided but carbon_emission_units_den is missing"
-                )
-
-            # EC9: carbon EF = 0 but denominator is filled
-            if ef_str and den:
-                try:
-                    if float(ef_str) == 0:
-                        warns.append(
-                            "Carbon emission factor is zero - carbon calc will produce 0"
-                        )
-                except ValueError:
-                    pass
+            # as the dialog does: a blank conversion factor is 1 only when
+            # the material and carbon units are the same
+            if ef_str and den and not record.get("conversion_factor") \
+                    and suggest_cf(record.get("unit", ""), den) == 1.0:
+                record["conversion_factor"] = "1"
+            scrap = record.get("scrap_rate", "")
+            recovery = record.get("recovery_pct", "")
+            # a value that is not a number is already an error; checking it
+            # again here would only repeat it ("must be greater than zero")
+            problems = [] if any("must be a number" in e for e in errs) else check_material(
+                name=record.get("name", ""),
+                unit=record.get("unit", ""),
+                quantity=record.get("quantity", ""),
+                rate=record.get("rate", ""),
+                carbon_on=bool(ef_str or den),
+                carbon_den=den,
+                emission=ef_str,
+                conversion=record.get("conversion_factor", ""),
+                recycle_on=bool(scrap or recovery),
+                scrap=scrap,
+                recovery=recovery,
+            )
+            for level, _title, message, _off in problems:
+                (errs if level == "error" else warns).append(message)
 
             # EC13: duplicate CID#ID across all sheets
             id_val = record.get("src_id", "").strip()
@@ -507,61 +504,68 @@ def verify_schema(parsed: dict[str, list[dict]]) -> dict[str, list[dict]]:
 # ---------------------------------------------------------------------------
 
 
-def record_to_material_dict(record: dict) -> dict:
-    """
-    Convert a verified record into the exact dict format that
-    StructureManagerWidget.add_material() expects - i.e. the same
-    structure produced by MaterialDialog.get_values().
-    """
+def _record_values(record: dict) -> dict:
+    """A record's cells as the material values MaterialDialog.get_values() gives."""
 
     def _float_or_none(key: str):
-        raw = record.get(key)
-        if raw is None or str(raw).strip() == "":
-            return None
-        try:
-            return float(raw)
-        except (ValueError, TypeError):
-            return None
+        return _num(record.get(key))
 
     raw_unit = record.get("unit", "").strip()
     carbon_ef = _float_or_none("carbon_emission")
     carbon_denom = record.get("carbon_emission_units_den", "").strip()
     scrap = _float_or_none("scrap_rate")
     recovery = _float_or_none("recovery_pct")
-    has_carbon = (carbon_ef or 0) > 0 and bool(carbon_denom)
-    has_recycle = (scrap or 0) > 0 or (recovery or 0) > 0
 
     unit_to_si, _ = get_unit_info(raw_unit)
     if unit_to_si is None:
         unit_to_si = 1.0
 
     cf = _float_or_none("conversion_factor")
+    # the default verify_schema fills in: blank is 1 when the units are the same
+    if cf is None and carbon_ef is not None and carbon_denom             and suggest_cf(raw_unit, carbon_denom) == 1.0:
+        cf = 1.0
 
     return {
-        "values": {
-            "src_id": record.get("src_id", "").strip() or None,
-            "material_name": record.get("name", "").strip(),
-            "quantity": _float_or_none("quantity"),
-            "unit": raw_unit,
-            "unit_to_si": unit_to_si,
-            "rate": _float_or_none("rate"),
-            "rate_source": record.get("rate_src", "").strip() or None,
-            "carbon_emission": carbon_ef,
-            "carbon_unit": f"kgCO₂e/{carbon_denom}" if carbon_denom else None,
-            "carbon_emission_src": record.get("carbon_emission_src", "").strip() or None,
-            "conversion_factor": cf,
-            "scrap_rate": scrap,
-            "post_demolition_recovery_percentage": recovery,
-            "is_recyclable": has_recycle,
-        },
+        "src_id": record.get("src_id", "").strip() or None,
+        "material_name": record.get("name", "").strip(),
+        "quantity": _float_or_none("quantity"),
+        "unit": raw_unit,
+        "unit_to_si": unit_to_si,
+        "rate": _float_or_none("rate"),
+        "rate_source": record.get("rate_src", "").strip() or None,
+        "carbon_emission": carbon_ef,
+        "carbon_unit": f"kgCO₂e/{carbon_denom}" if carbon_denom else None,
+        "carbon_emission_src": record.get("carbon_emission_src", "").strip() or None,
+        "conversion_factor": cf,
+        "scrap_rate": scrap,
+        "post_demolition_recovery_percentage": recovery,
+        "is_recyclable": (scrap or 0) > 0 or (recovery or 0) > 0,
+    }
+
+
+def record_to_material_dict(record: dict) -> dict:
+    """
+    Convert a verified record into the exact dict format that
+    StructureManagerWidget.add_material() expects - i.e. the same
+    structure produced by MaterialDialog.get_values().
+
+    db_original is the file's row (``_original``, kept by parse_excel), so
+    material_flags.material_flag can tell later whether it was edited.
+    """
+    values = _record_values(record)
+    original = record.get("_original")
+
+    return {
+        "values": values,
         "meta": {
             "source": "excel",
             "source_db_key": "",
-            "db_original": build_excel_snapshot(record),
+            "db_original": build_excel_snapshot(original or record),
         },
         "state": {
-            "included_in_carbon_emission": has_carbon,
-            "included_in_recyclability": has_recycle,
+            "included_in_carbon_emission": (values["carbon_emission"] or 0) > 0
+                                           and bool(values["carbon_unit"]),
+            "included_in_recyclability": values["is_recyclable"],
         },
         # Top-level routing/control flags - consumed before add_material() is called
         "_force_overwrite": bool(record.get("_duplicate_name", False)),
@@ -592,48 +596,34 @@ def _validate_for_engine(
     Returns a list of block reasons - empty = safe to call add_material().
 
     HARD BLOCKS (row skipped entirely):
-      1. material_name empty                  - validate_and_accept critical
-      2. quantity <= 0                        - validate_and_accept critical
+      1-2. whatever check_material() refuses  - the Add Material rules
       3. duplicate material_name in component - open_dialog warning block
 
     AUTO-EXCLUSIONS (row imports, flag silently set to False):
       4. state.included_in_carbon_emission → False if EF <= 0 or CF <= 0
-      5. state.included_in_recyclability   → False if scrap <= 0 AND recovery <= 0
+    (recyclability needs none: it is only on when scrap or recovery is > 0)
     """
-    reasons: list[str] = []
     v = values_dict.get("values", {})
+    st = values_dict.get("state", {})
 
-    # ── 1. material_name ─────────────────────────────────────────────────────
+    # ── 1-2. the Add Material refusals (check_material errors) ──────────────
+    reasons: list[str] = [
+        message for level, _title, message, _off in check_material(
+            name=v.get("material_name"),
+            unit=v.get("unit"),
+            quantity=v.get("quantity"),
+            rate=v.get("rate"),
+            carbon_on=st.get("included_in_carbon_emission") is True,
+            carbon_den=_carbon_denom(v.get("carbon_unit") or ""),
+            emission=v.get("carbon_emission"),
+            conversion=v.get("conversion_factor"),
+            recycle_on=bool(st.get("included_in_recyclability")),
+            scrap=v.get("scrap_rate"),
+            recovery=v.get("post_demolition_recovery_percentage"),
+        )
+        if level == "error"
+    ]
     name = str(v.get("material_name", "")).strip()
-    if not name:
-        reasons.append("material_name is empty")
-
-    # ── 2. quantity ──────────────────────────────────────────────────────────
-    try:
-        qty = float(v.get("quantity") or 0)
-    except (ValueError, TypeError):
-        qty = 0.0
-    if qty <= 0:
-        reasons.append(f"quantity must be > 0 (got {qty})")
-
-    # ── 2b. unit ─────────────────────────────────────────────────────────────
-    unit = str(v.get("unit", "")).strip()
-    if not unit:
-        reasons.append("unit is empty - every material must have a unit")
-
-    # ── 2c. rate ─────────────────────────────────────────────────────────────
-    rate_raw = v.get("rate")
-    if rate_raw is None:
-        reasons.append("rate is required")
-    else:
-        try:
-            rate = float(rate_raw)
-        except (ValueError, TypeError):
-            rate = 0.0
-        if rate < 0:
-            reasons.append(
-                f"rate must be >= 0 (got {rate_raw!r}) - negative rate is not allowed"
-            )
 
     # ── 3. duplicate name ────────────────────────────────────────────────────
     # Skipped when force_overwrite=True (user explicitly checked a duplicate row)
@@ -641,11 +631,11 @@ def _validate_for_engine(
         try:
             existing_data = manager.controller.engine.fetch_chunk(chunk_key) or {}
             taken = {
-                item.get("values", {}).get("material_name", "").strip().lower()
+                name_key(item.get("values", {}).get("material_name"))
                 for item in existing_data.get(comp_name, [])
                 if not item.get("state", {}).get("in_trash", False)
             }
-            if name.lower() in taken:
+            if name_key(name) in taken:
                 reasons.append(
                     f'"{name}" already exists in "{comp_name}" - '
                     f"use a different name or choose Merge"
@@ -672,19 +662,6 @@ def _validate_for_engine(
         if ef <= 0 or cf <= 0:
             state["included_in_carbon_emission"] = False
 
-    # ── 5. recyclability auto-exclusion ──────────────────────────────────────
-    if state.get("included_in_recyclability"):
-        try:
-            scrap = float(v.get("scrap_rate") or 0)
-        except (ValueError, TypeError):
-            scrap = 0.0
-        try:
-            recovery = float(v.get("post_demolition_recovery_percentage") or 0)
-        except (ValueError, TypeError):
-            recovery = 0.0
-        if scrap <= 0 and recovery <= 0:
-            state["included_in_recyclability"] = False
-
     return reasons
 
 
@@ -693,7 +670,7 @@ IMPORT_COLUMNS: list[tuple[str, str, bool]] = [
     ("_issues", "Status", False),  # first: the reason sits beside the tick box
     ("src_id", "ID", False),
     ("name", "Name *", False),
-    ("quantity", "Quantity", True),
+    ("quantity", "Quantity *", True),
     ("unit", "Unit *", False),
     ("rate", "Rate *", True),
     ("rate_src", "Rate Source", False),
@@ -704,9 +681,6 @@ IMPORT_COLUMNS: list[tuple[str, str, bool]] = [
     ("scrap_rate", "Scrap Rate", True),
     ("recovery_pct", "Recovery %", True),
 ]
-
-# Free-text columns share the spare width; the rest fit their contents
-_STRETCH_FIELDS = {"name", "rate_src", "carbon_emission_src"}
 
 # Col 0 is the selection checkbox; all IMPORT_COLUMNS data starts at col 1
 _CB_COL = 0
@@ -724,13 +698,22 @@ _STATE_ROLE = Qt.UserRole + 2
 
 _FIELD_LABEL = {f: lbl.rstrip(" *") for f, lbl, _n in IMPORT_COLUMNS}
 
-# warning message start -> short pill text
+# message start -> short pill text
 _SHORT_WARNINGS = (
+    ("Material Name is required", "Missing Name"),
+    ("Please select a unit.", "Missing Unit"),
+    ("Quantity must be", "Missing Quantity"),
+    ("Rate (unit cost) is required", "Missing Rate"),
+    ("Rate cannot be negative", "Negative rate"),
+    ("Rate (unit cost) is 0", "Zero rate"),
+    ("Please select a unit for the emission", "No carbon unit"),
+    ("Emission factor is 0", "Zero carbon EF"),
+    ("Conversion factor is 0", "Zero conversion"),
+    ("Conversion factor is required", "Missing conversion"),
+    ("Unit mismatch", "Check conversion"),
+    ("Recovery percentage cannot", "Recovery over 100%"),
+    ("Both scrap rate", "No recyclability"),
     ("Unknown unit", "Unknown unit"),
-    ("Rate is negative", "Negative rate"),
-    ("Rate is zero", "Zero rate"),
-    ("carbon_emission provided", "No carbon unit"),
-    ("Carbon emission factor is zero", "Zero carbon EF"),
     ("CID#ID", "Duplicate ID"),
     ("Component '", "Merged component"),
 )
@@ -738,9 +721,6 @@ _SHORT_WARNINGS = (
 
 def _short_issue(msg: str) -> str:
     """A few words for the pill; the full message stays in the tooltip."""
-    m = re.match(r"Missing required field: '(\w+)'", msg)
-    if m:
-        return f"Missing {_FIELD_LABEL.get(m[1], m[1])}"
     m = re.match(r"'(\w+)' must be a number", msg)
     if m:
         return f"{_FIELD_LABEL.get(m[1], m[1])} not a number"
@@ -801,29 +781,30 @@ class _StatusPillDelegate(QStyledItemDelegate):
         return QSize(size.width() + 2 * SP2, size.height())  # pill's own padding
 
 
-# ---------------------------------------------------------------------------
-# Delegate - enforces numeric-only input on designated columns
-# ---------------------------------------------------------------------------
+# dialog values key -> import record field, for writing an edited row back
+_DIALOG_TO_FIELD = {
+    "src_id": "src_id",
+    "material_name": "name",
+    "quantity": "quantity",
+    "unit": "unit",
+    "rate": "rate",
+    "rate_source": "rate_src",
+    "carbon_emission": "carbon_emission",
+    "carbon_unit": "carbon_emission_units_den",
+    "carbon_emission_src": "carbon_emission_src",
+    "conversion_factor": "conversion_factor",
+    "scrap_rate": "scrap_rate",
+    "post_demolition_recovery_percentage": "recovery_pct",
+}
 
 
-class _CellDelegate(QStyledItemDelegate):
-    """When numeric=True, attaches a QDoubleValidator to the editor."""
-
-    def __init__(self, numeric: bool = False, parent=None):
-        super().__init__(parent)
-        self._numeric = numeric
-
-    def createEditor(self, parent, option, index):
-        editor = QLineEdit(parent)
-        editor.setObjectName("importCellEditor")  # opaque in main.qss
-        if self._numeric:
-            validator = QDoubleValidator(editor)
-            validator.setNotation(QDoubleValidator.StandardNotation)
-            editor.setValidator(validator)
-        return editor
-
-    def updateEditorGeometry(self, editor, option, index):
-        editor.setGeometry(option.rect)
+def _cell_text(key: str, value) -> str:
+    """A dialog value as the text the import table holds."""
+    if value is None:
+        return ""
+    if key == "carbon_unit":  # "kgCO₂e/kg" -> "kg"
+        return _carbon_denom(value)
+    return _field_text(value)
 
 
 # ---------------------------------------------------------------------------
@@ -835,8 +816,7 @@ class ImportComponentTable(QTableWidget):
     """
     Table for one component's rows inside the preview window.
     - Col 0 is a selection checkbox (disabled for error rows).
-    - Numeric columns use QDoubleValidator via a delegate - alpha input is blocked.
-    - Inline double-click editing with live re-validation.
+    - Double-clicking a row edits it in the Add Material dialog, then re-validates it.
     """
 
     selection_changed = Signal()
@@ -864,36 +844,19 @@ class ImportComponentTable(QTableWidget):
                     f"Excel column: CID#{cid_name}"
                 )
 
-        hh = self.horizontalHeader()
-        hh.setSectionResizeMode(QHeaderView.ResizeToContents)
-        for col, (field, _, _n) in enumerate(IMPORT_COLUMNS):
-            if field in _STRETCH_FIELDS:
-                hh.setSectionResizeMode(col + _DATA_START, QHeaderView.Stretch)
-        hh.setStretchLastSection(False)
-        self.setWordWrap(True)
         self.setTextElideMode(Qt.ElideNone)
-        self.setEditTriggers(QTableWidget.DoubleClicked | QTableWidget.SelectedClicked)
-        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.setEditTriggers(QTableWidget.NoEditTriggers)  # edited in MaterialDialog
         fit_to_contents(self)
+        # widths from the header labels, like every other table
+        # (assets/themes/column_style.py); "Status" sizes to its pills
+        apply_column_style(self, {_ISSUES_COL: "misc"})
 
-        # Install cell delegate on every editable data column:
-        # enforces numeric input where needed.
-        _plain_delegate = _CellDelegate(numeric=False, parent=self)
-        _numeric_delegate = _CellDelegate(numeric=True, parent=self)
-        for col, (field, _, numeric) in enumerate(IMPORT_COLUMNS):
-            if field == "_issues":
-                self.setItemDelegateForColumn(
-                    col + _DATA_START, _StatusPillDelegate(self)
-                )
-                continue
-            actual_col = col + _DATA_START
-            self.setItemDelegateForColumn(
-                actual_col, _numeric_delegate if numeric else _plain_delegate
-            )
+        self.setItemDelegateForColumn(_ISSUES_COL, _StatusPillDelegate(self))
 
         self._valid_core_only: bool = False
         QTimer.singleShot(0, self._populate)
         self.itemChanged.connect(self._on_item_changed)
+        self.cellDoubleClicked.connect(self._on_cell_double_clicked)
 
     # -- build ----------------------------------------------------------------
 
@@ -901,19 +864,8 @@ class ImportComponentTable(QTableWidget):
         self.blockSignals(True)
         self.setRowCount(0)
         for rows_idx, record in enumerate(self._rows):
-            if self._valid_core_only:
-                try:
-                    qty = float(record.get("quantity") or 0)
-                except (ValueError, TypeError):
-                    qty = 0.0
-                try:
-                    rate = float(record.get("rate") or 0)
-                except (ValueError, TypeError):
-                    rate = 0.0
-                name = str(record.get("name", "") or "").strip()
-                unit = str(record.get("unit", "") or "").strip()
-                if qty <= 0 or rate <= 0 or not name or not unit:
-                    continue
+            if self._valid_core_only and record.get("_errors"):
+                continue
             self._append_record(record, rows_idx)
         self.blockSignals(False)
         self._update_height()
@@ -973,6 +925,47 @@ class ImportComponentTable(QTableWidget):
 
     # -- edit sync ------------------------------------------------------------
 
+    def _on_cell_double_clicked(self, row: int, col: int):
+        if col != _CB_COL:  # the tick box keeps its own click
+            self.edit_row(row)
+
+    def edit_row(self, table_row: int):
+        """Edit a row in the Add Material dialog (unlocked: fixing values is
+        the point here) and write the result back into the row's cells."""
+        cb = self.item(table_row, _CB_COL)
+        rows_idx = cb.data(Qt.UserRole + 1) if cb else None
+        if rows_idx is None or rows_idx >= len(self._rows):
+            return
+        record = self._rows[rows_idx]
+        data = record_to_material_dict(record)
+        data["state"]["allow_edit_checked"] = True
+        # open with a section ticked whenever the file filled it, even with 0s,
+        # so Update with no change gives the same values back
+        v = data["values"]
+        data["state"]["included_in_carbon_emission"] = (
+            v["carbon_emission"] is not None and bool(v["carbon_unit"]))
+        data["state"]["included_in_recyclability"] = (
+            v["scrap_rate"] is not None
+            or v["post_demolition_recovery_percentage"] is not None)
+        # parented to the window, not the table: main.qss strips the borders
+        # of every QLineEdit inside a QTableView (in-cell editors)
+        dialog = MaterialDialog(
+            self.component_name, self.window(), data=data, show_sor_info=False,
+        )
+        if not dialog.exec():
+            return
+        result = dialog.get_values()
+        cols = {f: c + _DATA_START for c, (f, _l, _n) in enumerate(IMPORT_COLUMNS)}
+        self.blockSignals(True)
+        for key, field in _DIALOG_TO_FIELD.items():
+            text = _cell_text(key, result["values"].get(key))
+            record[field] = text
+            item = self.item(table_row, cols[field])
+            if item:
+                item.setText(text)
+        self.blockSignals(False)
+        self._revalidate_row(table_row, rows_idx)
+
     def _on_item_changed(self, item: QTableWidgetItem):
         # Checkbox column - only notify selection change
         if item.column() == _CB_COL:
@@ -991,8 +984,9 @@ class ImportComponentTable(QTableWidget):
             self._rows[rows_idx][field] = item.text().strip()
             self._revalidate_row(item.row(), rows_idx)
 
-    def _revalidate_row(self, table_row: int, rows_idx: int):
-        record = self._rows[rows_idx]
+    @staticmethod
+    def _verify_record(record: dict):
+        """Re-run the import checks on one record, in place."""
         # Preserve routing keys set during initial parse - don't let the
         # synthetic sheet name "_" overwrite them with the fallback chunk.
         saved_chunk = record.get("_chunk_key")
@@ -1010,6 +1004,10 @@ class ImportComponentTable(QTableWidget):
         # become "<component> - <component>" and import into a new component
         if saved_component is not None:
             record["component"] = saved_component
+
+    def _revalidate_row(self, table_row: int, rows_idx: int):
+        record = self._rows[rows_idx]
+        self._verify_record(record)
 
         # the name may have been edited: check it against the project again
         was_dup = bool(record.get("_duplicate_name"))
@@ -1228,7 +1226,6 @@ class ComponentBlock(TableCard):
 class SheetPreviewWidget(QWidget):
     """
     Groups rows by CID#Component into ComponentBlock instances.
-    Adds a sheet-level "Select all" checkbox above the scroll area.
     """
 
     selection_changed = Signal()
@@ -1249,28 +1246,6 @@ class SheetPreviewWidget(QWidget):
             outer.setContentsMargins(SP3, SP3, SP3, SP3)
             outer.addWidget(lbl)
             return
-
-        # ── Sheet-level select-all header ─────────────────────────────────
-        sheet_hdr = QWidget()
-        shl = QHBoxLayout(sheet_hdr)
-        shl.setContentsMargins(6, 4, 6, 4)
-        shl.setSpacing(8)
-
-        self._sheet_chk = QCheckBox("Select all in sheet")
-        self._sheet_chk.setTristate(True)
-        shl.addWidget(self._sheet_chk)
-        shl.addStretch()
-
-        self._sheet_count_lbl = QLabel()
-        self._sheet_count_lbl.setObjectName("cardCount")
-        shl.addWidget(self._sheet_count_lbl)
-
-        outer.addWidget(sheet_hdr)
-
-        sep = QFrame()
-        sep.setFrameShape(QFrame.HLine)
-        sep.setFrameShadow(QFrame.Sunken)
-        outer.addWidget(sep)
 
         # ── Scroll area with one ComponentBlock per component ─────────────
         # Group rows by component name
@@ -1312,34 +1287,10 @@ class SheetPreviewWidget(QWidget):
 
         cl.addStretch()
 
-        self._sheet_chk.clicked.connect(self._on_sheet_chk_clicked)
-        self._update_sheet_chk()
-
     # -- internal -------------------------------------------------------------
 
     def _on_block_selection_changed(self):
-        self._update_sheet_chk()
         self.selection_changed.emit()
-
-    def _on_sheet_chk_clicked(self):
-        sel = self.selected_count()
-        total = self.selectable_count()
-        self.set_all_checked(sel < total)
-
-    def _update_sheet_chk(self):
-        if not hasattr(self, "_sheet_chk"):
-            return
-        sel = self.selected_count()
-        total = self.selectable_count()
-        self._sheet_count_lbl.setText(f"({sel} / {total} selected)")
-        self._sheet_chk.blockSignals(True)
-        if total == 0 or sel == 0:
-            self._sheet_chk.setCheckState(Qt.Unchecked)
-        elif sel == total:
-            self._sheet_chk.setCheckState(Qt.Checked)
-        else:
-            self._sheet_chk.setCheckState(Qt.PartiallyChecked)
-        self._sheet_chk.blockSignals(False)
 
     # -- public ---------------------------------------------------------------
 
@@ -1356,7 +1307,6 @@ class SheetPreviewWidget(QWidget):
     def apply_valid_qty_filter(self, enabled: bool):
         for block in self._component_blocks.values():
             block.apply_valid_qty_filter(enabled)
-        self._update_sheet_chk()
 
     def get_selected_valid_records(self) -> list[dict]:
         result = []
@@ -1532,11 +1482,7 @@ class ImportPreviewWindow(QDialog):
         # ── Top bar: info + select-all + filter ───────────────────────────────
         top_bar = QHBoxLayout()
 
-        info = QLabel(
-            "<b>Double-click</b> a cell to edit.  "
-            f"<span style='color:{get_token('danger')}'>■</span> Red = errors (cannot import).  "
-            f"<span style='color:{get_token('warning')}'>■</span> Yellow = warnings."
-        )
+        info = QLabel("<b>Double-click</b> a row to edit it.")
         info.setWordWrap(True)
         info.setObjectName("statLabel")
         top_bar.addWidget(info, stretch=1)
@@ -1573,32 +1519,6 @@ class ImportPreviewWindow(QDialog):
                 if not rec.get("_errors") and self._name_exists(rec):
                     rec["_duplicate_name"] = True
 
-        # ── Overwrite warning banner (shown only when duplicates exist) ───────
-        _dup_count = sum(
-            1
-            for _rows in parsed.values()
-            for rec in _rows
-            if rec.get("_duplicate_name")
-        )
-        if _dup_count:
-            # same callout as the transport warnings (#warnBox in main.qss)
-            warn_frame = QFrame()
-            warn_frame.setObjectName("warnBox")
-            warn_layout = QHBoxLayout(warn_frame)
-            warn_layout.setContentsMargins(10, 8, 10, 8)
-            warn_layout.setSpacing(8)
-            warn_icon = QLabel("!")
-            warn_icon.setObjectName("warnIcon")
-            warn_layout.addWidget(warn_icon, 0, Qt.AlignTop)
-            warn_lbl = QLabel(
-                f"<b>{_dup_count} row(s)</b> in this file already exist in the "
-                f"project (matched by name &amp; component, case-insensitive). "
-                f"They are <b>unchecked by default</b> - check them to overwrite."
-            )
-            warn_lbl.setWordWrap(True)
-            warn_layout.addWidget(warn_lbl, 1)
-            root.addWidget(warn_frame)
-
         # ── Tabs - one per sheet ─────────────────────────────────────────────
         self.tabs = QTabWidget()
         root.addWidget(self.tabs, stretch=1)
@@ -1620,6 +1540,11 @@ class ImportPreviewWindow(QDialog):
         # ── Summary label ────────────────────────────────────────────────────
         self._summary_lbl = QLabel()
         root.addWidget(self._summary_lbl)
+
+        # explains the count on sheet tabs; shown only while a tab carries one
+        self._star_note = QLabel("(n) rows with errors or warnings")
+        self._star_note.setObjectName("statLabel")
+        root.addWidget(self._star_note)
 
         # ── Buttons ──────────────────────────────────────────────────────────
         btn_row = QHBoxLayout()
@@ -1644,7 +1569,7 @@ class ImportPreviewWindow(QDialog):
         engine = getattr(getattr(self._manager, "controller", None), "engine", None)
         chunk_key = rec.get("_chunk_key", FALLBACK_CHUNK)
         comp = rec.get("component", "").strip()
-        name = rec.get("name", "").strip().lower()
+        name = name_key(rec.get("name"))
         if engine is None or not name or not comp:
             return False
         if chunk_key not in self._chunk_cache:
@@ -1653,7 +1578,7 @@ class ImportPreviewWindow(QDialog):
             except Exception:
                 self._chunk_cache[chunk_key] = {}
         return any(
-            item.get("values", {}).get("material_name", "").strip().lower() == name
+            name_key(item.get("values", {}).get("material_name")) == name
             for item in self._chunk_cache[chunk_key].get(comp, [])
             if not item.get("state", {}).get("in_trash", False)
         )
@@ -1675,15 +1600,13 @@ class ImportPreviewWindow(QDialog):
             widget.set_all_checked(check)
 
     def _tab_label(self, sheet_name: str, rows: list[dict]) -> str:
+        name = sheet_name.removeprefix("CAT#")  # display only; the sheet keeps it
         if not rows:
-            return sheet_name
-        errs = sum(1 for r in rows if r.get("_errors"))
-        if errs:
-            return f"{sheet_name} ({errs} ✗)"
-        warns = sum(1 for r in rows if _is_warning(r))
-        if warns:
-            return f"{sheet_name} ({warns} ⚠)"
-        return sheet_name
+            return name
+        flagged = sum(1 for r in rows if r.get("_errors") or _is_warning(r))
+        if flagged:
+            return f"{name} ({flagged})"  # the count is explained under the totals
+        return name
 
     def _refresh_summary(self):
         total = sum(len(rows) for rows in self._parsed.values())
@@ -1702,10 +1625,12 @@ class ImportPreviewWindow(QDialog):
         )
 
         # Tab labels follow the rows, so fixing a row by editing updates them
+        starred = False
         for sheet_name, widget in self._sheet_tables.items():
-            self.tabs.setTabText(
-                self.tabs.indexOf(widget), self._tab_label(sheet_name, self._parsed[sheet_name])
-            )
+            label = self._tab_label(sheet_name, self._parsed[sheet_name])
+            starred |= label != sheet_name.removeprefix("CAT#")
+            self.tabs.setTabText(self.tabs.indexOf(widget), label)
+        self._star_note.setVisible(starred)
 
         # Update import button label
         if hasattr(self, "_import_valid_btn"):
@@ -1915,7 +1840,7 @@ def _emit_result(
                 mat_name = values_dict.get("values", {}).get("material_name", f"row {row_idx + 1}")
                 try:
                     # --- Within-batch duplicate check ------------------------
-                    if mat_name.strip().lower() in _batch_seen[batch_key]:
+                    if name_key(mat_name) in _batch_seen[batch_key]:
                         failures.append(
                             f'[{comp_name}] "{mat_name}" skipped - '
                             f"duplicate name in this import batch"
@@ -1952,16 +1877,12 @@ def _emit_result(
                         _engine = manager.controller.engine
                         _chunk_data = _engine.fetch_chunk(chunk_key) or {}
                         _items = _chunk_data.get(comp_name, [])
-                        _name_lower = mat_name.strip().lower()
+                        _name_lower = name_key(mat_name)
                         _found = False
 
                         for _item in _items:
-                            _ev = (
-                                _item.get("values", {})
-                                .get("material_name", "")
-                                .strip()
-                                .lower()
-                            )
+                            _ev = name_key(
+                                _item.get("values", {}).get("material_name"))
                             if _ev == _name_lower and not _item.get("state", {}).get(
                                 "in_trash", False
                             ):
@@ -2012,7 +1933,7 @@ def _emit_result(
                         finally:
                             manager.on_refresh = _orig_refresh
 
-                    _batch_seen[batch_key].add(mat_name.strip().lower())
+                    _batch_seen[batch_key].add(name_key(mat_name))
                     imported += 1
 
                 except Exception as exc:

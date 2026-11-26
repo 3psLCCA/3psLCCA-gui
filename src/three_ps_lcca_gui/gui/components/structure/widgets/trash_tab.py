@@ -8,6 +8,7 @@ from PySide6.QtCore import QTimer
 from three_ps_lcca_gui.gui.themes import get_token
 from .base_table import _make_msgbox
 from .items_by_tab import ItemsByTabView, TAB_NAMES
+from .material_dialog import name_key
 
 
 class TrashTabWidget(ItemsByTabView):
@@ -105,10 +106,10 @@ class TrashTabWidget(ItemsByTabView):
         # Before restoring, check for an active item with the same name.
         if not should_trash:
             restoring_name = (
-                item.get("values", {}).get("material_name", "").strip().lower()
+                name_key(item.get("values", {}).get("material_name"))
             )
             active_names = {
-                it.get("values", {}).get("material_name", "").strip().lower()
+                name_key(it.get("values", {}).get("material_name"))
                 for it in items
                 if not it.get("state", {}).get("in_trash", False)
             }

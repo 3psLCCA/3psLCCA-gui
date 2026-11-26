@@ -1,0 +1,2016 @@
+[
+  {
+    "case": "manual entry",
+    "expect": "manual",
+    "why": "",
+    "item": {
+      "values": {
+        "src_id": null,
+        "material_name": "Site fencing",
+        "quantity": 40.0,
+        "unit": "m",
+        "unit_to_si": 1.0,
+        "rate": 350.0,
+        "rate_source": null,
+        "carbon_emission": null,
+        "carbon_unit": null,
+        "carbon_emission_src": null,
+        "conversion_factor": null,
+        "scrap_rate": null,
+        "post_demolition_recovery_percentage": null
+      },
+      "meta": {
+        "source": "manual",
+        "source_db_key": "",
+        "db_original": {}
+      },
+      "state": {
+        "included_in_carbon_emission": false,
+        "included_in_recyclability": false
+      }
+    }
+  },
+  {
+    "case": "manual, db_original null",
+    "expect": "manual",
+    "why": "",
+    "item": {
+      "values": {
+        "src_id": null,
+        "material_name": "Site fencing",
+        "quantity": 40.0,
+        "unit": "m",
+        "unit_to_si": 1.0,
+        "rate": 350.0,
+        "rate_source": null,
+        "carbon_emission": null,
+        "carbon_unit": null,
+        "carbon_emission_src": null,
+        "conversion_factor": null,
+        "scrap_rate": null,
+        "post_demolition_recovery_percentage": null
+      },
+      "meta": {
+        "source": "manual",
+        "source_db_key": "",
+        "db_original": null
+      },
+      "state": {
+        "included_in_carbon_emission": false,
+        "included_in_recyclability": false
+      }
+    }
+  },
+  {
+    "case": "legacy excel_modified, no snapshot",
+    "expect": "manual",
+    "why": "no snapshot: the stored source is not used",
+    "item": {
+      "values": {
+        "src_id": null,
+        "material_name": "Site fencing",
+        "quantity": 40.0,
+        "unit": "m",
+        "unit_to_si": 1.0,
+        "rate": 350.0,
+        "rate_source": null,
+        "carbon_emission": null,
+        "carbon_unit": null,
+        "carbon_emission_src": null,
+        "conversion_factor": null,
+        "scrap_rate": null,
+        "post_demolition_recovery_percentage": null
+      },
+      "meta": {
+        "source": "excel_modified",
+        "source_db_key": "",
+        "db_original": {}
+      },
+      "state": {
+        "included_in_carbon_emission": false,
+        "included_in_recyclability": false
+      }
+    }
+  },
+  {
+    "case": "legacy db, no snapshot",
+    "expect": "manual",
+    "why": "no snapshot: the stored source is not used",
+    "item": {
+      "values": {
+        "src_id": null,
+        "material_name": "Site fencing",
+        "quantity": 40.0,
+        "unit": "m",
+        "unit_to_si": 1.0,
+        "rate": 350.0,
+        "rate_source": null,
+        "carbon_emission": null,
+        "carbon_unit": null,
+        "carbon_emission_src": null,
+        "conversion_factor": null,
+        "scrap_rate": null,
+        "post_demolition_recovery_percentage": null
+      },
+      "meta": {
+        "source": "db",
+        "source_db_key": "",
+        "db_original": {}
+      },
+      "state": {
+        "included_in_carbon_emission": false,
+        "included_in_recyclability": false
+      }
+    }
+  },
+  {
+    "case": "unknown stored source",
+    "expect": "manual",
+    "why": "",
+    "item": {
+      "values": {
+        "src_id": null,
+        "material_name": "Site fencing",
+        "quantity": 40.0,
+        "unit": "m",
+        "unit_to_si": 1.0,
+        "rate": 350.0,
+        "rate_source": null,
+        "carbon_emission": null,
+        "carbon_unit": null,
+        "carbon_emission_src": null,
+        "conversion_factor": null,
+        "scrap_rate": null,
+        "post_demolition_recovery_percentage": null
+      },
+      "meta": {
+        "source": "user_added",
+        "source_db_key": "",
+        "db_original": {}
+      },
+      "state": {
+        "included_in_carbon_emission": false,
+        "included_in_recyclability": false
+      }
+    }
+  },
+  {
+    "case": "snapshot with unknown action",
+    "expect": "manual",
+    "why": "",
+    "item": {
+      "values": {
+        "src_id": null,
+        "material_name": "Site fencing",
+        "quantity": 40.0,
+        "unit": "m",
+        "unit_to_si": 1.0,
+        "rate": 350.0,
+        "rate_source": null,
+        "carbon_emission": null,
+        "carbon_unit": null,
+        "carbon_emission_src": null,
+        "conversion_factor": null,
+        "scrap_rate": null,
+        "post_demolition_recovery_percentage": null
+      },
+      "meta": {
+        "source": "manual",
+        "source_db_key": "",
+        "db_original": {
+          "action": "user_added"
+        }
+      },
+      "state": {
+        "included_in_carbon_emission": false,
+        "included_in_recyclability": false
+      }
+    }
+  },
+  {
+    "case": "excel as imported",
+    "expect": "excel",
+    "why": "",
+    "item": {
+      "values": {
+        "src_id": "A-1",
+        "material_name": "Concrete M25",
+        "quantity": 12.0,
+        "unit": "m3",
+        "unit_to_si": 1.0,
+        "rate": 4500.0,
+        "rate_source": "DSR 2023",
+        "carbon_emission": 0.25,
+        "carbon_unit": "kgCO₂e/kg",
+        "carbon_emission_src": "ICE v3",
+        "conversion_factor": 2400.0,
+        "scrap_rate": 50.0,
+        "post_demolition_recovery_percentage": 90.0,
+        "is_recyclable": true
+      },
+      "meta": {
+        "source": "excel",
+        "source_db_key": "",
+        "db_original": {
+          "src_id": "A-1",
+          "name": "Concrete M25",
+          "quantity": "12",
+          "unit": "m3",
+          "rate": "4500",
+          "rate_src": "DSR 2023",
+          "carbon_emission": "0.25",
+          "carbon_emission_units_den": "kg",
+          "conversion_factor": "2400",
+          "carbon_emission_src": "ICE v3",
+          "scrap_rate": "50",
+          "recovery_pct": "90",
+          "component": "Excavation",
+          "action": "excel"
+        }
+      },
+      "state": {
+        "included_in_carbon_emission": true,
+        "included_in_recyclability": true
+      }
+    }
+  },
+  {
+    "case": "excel, stored flag says modified but values equal file",
+    "expect": "excel",
+    "why": "changed and changed back",
+    "item": {
+      "values": {
+        "src_id": "A-1",
+        "material_name": "Concrete M25",
+        "quantity": 12.0,
+        "unit": "m3",
+        "unit_to_si": 1.0,
+        "rate": 4500.0,
+        "rate_source": "DSR 2023",
+        "carbon_emission": 0.25,
+        "carbon_unit": "kgCO₂e/kg",
+        "carbon_emission_src": "ICE v3",
+        "conversion_factor": 2400.0,
+        "scrap_rate": 50.0,
+        "post_demolition_recovery_percentage": 90.0,
+        "is_recyclable": true
+      },
+      "meta": {
+        "source": "excel_modified",
+        "source_db_key": "",
+        "db_original": {
+          "src_id": "A-1",
+          "name": "Concrete M25",
+          "quantity": "12",
+          "unit": "m3",
+          "rate": "4500",
+          "rate_src": "DSR 2023",
+          "carbon_emission": "0.25",
+          "carbon_emission_units_den": "kg",
+          "conversion_factor": "2400",
+          "carbon_emission_src": "ICE v3",
+          "scrap_rate": "50",
+          "recovery_pct": "90",
+          "component": "Excavation",
+          "action": "excel"
+        }
+      },
+      "state": {
+        "included_in_carbon_emission": true,
+        "included_in_recyclability": true
+      }
+    }
+  },
+  {
+    "case": "excel rate changed",
+    "expect": "excel_modified",
+    "why": "",
+    "item": {
+      "values": {
+        "src_id": "A-1",
+        "material_name": "Concrete M25",
+        "quantity": 12.0,
+        "unit": "m3",
+        "unit_to_si": 1.0,
+        "rate": 5000.0,
+        "rate_source": "DSR 2023",
+        "carbon_emission": 0.25,
+        "carbon_unit": "kgCO₂e/kg",
+        "carbon_emission_src": "ICE v3",
+        "conversion_factor": 2400.0,
+        "scrap_rate": 50.0,
+        "post_demolition_recovery_percentage": 90.0,
+        "is_recyclable": true
+      },
+      "meta": {
+        "source": "excel",
+        "source_db_key": "",
+        "db_original": {
+          "src_id": "A-1",
+          "name": "Concrete M25",
+          "quantity": "12",
+          "unit": "m3",
+          "rate": "4500",
+          "rate_src": "DSR 2023",
+          "carbon_emission": "0.25",
+          "carbon_emission_units_den": "kg",
+          "conversion_factor": "2400",
+          "carbon_emission_src": "ICE v3",
+          "scrap_rate": "50",
+          "recovery_pct": "90",
+          "component": "Excavation",
+          "action": "excel"
+        }
+      },
+      "state": {
+        "included_in_carbon_emission": true,
+        "included_in_recyclability": true
+      }
+    }
+  },
+  {
+    "case": "excel rate 4500.0 vs cell 4500.00",
+    "expect": "excel",
+    "why": "",
+    "item": {
+      "values": {
+        "src_id": "A-1",
+        "material_name": "Concrete M25",
+        "quantity": 12.0,
+        "unit": "m3",
+        "unit_to_si": 1.0,
+        "rate": 4500.0,
+        "rate_source": "DSR 2023",
+        "carbon_emission": 0.25,
+        "carbon_unit": "kgCO₂e/kg",
+        "carbon_emission_src": "ICE v3",
+        "conversion_factor": 2400.0,
+        "scrap_rate": 50.0,
+        "post_demolition_recovery_percentage": 90.0,
+        "is_recyclable": true
+      },
+      "meta": {
+        "source": "excel",
+        "source_db_key": "",
+        "db_original": {
+          "src_id": "A-1",
+          "name": "Concrete M25",
+          "quantity": "12",
+          "unit": "m3",
+          "rate": "4500.00",
+          "rate_src": "DSR 2023",
+          "carbon_emission": "0.25",
+          "carbon_emission_units_den": "kg",
+          "conversion_factor": "2400",
+          "carbon_emission_src": "ICE v3",
+          "scrap_rate": "50",
+          "recovery_pct": "90",
+          "component": "Excavation",
+          "action": "excel"
+        }
+      },
+      "state": {
+        "included_in_carbon_emission": true,
+        "included_in_recyclability": true
+      }
+    }
+  },
+  {
+    "case": "excel name changed",
+    "expect": "excel_modified",
+    "why": "",
+    "item": {
+      "values": {
+        "src_id": "A-1",
+        "material_name": "Concrete M30",
+        "quantity": 12.0,
+        "unit": "m3",
+        "unit_to_si": 1.0,
+        "rate": 4500.0,
+        "rate_source": "DSR 2023",
+        "carbon_emission": 0.25,
+        "carbon_unit": "kgCO₂e/kg",
+        "carbon_emission_src": "ICE v3",
+        "conversion_factor": 2400.0,
+        "scrap_rate": 50.0,
+        "post_demolition_recovery_percentage": 90.0,
+        "is_recyclable": true
+      },
+      "meta": {
+        "source": "excel",
+        "source_db_key": "",
+        "db_original": {
+          "src_id": "A-1",
+          "name": "Concrete M25",
+          "quantity": "12",
+          "unit": "m3",
+          "rate": "4500",
+          "rate_src": "DSR 2023",
+          "carbon_emission": "0.25",
+          "carbon_emission_units_den": "kg",
+          "conversion_factor": "2400",
+          "carbon_emission_src": "ICE v3",
+          "scrap_rate": "50",
+          "recovery_pct": "90",
+          "component": "Excavation",
+          "action": "excel"
+        }
+      },
+      "state": {
+        "included_in_carbon_emission": true,
+        "included_in_recyclability": true
+      }
+    }
+  },
+  {
+    "case": "excel name differs only by outer spaces",
+    "expect": "excel",
+    "why": "",
+    "item": {
+      "values": {
+        "src_id": "A-1",
+        "material_name": "Concrete M25",
+        "quantity": 12.0,
+        "unit": "m3",
+        "unit_to_si": 1.0,
+        "rate": 4500.0,
+        "rate_source": "DSR 2023",
+        "carbon_emission": 0.25,
+        "carbon_unit": "kgCO₂e/kg",
+        "carbon_emission_src": "ICE v3",
+        "conversion_factor": 2400.0,
+        "scrap_rate": 50.0,
+        "post_demolition_recovery_percentage": 90.0,
+        "is_recyclable": true
+      },
+      "meta": {
+        "source": "excel",
+        "source_db_key": "",
+        "db_original": {
+          "src_id": "A-1",
+          "name": "  Concrete M25 ",
+          "quantity": "12",
+          "unit": "m3",
+          "rate": "4500",
+          "rate_src": "DSR 2023",
+          "carbon_emission": "0.25",
+          "carbon_emission_units_den": "kg",
+          "conversion_factor": "2400",
+          "carbon_emission_src": "ICE v3",
+          "scrap_rate": "50",
+          "recovery_pct": "90",
+          "component": "Excavation",
+          "action": "excel"
+        }
+      },
+      "state": {
+        "included_in_carbon_emission": true,
+        "included_in_recyclability": true
+      }
+    }
+  },
+  {
+    "case": "excel quantity changed",
+    "expect": "excel_modified",
+    "why": "",
+    "item": {
+      "values": {
+        "src_id": "A-1",
+        "material_name": "Concrete M25",
+        "quantity": 13.0,
+        "unit": "m3",
+        "unit_to_si": 1.0,
+        "rate": 4500.0,
+        "rate_source": "DSR 2023",
+        "carbon_emission": 0.25,
+        "carbon_unit": "kgCO₂e/kg",
+        "carbon_emission_src": "ICE v3",
+        "conversion_factor": 2400.0,
+        "scrap_rate": 50.0,
+        "post_demolition_recovery_percentage": 90.0,
+        "is_recyclable": true
+      },
+      "meta": {
+        "source": "excel",
+        "source_db_key": "",
+        "db_original": {
+          "src_id": "A-1",
+          "name": "Concrete M25",
+          "quantity": "12",
+          "unit": "m3",
+          "rate": "4500",
+          "rate_src": "DSR 2023",
+          "carbon_emission": "0.25",
+          "carbon_emission_units_den": "kg",
+          "conversion_factor": "2400",
+          "carbon_emission_src": "ICE v3",
+          "scrap_rate": "50",
+          "recovery_pct": "90",
+          "component": "Excavation",
+          "action": "excel"
+        }
+      },
+      "state": {
+        "included_in_carbon_emission": true,
+        "included_in_recyclability": true
+      }
+    }
+  },
+  {
+    "case": "excel blank quantity saved as 0",
+    "expect": "excel",
+    "why": "",
+    "item": {
+      "values": {
+        "src_id": "A-1",
+        "material_name": "Concrete M25",
+        "quantity": 0.0,
+        "unit": "m3",
+        "unit_to_si": 1.0,
+        "rate": 4500.0,
+        "rate_source": "DSR 2023",
+        "carbon_emission": 0.25,
+        "carbon_unit": "kgCO₂e/kg",
+        "carbon_emission_src": "ICE v3",
+        "conversion_factor": 2400.0,
+        "scrap_rate": 50.0,
+        "post_demolition_recovery_percentage": 90.0,
+        "is_recyclable": true
+      },
+      "meta": {
+        "source": "excel",
+        "source_db_key": "",
+        "db_original": {
+          "src_id": "A-1",
+          "name": "Concrete M25",
+          "quantity": null,
+          "unit": "m3",
+          "rate": "4500",
+          "rate_src": "DSR 2023",
+          "carbon_emission": "0.25",
+          "carbon_emission_units_den": "kg",
+          "conversion_factor": "2400",
+          "carbon_emission_src": "ICE v3",
+          "scrap_rate": "50",
+          "recovery_pct": "90",
+          "component": "Excavation",
+          "action": "excel"
+        }
+      },
+      "state": {
+        "included_in_carbon_emission": true,
+        "included_in_recyclability": true
+      }
+    }
+  },
+  {
+    "case": "excel scrap changed",
+    "expect": "excel_modified",
+    "why": "",
+    "item": {
+      "values": {
+        "src_id": "A-1",
+        "material_name": "Concrete M25",
+        "quantity": 12.0,
+        "unit": "m3",
+        "unit_to_si": 1.0,
+        "rate": 4500.0,
+        "rate_source": "DSR 2023",
+        "carbon_emission": 0.25,
+        "carbon_unit": "kgCO₂e/kg",
+        "carbon_emission_src": "ICE v3",
+        "conversion_factor": 2400.0,
+        "scrap_rate": 40.0,
+        "post_demolition_recovery_percentage": 90.0,
+        "is_recyclable": true
+      },
+      "meta": {
+        "source": "excel",
+        "source_db_key": "",
+        "db_original": {
+          "src_id": "A-1",
+          "name": "Concrete M25",
+          "quantity": "12",
+          "unit": "m3",
+          "rate": "4500",
+          "rate_src": "DSR 2023",
+          "carbon_emission": "0.25",
+          "carbon_emission_units_den": "kg",
+          "conversion_factor": "2400",
+          "carbon_emission_src": "ICE v3",
+          "scrap_rate": "50",
+          "recovery_pct": "90",
+          "component": "Excavation",
+          "action": "excel"
+        }
+      },
+      "state": {
+        "included_in_carbon_emission": true,
+        "included_in_recyclability": true
+      }
+    }
+  },
+  {
+    "case": "excel recovery removed",
+    "expect": "excel_modified",
+    "why": "",
+    "item": {
+      "values": {
+        "src_id": "A-1",
+        "material_name": "Concrete M25",
+        "quantity": 12.0,
+        "unit": "m3",
+        "unit_to_si": 1.0,
+        "rate": 4500.0,
+        "rate_source": "DSR 2023",
+        "carbon_emission": 0.25,
+        "carbon_unit": "kgCO₂e/kg",
+        "carbon_emission_src": "ICE v3",
+        "conversion_factor": 2400.0,
+        "scrap_rate": 50.0,
+        "post_demolition_recovery_percentage": null,
+        "is_recyclable": true
+      },
+      "meta": {
+        "source": "excel",
+        "source_db_key": "",
+        "db_original": {
+          "src_id": "A-1",
+          "name": "Concrete M25",
+          "quantity": "12",
+          "unit": "m3",
+          "rate": "4500",
+          "rate_src": "DSR 2023",
+          "carbon_emission": "0.25",
+          "carbon_emission_units_den": "kg",
+          "conversion_factor": "2400",
+          "carbon_emission_src": "ICE v3",
+          "scrap_rate": "50",
+          "recovery_pct": "90",
+          "component": "Excavation",
+          "action": "excel"
+        }
+      },
+      "state": {
+        "included_in_carbon_emission": true,
+        "included_in_recyclability": true
+      }
+    }
+  },
+  {
+    "case": "excel file unit cum, saved as m3",
+    "expect": "excel",
+    "why": "",
+    "item": {
+      "values": {
+        "src_id": "A-1",
+        "material_name": "Concrete M25",
+        "quantity": 12.0,
+        "unit": "m3",
+        "unit_to_si": 1.0,
+        "rate": 4500.0,
+        "rate_source": "DSR 2023",
+        "carbon_emission": 0.25,
+        "carbon_unit": "kgCO₂e/kg",
+        "carbon_emission_src": "ICE v3",
+        "conversion_factor": 2400.0,
+        "scrap_rate": 50.0,
+        "post_demolition_recovery_percentage": 90.0,
+        "is_recyclable": true
+      },
+      "meta": {
+        "source": "excel",
+        "source_db_key": "",
+        "db_original": {
+          "src_id": "A-1",
+          "name": "Concrete M25",
+          "quantity": "12",
+          "unit": "cum",
+          "rate": "4500",
+          "rate_src": "DSR 2023",
+          "carbon_emission": "0.25",
+          "carbon_emission_units_den": "kg",
+          "conversion_factor": "2400",
+          "carbon_emission_src": "ICE v3",
+          "scrap_rate": "50",
+          "recovery_pct": "90",
+          "component": "Excavation",
+          "action": "excel"
+        }
+      },
+      "state": {
+        "included_in_carbon_emission": true,
+        "included_in_recyclability": true
+      }
+    }
+  },
+  {
+    "case": "excel unit changed m3 -> m2",
+    "expect": "excel_modified",
+    "why": "",
+    "item": {
+      "values": {
+        "src_id": "A-1",
+        "material_name": "Concrete M25",
+        "quantity": 12.0,
+        "unit": "m2",
+        "unit_to_si": 1.0,
+        "rate": 4500.0,
+        "rate_source": "DSR 2023",
+        "carbon_emission": 0.25,
+        "carbon_unit": "kgCO₂e/kg",
+        "carbon_emission_src": "ICE v3",
+        "conversion_factor": 2400.0,
+        "scrap_rate": 50.0,
+        "post_demolition_recovery_percentage": 90.0,
+        "is_recyclable": true
+      },
+      "meta": {
+        "source": "excel",
+        "source_db_key": "",
+        "db_original": {
+          "src_id": "A-1",
+          "name": "Concrete M25",
+          "quantity": "12",
+          "unit": "m3",
+          "rate": "4500",
+          "rate_src": "DSR 2023",
+          "carbon_emission": "0.25",
+          "carbon_emission_units_den": "kg",
+          "conversion_factor": "2400",
+          "carbon_emission_src": "ICE v3",
+          "scrap_rate": "50",
+          "recovery_pct": "90",
+          "component": "Excavation",
+          "action": "excel"
+        }
+      },
+      "state": {
+        "included_in_carbon_emission": true,
+        "included_in_recyclability": true
+      }
+    }
+  },
+  {
+    "case": "excel carbon denominator changed",
+    "expect": "excel_modified",
+    "why": "",
+    "item": {
+      "values": {
+        "src_id": "A-1",
+        "material_name": "Concrete M25",
+        "quantity": 12.0,
+        "unit": "m3",
+        "unit_to_si": 1.0,
+        "rate": 4500.0,
+        "rate_source": "DSR 2023",
+        "carbon_emission": 0.25,
+        "carbon_unit": "kgCO₂e/t",
+        "carbon_emission_src": "ICE v3",
+        "conversion_factor": 2400.0,
+        "scrap_rate": 50.0,
+        "post_demolition_recovery_percentage": 90.0,
+        "is_recyclable": true
+      },
+      "meta": {
+        "source": "excel",
+        "source_db_key": "",
+        "db_original": {
+          "src_id": "A-1",
+          "name": "Concrete M25",
+          "quantity": "12",
+          "unit": "m3",
+          "rate": "4500",
+          "rate_src": "DSR 2023",
+          "carbon_emission": "0.25",
+          "carbon_emission_units_den": "kg",
+          "conversion_factor": "2400",
+          "carbon_emission_src": "ICE v3",
+          "scrap_rate": "50",
+          "recovery_pct": "90",
+          "component": "Excavation",
+          "action": "excel"
+        }
+      },
+      "state": {
+        "included_in_carbon_emission": true,
+        "included_in_recyclability": true
+      }
+    }
+  },
+  {
+    "case": "excel carbon turned off (values dropped)",
+    "expect": "excel_modified",
+    "why": "",
+    "item": {
+      "values": {
+        "src_id": "A-1",
+        "material_name": "Concrete M25",
+        "quantity": 12.0,
+        "unit": "m3",
+        "unit_to_si": 1.0,
+        "rate": 4500.0,
+        "rate_source": "DSR 2023",
+        "carbon_emission": null,
+        "carbon_unit": null,
+        "carbon_emission_src": null,
+        "conversion_factor": 2400.0,
+        "scrap_rate": 50.0,
+        "post_demolition_recovery_percentage": 90.0,
+        "is_recyclable": true
+      },
+      "meta": {
+        "source": "excel",
+        "source_db_key": "",
+        "db_original": {
+          "src_id": "A-1",
+          "name": "Concrete M25",
+          "quantity": "12",
+          "unit": "m3",
+          "rate": "4500",
+          "rate_src": "DSR 2023",
+          "carbon_emission": "0.25",
+          "carbon_emission_units_den": "kg",
+          "conversion_factor": "2400",
+          "carbon_emission_src": "ICE v3",
+          "scrap_rate": "50",
+          "recovery_pct": "90",
+          "component": "Excavation",
+          "action": "excel"
+        }
+      },
+      "state": {
+        "included_in_carbon_emission": true,
+        "included_in_recyclability": true
+      }
+    }
+  },
+  {
+    "case": "excel source text cleared",
+    "expect": "excel_modified",
+    "why": "",
+    "item": {
+      "values": {
+        "src_id": "A-1",
+        "material_name": "Concrete M25",
+        "quantity": 12.0,
+        "unit": "m3",
+        "unit_to_si": 1.0,
+        "rate": 4500.0,
+        "rate_source": null,
+        "carbon_emission": 0.25,
+        "carbon_unit": "kgCO₂e/kg",
+        "carbon_emission_src": "ICE v3",
+        "conversion_factor": 2400.0,
+        "scrap_rate": 50.0,
+        "post_demolition_recovery_percentage": 90.0,
+        "is_recyclable": true
+      },
+      "meta": {
+        "source": "excel",
+        "source_db_key": "",
+        "db_original": {
+          "src_id": "A-1",
+          "name": "Concrete M25",
+          "quantity": "12",
+          "unit": "m3",
+          "rate": "4500",
+          "rate_src": "DSR 2023",
+          "carbon_emission": "0.25",
+          "carbon_emission_units_den": "kg",
+          "conversion_factor": "2400",
+          "carbon_emission_src": "ICE v3",
+          "scrap_rate": "50",
+          "recovery_pct": "90",
+          "component": "Excavation",
+          "action": "excel"
+        }
+      },
+      "state": {
+        "included_in_carbon_emission": true,
+        "included_in_recyclability": true
+      }
+    }
+  },
+  {
+    "case": "excel ID changed",
+    "expect": "excel_modified",
+    "why": "",
+    "item": {
+      "values": {
+        "src_id": "A-2",
+        "material_name": "Concrete M25",
+        "quantity": 12.0,
+        "unit": "m3",
+        "unit_to_si": 1.0,
+        "rate": 4500.0,
+        "rate_source": "DSR 2023",
+        "carbon_emission": 0.25,
+        "carbon_unit": "kgCO₂e/kg",
+        "carbon_emission_src": "ICE v3",
+        "conversion_factor": 2400.0,
+        "scrap_rate": 50.0,
+        "post_demolition_recovery_percentage": 90.0,
+        "is_recyclable": true
+      },
+      "meta": {
+        "source": "excel",
+        "source_db_key": "",
+        "db_original": {
+          "src_id": "A-1",
+          "name": "Concrete M25",
+          "quantity": "12",
+          "unit": "m3",
+          "rate": "4500",
+          "rate_src": "DSR 2023",
+          "carbon_emission": "0.25",
+          "carbon_emission_units_den": "kg",
+          "conversion_factor": "2400",
+          "carbon_emission_src": "ICE v3",
+          "scrap_rate": "50",
+          "recovery_pct": "90",
+          "component": "Excavation",
+          "action": "excel"
+        }
+      },
+      "state": {
+        "included_in_carbon_emission": true,
+        "included_in_recyclability": true
+      }
+    }
+  },
+  {
+    "case": "excel blank CF, same units, saved CF 1",
+    "expect": "excel",
+    "why": "",
+    "item": {
+      "values": {
+        "src_id": "A-1",
+        "material_name": "Concrete M25",
+        "quantity": 12.0,
+        "unit": "kg",
+        "unit_to_si": 1.0,
+        "rate": 4500.0,
+        "rate_source": "DSR 2023",
+        "carbon_emission": 0.25,
+        "carbon_unit": "kgCO₂e/kg",
+        "carbon_emission_src": "ICE v3",
+        "conversion_factor": 1.0,
+        "scrap_rate": 50.0,
+        "post_demolition_recovery_percentage": 90.0,
+        "is_recyclable": true
+      },
+      "meta": {
+        "source": "excel",
+        "source_db_key": "",
+        "db_original": {
+          "src_id": "A-1",
+          "name": "Concrete M25",
+          "quantity": "12",
+          "unit": "kg",
+          "rate": "4500",
+          "rate_src": "DSR 2023",
+          "carbon_emission": "0.25",
+          "carbon_emission_units_den": "kg",
+          "conversion_factor": null,
+          "carbon_emission_src": "ICE v3",
+          "scrap_rate": "50",
+          "recovery_pct": "90",
+          "component": "Excavation",
+          "action": "excel"
+        }
+      },
+      "state": {
+        "included_in_carbon_emission": true,
+        "included_in_recyclability": true
+      }
+    }
+  },
+  {
+    "case": "excel blank CF, same dimension t/kg, saved 1000",
+    "expect": "excel",
+    "why": "",
+    "item": {
+      "values": {
+        "src_id": "A-1",
+        "material_name": "Concrete M25",
+        "quantity": 12.0,
+        "unit": "t",
+        "unit_to_si": 1.0,
+        "rate": 4500.0,
+        "rate_source": "DSR 2023",
+        "carbon_emission": 0.25,
+        "carbon_unit": "kgCO₂e/kg",
+        "carbon_emission_src": "ICE v3",
+        "conversion_factor": 1000.0,
+        "scrap_rate": 50.0,
+        "post_demolition_recovery_percentage": 90.0,
+        "is_recyclable": true
+      },
+      "meta": {
+        "source": "excel",
+        "source_db_key": "",
+        "db_original": {
+          "src_id": "A-1",
+          "name": "Concrete M25",
+          "quantity": "12",
+          "unit": "t",
+          "rate": "4500",
+          "rate_src": "DSR 2023",
+          "carbon_emission": "0.25",
+          "carbon_emission_units_den": "kg",
+          "conversion_factor": null,
+          "carbon_emission_src": "ICE v3",
+          "scrap_rate": "50",
+          "recovery_pct": "90",
+          "component": "Excavation",
+          "action": "excel"
+        }
+      },
+      "state": {
+        "included_in_carbon_emission": true,
+        "included_in_recyclability": true
+      }
+    }
+  },
+  {
+    "case": "excel blank CF, m3/kg, user typed 2400",
+    "expect": "excel_modified",
+    "why": "no automatic CF between volume and mass",
+    "item": {
+      "values": {
+        "src_id": "A-1",
+        "material_name": "Concrete M25",
+        "quantity": 12.0,
+        "unit": "m3",
+        "unit_to_si": 1.0,
+        "rate": 4500.0,
+        "rate_source": "DSR 2023",
+        "carbon_emission": 0.25,
+        "carbon_unit": "kgCO₂e/kg",
+        "carbon_emission_src": "ICE v3",
+        "conversion_factor": 2400.0,
+        "scrap_rate": 50.0,
+        "post_demolition_recovery_percentage": 90.0,
+        "is_recyclable": true
+      },
+      "meta": {
+        "source": "excel",
+        "source_db_key": "",
+        "db_original": {
+          "src_id": "A-1",
+          "name": "Concrete M25",
+          "quantity": "12",
+          "unit": "m3",
+          "rate": "4500",
+          "rate_src": "DSR 2023",
+          "carbon_emission": "0.25",
+          "carbon_emission_units_den": "kg",
+          "conversion_factor": null,
+          "carbon_emission_src": "ICE v3",
+          "scrap_rate": "50",
+          "recovery_pct": "90",
+          "component": "Excavation",
+          "action": "excel"
+        }
+      },
+      "state": {
+        "included_in_carbon_emission": true,
+        "included_in_recyclability": true
+      }
+    }
+  },
+  {
+    "case": "excel blank CF, still blank",
+    "expect": "excel",
+    "why": "",
+    "item": {
+      "values": {
+        "src_id": "A-1",
+        "material_name": "Concrete M25",
+        "quantity": 12.0,
+        "unit": "m3",
+        "unit_to_si": 1.0,
+        "rate": 4500.0,
+        "rate_source": "DSR 2023",
+        "carbon_emission": 0.25,
+        "carbon_unit": "kgCO₂e/kg",
+        "carbon_emission_src": "ICE v3",
+        "conversion_factor": null,
+        "scrap_rate": 50.0,
+        "post_demolition_recovery_percentage": 90.0,
+        "is_recyclable": true
+      },
+      "meta": {
+        "source": "excel",
+        "source_db_key": "",
+        "db_original": {
+          "src_id": "A-1",
+          "name": "Concrete M25",
+          "quantity": "12",
+          "unit": "m3",
+          "rate": "4500",
+          "rate_src": "DSR 2023",
+          "carbon_emission": "0.25",
+          "carbon_emission_units_den": "kg",
+          "conversion_factor": null,
+          "carbon_emission_src": "ICE v3",
+          "scrap_rate": "50",
+          "recovery_pct": "90",
+          "component": "Excavation",
+          "action": "excel"
+        }
+      },
+      "state": {
+        "included_in_carbon_emission": true,
+        "included_in_recyclability": true
+      }
+    }
+  },
+  {
+    "case": "excel CF changed",
+    "expect": "excel_modified",
+    "why": "",
+    "item": {
+      "values": {
+        "src_id": "A-1",
+        "material_name": "Concrete M25",
+        "quantity": 12.0,
+        "unit": "m3",
+        "unit_to_si": 1.0,
+        "rate": 4500.0,
+        "rate_source": "DSR 2023",
+        "carbon_emission": 0.25,
+        "carbon_unit": "kgCO₂e/kg",
+        "carbon_emission_src": "ICE v3",
+        "conversion_factor": 2350.0,
+        "scrap_rate": 50.0,
+        "post_demolition_recovery_percentage": 90.0,
+        "is_recyclable": true
+      },
+      "meta": {
+        "source": "excel",
+        "source_db_key": "",
+        "db_original": {
+          "src_id": "A-1",
+          "name": "Concrete M25",
+          "quantity": "12",
+          "unit": "m3",
+          "rate": "4500",
+          "rate_src": "DSR 2023",
+          "carbon_emission": "0.25",
+          "carbon_emission_units_den": "kg",
+          "conversion_factor": "2400",
+          "carbon_emission_src": "ICE v3",
+          "scrap_rate": "50",
+          "recovery_pct": "90",
+          "component": "Excavation",
+          "action": "excel"
+        }
+      },
+      "state": {
+        "included_in_carbon_emission": true,
+        "included_in_recyclability": true
+      }
+    }
+  },
+  {
+    "case": "excel tiny float noise",
+    "expect": "excel",
+    "why": "",
+    "item": {
+      "values": {
+        "src_id": "A-1",
+        "material_name": "Concrete M25",
+        "quantity": 12.0,
+        "unit": "m3",
+        "unit_to_si": 1.0,
+        "rate": 4500.0,
+        "rate_source": "DSR 2023",
+        "carbon_emission": 0.25000000000000006,
+        "carbon_unit": "kgCO₂e/kg",
+        "carbon_emission_src": "ICE v3",
+        "conversion_factor": 2400.0,
+        "scrap_rate": 50.0,
+        "post_demolition_recovery_percentage": 90.0,
+        "is_recyclable": true
+      },
+      "meta": {
+        "source": "excel",
+        "source_db_key": "",
+        "db_original": {
+          "src_id": "A-1",
+          "name": "Concrete M25",
+          "quantity": "12",
+          "unit": "m3",
+          "rate": "4500",
+          "rate_src": "DSR 2023",
+          "carbon_emission": "0.25",
+          "carbon_emission_units_den": "kg",
+          "conversion_factor": "2400",
+          "carbon_emission_src": "ICE v3",
+          "scrap_rate": "50",
+          "recovery_pct": "90",
+          "component": "Excavation",
+          "action": "excel"
+        }
+      },
+      "state": {
+        "included_in_carbon_emission": true,
+        "included_in_recyclability": true
+      }
+    }
+  },
+  {
+    "case": "db as picked",
+    "expect": "db",
+    "why": "",
+    "item": {
+      "values": {
+        "src_id": "DSR-5.1",
+        "material_name": "Cement OPC 43",
+        "quantity": 25.0,
+        "unit": "t",
+        "unit_to_si": 1000.0,
+        "rate": 7200.5,
+        "rate_source": "DSR 2023",
+        "carbon_emission": 0.91,
+        "carbon_unit": "kgCO₂e/kg",
+        "carbon_emission_src": "ICE v3",
+        "conversion_factor": 1000.0,
+        "scrap_rate": null,
+        "post_demolition_recovery_percentage": null
+      },
+      "meta": {
+        "source": "db",
+        "source_db_key": "IN_DSR_2023",
+        "db_original": {
+          "name": "Cement OPC 43",
+          "src_id": "DSR-5.1",
+          "unit": "t",
+          "rate": 7200.5,
+          "rate_src": "DSR 2023",
+          "carbon_emission": 0.91,
+          "carbon_emission_units_den": "kg",
+          "conversion_factor": 1000,
+          "carbon_emission_src": "ICE v3",
+          "db_key": "IN_DSR_2023",
+          "action": "internal_db"
+        }
+      },
+      "state": {
+        "included_in_carbon_emission": true,
+        "included_in_recyclability": false,
+        "allow_edit_checked": false
+      }
+    }
+  },
+  {
+    "case": "db, stored db_modified but values equal",
+    "expect": "db",
+    "why": "",
+    "item": {
+      "values": {
+        "src_id": "DSR-5.1",
+        "material_name": "Cement OPC 43",
+        "quantity": 25.0,
+        "unit": "t",
+        "unit_to_si": 1000.0,
+        "rate": 7200.5,
+        "rate_source": "DSR 2023",
+        "carbon_emission": 0.91,
+        "carbon_unit": "kgCO₂e/kg",
+        "carbon_emission_src": "ICE v3",
+        "conversion_factor": 1000.0,
+        "scrap_rate": null,
+        "post_demolition_recovery_percentage": null
+      },
+      "meta": {
+        "source": "db_modified",
+        "source_db_key": "IN_DSR_2023",
+        "db_original": {
+          "name": "Cement OPC 43",
+          "src_id": "DSR-5.1",
+          "unit": "t",
+          "rate": 7200.5,
+          "rate_src": "DSR 2023",
+          "carbon_emission": 0.91,
+          "carbon_emission_units_den": "kg",
+          "conversion_factor": 1000,
+          "carbon_emission_src": "ICE v3",
+          "db_key": "IN_DSR_2023",
+          "action": "internal_db"
+        }
+      },
+      "state": {
+        "included_in_carbon_emission": true,
+        "included_in_recyclability": false,
+        "allow_edit_checked": false
+      }
+    }
+  },
+  {
+    "case": "db rate changed",
+    "expect": "db_modified",
+    "why": "",
+    "item": {
+      "values": {
+        "src_id": "DSR-5.1",
+        "material_name": "Cement OPC 43",
+        "quantity": 25.0,
+        "unit": "t",
+        "unit_to_si": 1000.0,
+        "rate": 7300.0,
+        "rate_source": "DSR 2023",
+        "carbon_emission": 0.91,
+        "carbon_unit": "kgCO₂e/kg",
+        "carbon_emission_src": "ICE v3",
+        "conversion_factor": 1000.0,
+        "scrap_rate": null,
+        "post_demolition_recovery_percentage": null
+      },
+      "meta": {
+        "source": "db",
+        "source_db_key": "IN_DSR_2023",
+        "db_original": {
+          "name": "Cement OPC 43",
+          "src_id": "DSR-5.1",
+          "unit": "t",
+          "rate": 7200.5,
+          "rate_src": "DSR 2023",
+          "carbon_emission": 0.91,
+          "carbon_emission_units_den": "kg",
+          "conversion_factor": 1000,
+          "carbon_emission_src": "ICE v3",
+          "db_key": "IN_DSR_2023",
+          "action": "internal_db"
+        }
+      },
+      "state": {
+        "included_in_carbon_emission": true,
+        "included_in_recyclability": false,
+        "allow_edit_checked": false
+      }
+    }
+  },
+  {
+    "case": "db name changed",
+    "expect": "db",
+    "why": "name and quantity are the user's for db items",
+    "item": {
+      "values": {
+        "src_id": "DSR-5.1",
+        "material_name": "Cement",
+        "quantity": 25.0,
+        "unit": "t",
+        "unit_to_si": 1000.0,
+        "rate": 7200.5,
+        "rate_source": "DSR 2023",
+        "carbon_emission": 0.91,
+        "carbon_unit": "kgCO₂e/kg",
+        "carbon_emission_src": "ICE v3",
+        "conversion_factor": 1000.0,
+        "scrap_rate": null,
+        "post_demolition_recovery_percentage": null
+      },
+      "meta": {
+        "source": "db",
+        "source_db_key": "IN_DSR_2023",
+        "db_original": {
+          "name": "Cement OPC 43",
+          "src_id": "DSR-5.1",
+          "unit": "t",
+          "rate": 7200.5,
+          "rate_src": "DSR 2023",
+          "carbon_emission": 0.91,
+          "carbon_emission_units_den": "kg",
+          "conversion_factor": 1000,
+          "carbon_emission_src": "ICE v3",
+          "db_key": "IN_DSR_2023",
+          "action": "internal_db"
+        }
+      },
+      "state": {
+        "included_in_carbon_emission": true,
+        "included_in_recyclability": false,
+        "allow_edit_checked": false
+      }
+    }
+  },
+  {
+    "case": "db quantity changed",
+    "expect": "db",
+    "why": "",
+    "item": {
+      "values": {
+        "src_id": "DSR-5.1",
+        "material_name": "Cement OPC 43",
+        "quantity": 99.0,
+        "unit": "t",
+        "unit_to_si": 1000.0,
+        "rate": 7200.5,
+        "rate_source": "DSR 2023",
+        "carbon_emission": 0.91,
+        "carbon_unit": "kgCO₂e/kg",
+        "carbon_emission_src": "ICE v3",
+        "conversion_factor": 1000.0,
+        "scrap_rate": null,
+        "post_demolition_recovery_percentage": null
+      },
+      "meta": {
+        "source": "db",
+        "source_db_key": "IN_DSR_2023",
+        "db_original": {
+          "name": "Cement OPC 43",
+          "src_id": "DSR-5.1",
+          "unit": "t",
+          "rate": 7200.5,
+          "rate_src": "DSR 2023",
+          "carbon_emission": 0.91,
+          "carbon_emission_units_den": "kg",
+          "conversion_factor": 1000,
+          "carbon_emission_src": "ICE v3",
+          "db_key": "IN_DSR_2023",
+          "action": "internal_db"
+        }
+      },
+      "state": {
+        "included_in_carbon_emission": true,
+        "included_in_recyclability": false,
+        "allow_edit_checked": false
+      }
+    }
+  },
+  {
+    "case": "db scrap added",
+    "expect": "db",
+    "why": "recyclability is not from the database",
+    "item": {
+      "values": {
+        "src_id": "DSR-5.1",
+        "material_name": "Cement OPC 43",
+        "quantity": 25.0,
+        "unit": "t",
+        "unit_to_si": 1000.0,
+        "rate": 7200.5,
+        "rate_source": "DSR 2023",
+        "carbon_emission": 0.91,
+        "carbon_unit": "kgCO₂e/kg",
+        "carbon_emission_src": "ICE v3",
+        "conversion_factor": 1000.0,
+        "scrap_rate": 10.0,
+        "post_demolition_recovery_percentage": null
+      },
+      "meta": {
+        "source": "db",
+        "source_db_key": "IN_DSR_2023",
+        "db_original": {
+          "name": "Cement OPC 43",
+          "src_id": "DSR-5.1",
+          "unit": "t",
+          "rate": 7200.5,
+          "rate_src": "DSR 2023",
+          "carbon_emission": 0.91,
+          "carbon_emission_units_den": "kg",
+          "conversion_factor": 1000,
+          "carbon_emission_src": "ICE v3",
+          "db_key": "IN_DSR_2023",
+          "action": "internal_db"
+        }
+      },
+      "state": {
+        "included_in_carbon_emission": true,
+        "included_in_recyclability": false,
+        "allow_edit_checked": false
+      }
+    }
+  },
+  {
+    "case": "db rate source cleared",
+    "expect": "db_modified",
+    "why": "",
+    "item": {
+      "values": {
+        "src_id": "DSR-5.1",
+        "material_name": "Cement OPC 43",
+        "quantity": 25.0,
+        "unit": "t",
+        "unit_to_si": 1000.0,
+        "rate": 7200.5,
+        "rate_source": null,
+        "carbon_emission": 0.91,
+        "carbon_unit": "kgCO₂e/kg",
+        "carbon_emission_src": "ICE v3",
+        "conversion_factor": 1000.0,
+        "scrap_rate": null,
+        "post_demolition_recovery_percentage": null
+      },
+      "meta": {
+        "source": "db",
+        "source_db_key": "IN_DSR_2023",
+        "db_original": {
+          "name": "Cement OPC 43",
+          "src_id": "DSR-5.1",
+          "unit": "t",
+          "rate": 7200.5,
+          "rate_src": "DSR 2023",
+          "carbon_emission": 0.91,
+          "carbon_emission_units_den": "kg",
+          "conversion_factor": 1000,
+          "carbon_emission_src": "ICE v3",
+          "db_key": "IN_DSR_2023",
+          "action": "internal_db"
+        }
+      },
+      "state": {
+        "included_in_carbon_emission": true,
+        "included_in_recyclability": false,
+        "allow_edit_checked": false
+      }
+    }
+  },
+  {
+    "case": "db emission factor changed",
+    "expect": "db_modified",
+    "why": "",
+    "item": {
+      "values": {
+        "src_id": "DSR-5.1",
+        "material_name": "Cement OPC 43",
+        "quantity": 25.0,
+        "unit": "t",
+        "unit_to_si": 1000.0,
+        "rate": 7200.5,
+        "rate_source": "DSR 2023",
+        "carbon_emission": 0.95,
+        "carbon_unit": "kgCO₂e/kg",
+        "carbon_emission_src": "ICE v3",
+        "conversion_factor": 1000.0,
+        "scrap_rate": null,
+        "post_demolition_recovery_percentage": null
+      },
+      "meta": {
+        "source": "db",
+        "source_db_key": "IN_DSR_2023",
+        "db_original": {
+          "name": "Cement OPC 43",
+          "src_id": "DSR-5.1",
+          "unit": "t",
+          "rate": 7200.5,
+          "rate_src": "DSR 2023",
+          "carbon_emission": 0.91,
+          "carbon_emission_units_den": "kg",
+          "conversion_factor": 1000,
+          "carbon_emission_src": "ICE v3",
+          "db_key": "IN_DSR_2023",
+          "action": "internal_db"
+        }
+      },
+      "state": {
+        "included_in_carbon_emission": true,
+        "included_in_recyclability": false,
+        "allow_edit_checked": false
+      }
+    }
+  },
+  {
+    "case": "db unit alias M.T. saved as t",
+    "expect": "db",
+    "why": "",
+    "item": {
+      "values": {
+        "src_id": "DSR-5.1",
+        "material_name": "Cement OPC 43",
+        "quantity": 25.0,
+        "unit": "t",
+        "unit_to_si": 1000.0,
+        "rate": 7200.5,
+        "rate_source": "DSR 2023",
+        "carbon_emission": 0.91,
+        "carbon_unit": "kgCO₂e/kg",
+        "carbon_emission_src": "ICE v3",
+        "conversion_factor": 1000.0,
+        "scrap_rate": null,
+        "post_demolition_recovery_percentage": null
+      },
+      "meta": {
+        "source": "db",
+        "source_db_key": "IN_DSR_2023",
+        "db_original": {
+          "name": "Cement OPC 43",
+          "src_id": "DSR-5.1",
+          "unit": "M.T.",
+          "rate": 7200.5,
+          "rate_src": "DSR 2023",
+          "carbon_emission": 0.91,
+          "carbon_emission_units_den": "kg",
+          "conversion_factor": 1000,
+          "carbon_emission_src": "ICE v3",
+          "db_key": "IN_DSR_2023",
+          "action": "internal_db"
+        }
+      },
+      "state": {
+        "included_in_carbon_emission": true,
+        "included_in_recyclability": false,
+        "allow_edit_checked": false
+      }
+    }
+  },
+  {
+    "case": "db unit changed",
+    "expect": "db_modified",
+    "why": "",
+    "item": {
+      "values": {
+        "src_id": "DSR-5.1",
+        "material_name": "Cement OPC 43",
+        "quantity": 25.0,
+        "unit": "kg",
+        "unit_to_si": 1000.0,
+        "rate": 7200.5,
+        "rate_source": "DSR 2023",
+        "carbon_emission": 0.91,
+        "carbon_unit": "kgCO₂e/kg",
+        "carbon_emission_src": "ICE v3",
+        "conversion_factor": 1000.0,
+        "scrap_rate": null,
+        "post_demolition_recovery_percentage": null
+      },
+      "meta": {
+        "source": "db",
+        "source_db_key": "IN_DSR_2023",
+        "db_original": {
+          "name": "Cement OPC 43",
+          "src_id": "DSR-5.1",
+          "unit": "t",
+          "rate": 7200.5,
+          "rate_src": "DSR 2023",
+          "carbon_emission": 0.91,
+          "carbon_emission_units_den": "kg",
+          "conversion_factor": 1000,
+          "carbon_emission_src": "ICE v3",
+          "db_key": "IN_DSR_2023",
+          "action": "internal_db"
+        }
+      },
+      "state": {
+        "included_in_carbon_emission": true,
+        "included_in_recyclability": false,
+        "allow_edit_checked": false
+      }
+    }
+  },
+  {
+    "case": "db without carbon, none saved",
+    "expect": "db",
+    "why": "",
+    "item": {
+      "values": {
+        "src_id": "DSR-5.1",
+        "material_name": "Cement OPC 43",
+        "quantity": 25.0,
+        "unit": "t",
+        "unit_to_si": 1000.0,
+        "rate": 7200.5,
+        "rate_source": "DSR 2023",
+        "carbon_emission": null,
+        "carbon_unit": null,
+        "carbon_emission_src": null,
+        "conversion_factor": null,
+        "scrap_rate": null,
+        "post_demolition_recovery_percentage": null
+      },
+      "meta": {
+        "source": "db",
+        "source_db_key": "IN_DSR_2023",
+        "db_original": {
+          "name": "Cement OPC 43",
+          "src_id": "DSR-5.1",
+          "unit": "t",
+          "rate": 7200.5,
+          "rate_src": "DSR 2023",
+          "carbon_emission": null,
+          "carbon_emission_units_den": null,
+          "conversion_factor": null,
+          "carbon_emission_src": null,
+          "db_key": "IN_DSR_2023",
+          "action": "internal_db"
+        }
+      },
+      "state": {
+        "included_in_carbon_emission": true,
+        "included_in_recyclability": false,
+        "allow_edit_checked": false
+      }
+    }
+  },
+  {
+    "case": "db without carbon, user added it",
+    "expect": "db_modified",
+    "why": "",
+    "item": {
+      "values": {
+        "src_id": "DSR-5.1",
+        "material_name": "Cement OPC 43",
+        "quantity": 25.0,
+        "unit": "t",
+        "unit_to_si": 1000.0,
+        "rate": 7200.5,
+        "rate_source": "DSR 2023",
+        "carbon_emission": 0.5,
+        "carbon_unit": "kgCO₂e/kg",
+        "carbon_emission_src": "ICE v3",
+        "conversion_factor": 1000.0,
+        "scrap_rate": null,
+        "post_demolition_recovery_percentage": null
+      },
+      "meta": {
+        "source": "db",
+        "source_db_key": "IN_DSR_2023",
+        "db_original": {
+          "name": "Cement OPC 43",
+          "src_id": "DSR-5.1",
+          "unit": "t",
+          "rate": 7200.5,
+          "rate_src": "DSR 2023",
+          "carbon_emission": null,
+          "carbon_emission_units_den": null,
+          "conversion_factor": null,
+          "carbon_emission_src": null,
+          "db_key": "IN_DSR_2023",
+          "action": "internal_db"
+        }
+      },
+      "state": {
+        "included_in_carbon_emission": true,
+        "included_in_recyclability": false,
+        "allow_edit_checked": false
+      }
+    }
+  },
+  {
+    "case": "db CF 0 in database, saved blank",
+    "expect": "db",
+    "why": "",
+    "item": {
+      "values": {
+        "src_id": "DSR-5.1",
+        "material_name": "Cement OPC 43",
+        "quantity": 25.0,
+        "unit": "t",
+        "unit_to_si": 1000.0,
+        "rate": 7200.5,
+        "rate_source": "DSR 2023",
+        "carbon_emission": 0.91,
+        "carbon_unit": "kgCO₂e/kg",
+        "carbon_emission_src": "ICE v3",
+        "conversion_factor": null,
+        "scrap_rate": null,
+        "post_demolition_recovery_percentage": null
+      },
+      "meta": {
+        "source": "db",
+        "source_db_key": "IN_DSR_2023",
+        "db_original": {
+          "name": "Cement OPC 43",
+          "src_id": "DSR-5.1",
+          "unit": "t",
+          "rate": 7200.5,
+          "rate_src": "DSR 2023",
+          "carbon_emission": 0.91,
+          "carbon_emission_units_den": "kg",
+          "conversion_factor": 0,
+          "carbon_emission_src": "ICE v3",
+          "db_key": "IN_DSR_2023",
+          "action": "internal_db"
+        }
+      },
+      "state": {
+        "included_in_carbon_emission": true,
+        "included_in_recyclability": false,
+        "allow_edit_checked": false
+      }
+    }
+  },
+  {
+    "case": "db blank CF, t/kg auto 1000",
+    "expect": "db",
+    "why": "",
+    "item": {
+      "values": {
+        "src_id": "DSR-5.1",
+        "material_name": "Cement OPC 43",
+        "quantity": 25.0,
+        "unit": "t",
+        "unit_to_si": 1000.0,
+        "rate": 7200.5,
+        "rate_source": "DSR 2023",
+        "carbon_emission": 0.91,
+        "carbon_unit": "kgCO₂e/kg",
+        "carbon_emission_src": "ICE v3",
+        "conversion_factor": 1000.0,
+        "scrap_rate": null,
+        "post_demolition_recovery_percentage": null
+      },
+      "meta": {
+        "source": "db",
+        "source_db_key": "IN_DSR_2023",
+        "db_original": {
+          "name": "Cement OPC 43",
+          "src_id": "DSR-5.1",
+          "unit": "t",
+          "rate": 7200.5,
+          "rate_src": "DSR 2023",
+          "carbon_emission": 0.91,
+          "carbon_emission_units_den": "kg",
+          "conversion_factor": null,
+          "carbon_emission_src": "ICE v3",
+          "db_key": "IN_DSR_2023",
+          "action": "internal_db"
+        }
+      },
+      "state": {
+        "included_in_carbon_emission": true,
+        "included_in_recyclability": false,
+        "allow_edit_checked": false
+      }
+    }
+  },
+  {
+    "case": "db numbers stored as text",
+    "expect": "db",
+    "why": "",
+    "item": {
+      "values": {
+        "src_id": "DSR-5.1",
+        "material_name": "Cement OPC 43",
+        "quantity": 25.0,
+        "unit": "t",
+        "unit_to_si": 1000.0,
+        "rate": 7200.5,
+        "rate_source": "DSR 2023",
+        "carbon_emission": 0.91,
+        "carbon_unit": "kgCO₂e/kg",
+        "carbon_emission_src": "ICE v3",
+        "conversion_factor": 1000.0,
+        "scrap_rate": null,
+        "post_demolition_recovery_percentage": null
+      },
+      "meta": {
+        "source": "db",
+        "source_db_key": "IN_DSR_2023",
+        "db_original": {
+          "name": "Cement OPC 43",
+          "src_id": "DSR-5.1",
+          "unit": "t",
+          "rate": "7200.5",
+          "rate_src": "DSR 2023",
+          "carbon_emission": "0.91",
+          "carbon_emission_units_den": "kg",
+          "conversion_factor": "1000",
+          "carbon_emission_src": "ICE v3",
+          "db_key": "IN_DSR_2023",
+          "action": "internal_db"
+        }
+      },
+      "state": {
+        "included_in_carbon_emission": true,
+        "included_in_recyclability": false,
+        "allow_edit_checked": false
+      }
+    }
+  },
+  {
+    "case": "custom db as picked",
+    "expect": "custom_db",
+    "why": "",
+    "item": {
+      "values": {
+        "src_id": "DSR-5.1",
+        "material_name": "Cement OPC 43",
+        "quantity": 25.0,
+        "unit": "t",
+        "unit_to_si": 1000.0,
+        "rate": 7200.5,
+        "rate_source": "DSR 2023",
+        "carbon_emission": 0.91,
+        "carbon_unit": "kgCO₂e/kg",
+        "carbon_emission_src": "ICE v3",
+        "conversion_factor": 1000.0,
+        "scrap_rate": null,
+        "post_demolition_recovery_percentage": null
+      },
+      "meta": {
+        "source": "custom_db",
+        "source_db_key": "my_db",
+        "db_original": {
+          "name": "Cement OPC 43",
+          "src_id": "DSR-5.1",
+          "unit": "t",
+          "rate": 7200.5,
+          "rate_src": "DSR 2023",
+          "carbon_emission": 0.91,
+          "carbon_emission_units_den": "kg",
+          "conversion_factor": 1000,
+          "carbon_emission_src": "ICE v3",
+          "db_key": "custom::my_db",
+          "action": "custom_db"
+        }
+      },
+      "state": {
+        "included_in_carbon_emission": true,
+        "included_in_recyclability": false,
+        "allow_edit_checked": false
+      }
+    }
+  },
+  {
+    "case": "custom db rate changed",
+    "expect": "custom_db_modified",
+    "why": "",
+    "item": {
+      "values": {
+        "src_id": "DSR-5.1",
+        "material_name": "Cement OPC 43",
+        "quantity": 25.0,
+        "unit": "t",
+        "unit_to_si": 1000.0,
+        "rate": 1.0,
+        "rate_source": "DSR 2023",
+        "carbon_emission": 0.91,
+        "carbon_unit": "kgCO₂e/kg",
+        "carbon_emission_src": "ICE v3",
+        "conversion_factor": 1000.0,
+        "scrap_rate": null,
+        "post_demolition_recovery_percentage": null
+      },
+      "meta": {
+        "source": "custom_db",
+        "source_db_key": "my_db",
+        "db_original": {
+          "name": "Cement OPC 43",
+          "src_id": "DSR-5.1",
+          "unit": "t",
+          "rate": 7200.5,
+          "rate_src": "DSR 2023",
+          "carbon_emission": 0.91,
+          "carbon_emission_units_den": "kg",
+          "conversion_factor": 1000,
+          "carbon_emission_src": "ICE v3",
+          "db_key": "custom::my_db",
+          "action": "custom_db"
+        }
+      },
+      "state": {
+        "included_in_carbon_emission": true,
+        "included_in_recyclability": false,
+        "allow_edit_checked": false
+      }
+    }
+  },
+  {
+    "case": "custom db, stored modified but equal",
+    "expect": "custom_db",
+    "why": "",
+    "item": {
+      "values": {
+        "src_id": "DSR-5.1",
+        "material_name": "Cement OPC 43",
+        "quantity": 25.0,
+        "unit": "t",
+        "unit_to_si": 1000.0,
+        "rate": 7200.5,
+        "rate_source": "DSR 2023",
+        "carbon_emission": 0.91,
+        "carbon_unit": "kgCO₂e/kg",
+        "carbon_emission_src": "ICE v3",
+        "conversion_factor": 1000.0,
+        "scrap_rate": null,
+        "post_demolition_recovery_percentage": null
+      },
+      "meta": {
+        "source": "custom_db_modified",
+        "source_db_key": "my_db",
+        "db_original": {
+          "name": "Cement OPC 43",
+          "src_id": "DSR-5.1",
+          "unit": "t",
+          "rate": 7200.5,
+          "rate_src": "DSR 2023",
+          "carbon_emission": 0.91,
+          "carbon_emission_units_den": "kg",
+          "conversion_factor": 1000,
+          "carbon_emission_src": "ICE v3",
+          "db_key": "custom::my_db",
+          "action": "custom_db"
+        }
+      },
+      "state": {
+        "included_in_carbon_emission": true,
+        "included_in_recyclability": false,
+        "allow_edit_checked": false
+      }
+    }
+  }
+]
