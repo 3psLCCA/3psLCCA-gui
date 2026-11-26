@@ -1,12 +1,13 @@
 from PySide6.QtWidgets import (
+    QComboBox,
     QFormLayout,
-    QGroupBox,
     QHBoxLayout,
     QHeaderView,
     QLabel,
+    QMenu,
     QPushButton,
+    QScrollArea,
     QSizePolicy,
-    QStackedWidget,
     QTableWidget,
     QTableWidgetItem,
     QWidget,
@@ -14,13 +15,15 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QBrush, QColor
 from three_ps_lcca_gui.gui.themes import get_token, theme_manager
-from three_ps_lcca_gui.gui.theme import FS_SECTION
+from three_ps_lcca_gui.gui.theme import FS_SECTION, FW_BOLD, SP1, SP2, SP3, SP4
+from three_ps_lcca_gui.gui.styles import font
 
 from ...base_widget import ScrollableForm
 from ...utils.form_builder.form_definitions import FieldDef
-from ...utils.form_builder.form_builder import build_form, make_section_header
+from ...utils.form_builder.form_builder import build_form
 from ...utils.remarks_editor import RemarksEditor
 from ...utils.display_format import fmt
+from ...utils.icons import make_icon
 from ...utils.table_widgets import (
     EditableCellDelegate, TableCard, TableDoubleSpinBox, TooltipTableMixin, fit_to_contents,
 )
@@ -253,6 +256,10 @@ class _EmissionsTable(TooltipTableMixin, QTableWidget):
 class TrafficEmissions(ScrollableForm):
     def __init__(self, controller=None):
         super().__init__(controller=controller, chunk_name=CHUNK)
+        # page margins and scrollbar as on Transportation / Material / Machinery
+        self.layout.unsetContentsMargins()
+        self.form.unsetContentsMargins()
+        self.findChild(QScrollArea).setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
         self._suppress_mode_signal = False
         self._build_ui()
 
@@ -279,25 +286,27 @@ class TrafficEmissions(ScrollableForm):
     def _build_ui(self):
         main_form = self.form
 
-        # Build mode combo via form_builder (gives us setattr + field wrapper),
-        # then immediately pop it from _field_map so the base _on_field_changed
-        # never fires for it and never writes a partial dict to the chunk.
-        build_form(
-            self,
-            [
-                FieldDef("mode", "Select Mode", "", "combo", options=_MODES, combo_placeholder=""),
-            ],
-        )
-        self._field_map.pop("mode", None)  # ← prevent base save loop from firing
-
-        self.mode.setFixedWidth(220)
-        self.mode.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-        if self.mode.parentWidget():
-            self.mode.parentWidget().setSizePolicy(
-                QSizePolicy.Expanding, QSizePolicy.Fixed
-            )
+        # ── Heading row: title, mode and total, as on Machinery ───────────
+        head = QWidget()
+        head_layout = QHBoxLayout(head)
+        head_layout.setContentsMargins(SP1, SP2, SP1, SP1)
+        head_layout.setSpacing(SP3)
+        title = QLabel("Traffic Diversion")
+        title.setFont(font(FS_SECTION, FW_BOLD))
+        # mode dropdown beside the title (saved by collect_data)
+        self.mode = QComboBox()
+        self.mode.addItems(_MODES)
+        self.mode.setToolTip("Mode is set from the Traffic Data tab")
         self.mode.currentIndexChanged.connect(self._on_mode_changed)
         self.mode.setEnabled(False)  # driven by traffic data, not user
+        self._total_label = QLabel("- kgCO₂e/day")
+        self._total_label.setFont(font(FS_SECTION, FW_BOLD))
+        self._total_label.setToolTip("Total daily emissions from traffic diversion")
+        head_layout.addWidget(title)
+        head_layout.addWidget(self.mode)
+        head_layout.addStretch()
+        head_layout.addWidget(self._total_label)
+        main_form.addRow(head)
 
         # Warning label
         self._warning_label = QLabel()
@@ -306,9 +315,8 @@ class TrafficEmissions(ScrollableForm):
         self._warning_label.setWordWrap(True)
         main_form.addRow(self._warning_label)
 
-        # Stack
-        self._stack = QStackedWidget()
-        # self._stack.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Minimum)
+        # Panels: one per mode, only the current one shown (hidden widgets
+        # take no space in the layout)
 
         # ── Panel 0: Calculate by Vehicle ─────────────────────────────────────
         calc_widget = QWidget()
@@ -326,35 +334,21 @@ class TrafficEmissions(ScrollableForm):
             on_change=self._on_field_changed,
             on_total_changed=self._refresh_total,
         )
-        calc_layout.addRow(TableCard(self._emissions_table, "Vehicle Emission Factors"))
+        card = TableCard(self._emissions_table, "Vehicle Emission Factors")
+        # ••• menu in the card heading, as on Machinery
+        menu = QMenu(card)
+        menu.setStyleSheet(
+            f"QMenu {{ padding: {SP1}px; }}"
+            f"QMenu::item {{ padding: {SP2}px {SP4}px {SP2}px {SP2}px; }}"
+            f"QMenu::icon {{ padding-left: {SP3}px; }}"
+        )
+        defaults_act = menu.addAction("Load default factors")
+        defaults_act.triggered.connect(lambda checked=False: self._on_load_defaults())
+        # icons follow the theme, so set them on open
+        menu.aboutToShow.connect(lambda: defaults_act.setIcon(make_icon("restore")))
+        self.btn_more = card.set_menu(menu)
+        calc_layout.addRow(card)
 
-        total_banner = QGroupBox()
-        banner_layout = QHBoxLayout(total_banner)
-        banner_layout.setContentsMargins(16, 12, 16, 12)
-
-        title_lbl = QLabel("<b>Total Daily Emissions:</b>")
-        title_lbl.setStyleSheet(f"font-size: {FS_SECTION}pt; font-weight: bold;")
-
-        self._total_label = QLabel("0.0000 kgCO₂e/day")
-        self._total_label.setStyleSheet(f"font-size: {FS_SECTION}pt; font-weight: bold; color: {get_token('primary')};")
-
-        banner_layout.addWidget(title_lbl)
-        banner_layout.addSpacing(8)
-        banner_layout.addWidget(self._total_label)
-        banner_layout.addStretch()
-
-        calc_layout.addRow(total_banner)
-
-        self.btn_defaults = QPushButton("Load Default Factors")
-        self.btn_defaults.setObjectName("formActionBtn")
-        self.btn_defaults.clicked.connect(self._on_load_defaults)
-        defaults_row = QHBoxLayout()
-        defaults_row.setContentsMargins(0, 0, 0, 0)
-        defaults_row.addWidget(self.btn_defaults, 1)  # half the row: button + equal empty stretch
-        defaults_row.addStretch(1)
-        calc_layout.addRow(defaults_row)
-
-        self._stack.addWidget(calc_widget)  # index 0
 
         # ── Panel 1: Enter Directly ───────────────────────────────────────────
         direct_widget = QWidget()
@@ -371,10 +365,12 @@ class TrafficEmissions(ScrollableForm):
         for _k in ("total_direct_emissions", "source", "comments"):
             self._field_map.pop(_k, None)  # handled in collect_data
         self.form = _temp
+        self.total_direct_emissions.valueChanged.connect(self._refresh_total)
 
-        self._stack.addWidget(direct_widget)  # index 1
-        main_form.addRow(self._stack)
-        self._shrink_stack_to_current()
+        self._panels = [calc_widget, direct_widget]  # index = mode
+        main_form.addRow(calc_widget)
+        main_form.addRow(direct_widget)
+        self._show_current_panel()
 
         # Remarks
         self._remarks = RemarksEditor(
@@ -389,6 +385,7 @@ class TrafficEmissions(ScrollableForm):
         btn_clear.clicked.connect(self.clear_all)
 
         btn_row = QHBoxLayout()
+        btn_row.setContentsMargins(0, 0, 0, 0)  # line up with the fields
         btn_row.addWidget(btn_clear, 1)  # half the row: button + equal empty stretch
         btn_row.addStretch(1)
         btn_widget = QWidget()
@@ -408,14 +405,16 @@ class TrafficEmissions(ScrollableForm):
             )
         self.data_changed.emit()
 
-    def _shrink_stack_to_current(self):
-        self._stack.setCurrentIndex(self.mode.currentIndex())
+    def _show_current_panel(self):
+        idx = self.mode.currentIndex()
+        for i, panel in enumerate(self._panels):
+            panel.setVisible(i == idx)
 
     def _on_mode_changed(self, idx: int):
         if self._suppress_mode_signal:
             return
-        self._stack.setCurrentIndex(idx)
-        self._shrink_stack_to_current()
+        self._show_current_panel()
+        self._refresh_total()
         self._on_field_changed()
 
     def _on_load_defaults(self):
@@ -423,7 +422,14 @@ class TrafficEmissions(ScrollableForm):
         self._refresh_total()
 
     def _refresh_total(self):
-        self._total_label.setText(f"{fmt(self._emissions_table.total_emissions())} kgCO₂e/day")
+        """Heading total for the current mode."""
+        if not hasattr(self, "_total_label"):
+            return
+        if self.mode.currentIndex() == 1:
+            total = self.total_direct_emissions.value()
+        else:
+            total = self._emissions_table.total_emissions()
+        self._total_label.setText(f"{fmt(total)} kgCO₂e/day")
 
 
 
@@ -462,7 +468,7 @@ class TrafficEmissions(ScrollableForm):
 
         if idx >= 0:
             self.mode.setCurrentIndex(idx)
-            self._stack.setCurrentIndex(idx)
+            self._show_current_panel()
 
         self._suppress_mode_signal = False
 
@@ -493,7 +499,7 @@ class TrafficEmissions(ScrollableForm):
 
         # ── Final refresh ───────────────────────────────────────────────────
         self._refresh_total()
-        self._shrink_stack_to_current()
+        self._show_current_panel()
 
 
 
@@ -551,7 +557,7 @@ class TrafficEmissions(ScrollableForm):
             idx = self.mode.findText(data.get("mode", _MODES[0]))
             self.mode.setCurrentIndex(idx if idx >= 0 else 0)
             self.mode.blockSignals(False)
-            self._stack.setCurrentIndex(self.mode.currentIndex())
+            self._show_current_panel()
 
             self._emissions_table.load_factors(data.get("emission_factors", {}))
 
@@ -597,7 +603,7 @@ class TrafficEmissions(ScrollableForm):
         return {"errors": [], "warnings": warnings}
 
     def freeze(self, frozen: bool = True):
-        self.btn_defaults.setEnabled(not frozen)
+        self.btn_more.setEnabled(not frozen)
         self.btn_clear.setEnabled(not frozen)
         self._emissions_table.freeze(frozen)
         if hasattr(self, "total_direct_emissions"):

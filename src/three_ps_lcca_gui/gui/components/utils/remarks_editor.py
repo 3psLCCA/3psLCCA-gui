@@ -7,10 +7,12 @@ Saves content as HTML into the engine chunk under the key "remarks".
 
 from PySide6.QtWidgets import (
     QGroupBox,
+    QHBoxLayout,
     QInputDialog,
     QSizePolicy,
     QTextEdit,
     QToolBar,
+    QWidget,
     QVBoxLayout,
 )
 from PySide6.QtGui import (
@@ -23,7 +25,7 @@ from PySide6.QtGui import (
     QTextListFormat,
     QTextTableFormat,
 )
-from three_ps_lcca_gui.gui.theme import FW_BOLD
+from three_ps_lcca_gui.gui.theme import FW_BOLD, SP1
 from PySide6.QtCore import Qt
 from .validation_helpers import confirm_clear_all
 
@@ -36,18 +38,21 @@ class RemarksEditor(QGroupBox):
     """
 
     def __init__(self, title: str = "Notes", on_change=None, parent=None):
-        super().__init__(title, parent)
+        # one input-like box: toolbar on top, text below; no heading, the
+        # placeholder says what it is for (styled in main.qss)
+        super().__init__(parent)
+        self.setAccessibleName(title)
         self._on_change = on_change
+        self.setObjectName("remarksEditor")
 
         root = QVBoxLayout(self)
-        root.setContentsMargins(6, 6, 6, 6)
-        root.setSpacing(4)
+        root.setContentsMargins(0, 0, 0, 0)  # toolbar divider runs edge to edge
+        root.setSpacing(0)
 
         # ── Toolbar ───────────────────────────────────────────────────────
         self._toolbar = QToolBar()
         self._toolbar.setMovable(False)
         self._toolbar.setFloatable(False)
-        self._toolbar.setStyleSheet("QToolBar { spacing: 2px; }")
         toolbar = self._toolbar
 
         # # Bold
@@ -130,8 +135,6 @@ class RemarksEditor(QGroupBox):
         act_numbered.triggered.connect(self._toggle_numbered)
         toolbar.addAction(act_numbered)
 
-        toolbar.addSeparator()
-
         # # Insert table
         # act_table = QAction("+ Table", self)
         # act_table.setToolTip("Insert table (prompts for rows/cols)")
@@ -148,15 +151,23 @@ class RemarksEditor(QGroupBox):
         # act_add_col.triggered.connect(self._add_table_col)
         # toolbar.addAction(act_add_col)
 
-        toolbar.addSeparator()
-
-        # Clear
+        # Clear, on the right in the danger colour (main.qss)
+        spacer = QWidget()
+        spacer.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        toolbar.addWidget(spacer)
         act_clear = QAction("Clear", self)
         act_clear.setToolTip("Clear all content")
         act_clear.triggered.connect(self._clear)
         toolbar.addAction(act_clear)
+        toolbar.widgetForAction(act_clear).setObjectName("notesClear")
 
-        root.addWidget(toolbar)
+        # toolbar in a padded strip; the strip draws the divider (main.qss)
+        strip = QWidget()
+        strip.setObjectName("notesToolbar")
+        strip_layout = QHBoxLayout(strip)
+        strip_layout.setContentsMargins(SP1, SP1, SP1, SP1)  # labels line up with the text
+        strip_layout.addWidget(toolbar)
+        root.addWidget(strip)
 
         # ── Editor ────────────────────────────────────────────────────────
         self._editor = QTextEdit()

@@ -804,3 +804,29 @@ QFrame#stepSegment {
 }
 QFrame#stepSegment[reached="true"] { background-color: $primary; }
 
+/* ── Notes editor (utils/remarks_editor.py) ─────────────────────────────── */
+/* one box like a text input: toolbar on top, borderless text area below */
+QGroupBox#remarksEditor {
+    background-color: $base;
+    border: 1px solid $border;
+    border-radius: $radius-lg;
+    margin-top: 0px;
+    padding: 0px;
+}
+QGroupBox#remarksEditor QToolBar {
+    background-color: transparent;
+    border: none;
+}
+QGroupBox#remarksEditor QWidget#notesToolbar {
+    border-bottom: 1px solid $border-faint;
+}
+QGroupBox#remarksEditor QTextEdit,
+QGroupBox#remarksEditor QTextEdit:focus {
+    background-color: transparent;
+    border: none;
+}
+QGroupBox#remarksEditor QToolButton#notesClear { color: $danger; }
+QGroupBox#remarksEditor QToolButton#notesClear:disabled { color: $text_disabled; }
+QGroupBox#remarksEditor:disabled {
+    background-color: $window;
+}
