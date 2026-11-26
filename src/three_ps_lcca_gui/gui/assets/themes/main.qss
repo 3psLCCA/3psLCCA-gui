@@ -788,3 +788,11 @@ QPushButton#povSeg:checked:disabled {
     background-color: $surface_mid;
     border-color: $surface_mid;
 }
+
+/* ── First-launch wizard: step progress bar (first_launch_dialog.py) ────── */
+QFrame#stepSegment {
+    background-color: $surface_mid;
+    border-radius: 2px;   /* half the 4px bar height */
+}
+QFrame#stepSegment[reached="true"] { background-color: $primary; }
+

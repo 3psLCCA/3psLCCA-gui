@@ -47,6 +47,15 @@ def setup_dev_menu(parent_window, menubar):
     action_inspector.triggered.connect(lambda: set_pesticide("beast"))
     dev_menu.addAction(action_inspector)
 
+    # --- First-launch screen (normally shown once, after installation) ---
+    def _open_first_launch():
+        from three_ps_lcca_gui.gui.components.first_launch_dialog import FirstLaunchDialog
+        FirstLaunchDialog(parent_window).exec()
+
+    action_first_launch = QAction("Launch First Screen", parent_window)
+    action_first_launch.triggered.connect(_open_first_launch)
+    dev_menu.addAction(action_first_launch)
+
     # --- Project Inspector ---
     dev_menu.addSeparator()
 

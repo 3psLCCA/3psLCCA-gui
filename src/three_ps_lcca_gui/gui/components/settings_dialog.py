@@ -41,7 +41,7 @@ from three_ps_lcca_gui.gui.themes import (
 import three_ps_lcca_gui.gui.themes as _themes
 from three_ps_lcca_gui.gui.theme import FS_SM
 from three_ps_lcca_gui.gui.styles import btn_outline, font
-from three_ps_lcca_gui.gui.theme import FS_SM, FW_MEDIUM
+from three_ps_lcca_gui.gui.theme import FS_SM, FW_MEDIUM, SP10
 from three_ps_lcca_gui.gui.components.agency_profile_dialog import AgencyProfileForm
 from three_ps_lcca_gui.gui.themes import get_token
 
@@ -70,9 +70,11 @@ class SettingsPanel(QWidget):
         # Each category is its own widget so SettingsDialog can put them in
         # separate tabs; on their own (FirstLaunchDialog) they stack with headings.
         general, layout_general = self._section()
+        appearance, layout_appearance = self._section()
         storage, layout_storage = self._section()
         self.sections = [
             ("General", general),
+            ("Appearance", appearance),
             ("Storage", storage),
         ]
 
@@ -100,7 +102,6 @@ class SettingsPanel(QWidget):
 
         layout = layout_storage
         # ── Projects Folder ───────────────────────────────────────────────
-        layout.addWidget(QLabel("<b>Projects Folder</b>"))
         folder_hint = QLabel("Where your projects are saved.")
         folder_hint.setEnabled(False)
         folder_hint.setFont(font(FS_SM))
@@ -120,34 +121,32 @@ class SettingsPanel(QWidget):
         self._folder_status.setWordWrap(True)
         folder_row.addWidget(self._folder_status, stretch=1)
         self._btn_default = QPushButton("Reset to Default")
-        self._btn_default.setFixedHeight(30)
         self._btn_default.setAutoDefault(False)
         self._btn_default.setStyleSheet(btn_outline())
         self._btn_default.clicked.connect(lambda: self._set_folder(""))
         folder_row.addWidget(self._btn_default)
-        btn_browse = QPushButton("Change…")
-        btn_browse.setFixedHeight(30)
+        btn_browse = QPushButton("Change")
         btn_browse.setAutoDefault(False)
         btn_browse.setStyleSheet(btn_outline())
         btn_browse.clicked.connect(self._browse_folder)
         folder_row.addWidget(btn_browse)
         layout.addLayout(folder_row)
 
-        move_hint = QLabel(
+        # Public so the first-launch wizard can hide it (no projects exist yet)
+        self.move_hint = QLabel(
             "Changing the folder does not move existing projects - "
             "use Export / Load Project to bring them over."
         )
-        move_hint.setEnabled(False)
-        move_hint.setFont(font(FS_SM))
-        move_hint.setWordWrap(True)
-        layout.addWidget(move_hint)
+        self.move_hint.setEnabled(False)
+        self.move_hint.setFont(font(FS_SM))
+        self.move_hint.setWordWrap(True)
+        layout.addWidget(self.move_hint)
         self._refresh_folder_view()
 
-        layout = layout_general
-        layout.addSpacing(8)
-        # ── Appearance Mode ───────────────────────────────────────────────
-        layout.addWidget(QLabel("<b>Appearance Mode</b>"))
-        mode_hint = QLabel("Switch between light and dark mode. 'Auto' follows your OS setting.")
+        layout = layout_appearance
+        # ── Theme mode (light / dark / system) ──────────────────────────────────────────────────────
+        layout.addWidget(QLabel("<b>Theme mode</b>"))
+        mode_hint = QLabel("Switch between light and dark mode. 'System' follows your OS setting.")
         mode_hint.setEnabled(False)
         mode_hint.setFont(font(FS_SM))
         mode_hint.setWordWrap(True)
@@ -155,7 +154,7 @@ class SettingsPanel(QWidget):
 
         self._mode_combo = QComboBox()
         for value, label in [
-            ("auto", "Auto (follow OS)"),
+            ("auto", "System"),
             ("light", "Light"),
             ("dark", "Dark"),
         ]:
@@ -167,7 +166,7 @@ class SettingsPanel(QWidget):
         layout.addSpacing(8)
 
         # ── Light Theme ───────────────────────────────────────────────────
-        layout.addWidget(QLabel("<b>Light Theme</b>"))
+        layout.addWidget(QLabel("<b>Light theme</b>"))
         light_hint = QLabel("Colour scheme used in light mode.")
         light_hint.setEnabled(False)
         light_hint.setFont(font(FS_SM))
@@ -179,7 +178,7 @@ class SettingsPanel(QWidget):
         layout.addSpacing(8)
 
         # ── Dark Theme ────────────────────────────────────────────────────
-        layout.addWidget(QLabel("<b>Dark Theme</b>"))
+        layout.addWidget(QLabel("<b>Dark theme</b>"))
         dark_hint = QLabel("Colour scheme used in dark mode.")
         dark_hint.setEnabled(False)
         dark_hint.setFont(font(FS_SM))
@@ -425,17 +424,20 @@ class _CircularAvatar(QWidget):
 class SettingsDialog(QDialog):
     """
     Settings dialog with a multi-tab system.
-    General / Storage: SettingsPanel sections, one tab each
+    General (with Appearance) / Storage: SettingsPanel sections
     Profiles: Chrome-like profile management
     """
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Settings")
-        self.setFixedWidth(520)
-        self.setFixedHeight(720)
+        self.setMinimumWidth(520)
         self.setModal(True)
         self._build()
+        # Resizable; opens at 720 tall, or shorter on a small screen so
+        # Save / Cancel stay visible (the tabs scroll).
+        room = self.screen().availableGeometry().height() - 2 * SP10  # title bar
+        self.resize(520, min(720, room))
 
     def _build(self):
         layout = QVBoxLayout(self)
@@ -444,17 +446,26 @@ class SettingsDialog(QDialog):
 
         self.tabs = QTabWidget()
         
-        # ── Tabs: General / Storage ─────────────────────────────────────
+        # ── Tabs: General (+ Appearance) / Storage ──────────────────────
 
-        # One tab per SettingsPanel section (General / Storage).
+        # SettingsPanel sections as tabs; Appearance shares the General tab
+        # here (the first-launch wizard shows it as a step of its own).
         # The panel itself stays hidden; it only owns the widgets and save().
         self._panel = SettingsPanel(self, stacked=False)
         self._panel.hide()
-        for title, section in self._panel.sections:
+        (_, general), (_, appearance), (_, storage) = self._panel.sections
+        for title, sections in [
+            ("General", [general, appearance]),
+            ("Storage", [storage]),
+        ]:
             content = QWidget()
             content_layout = QVBoxLayout(content)
             content_layout.setContentsMargins(24, 24, 24, 24)
-            content_layout.addWidget(section)
+            content_layout.setSpacing(10)  # same as within a section
+            for i, section in enumerate(sections):
+                if i:
+                    content_layout.addSpacing(8)  # extra gap between groups
+                content_layout.addWidget(section)
             content_layout.addStretch()
             scroll = QScrollArea()
             scroll.setWidgetResizable(True)
