@@ -2,7 +2,6 @@ from three_ps_lcca_gui.gui.themes import get_token
 from three_ps_lcca_gui.gui.theme import SP1, SP2, SP3, SP4, FS_MD, FS_SECTION, FW_BOLD
 from three_ps_lcca_gui.gui.styles import font
 from ..carbon_emission.widgets.transport_emissions import _named_label, _stat_grid
-from ..utils.form_builder.form_builder import make_section_label
 from three_ps_lcca_gui.gui.assets.themes.column_style import (
     apply_column_style,
     pin_last_column,
@@ -280,11 +279,10 @@ class Recycling(QWidget):
                 lambda name: QTimer.singleShot(0, self.on_refresh) if name in _STRUCTURE_CHUNKS else None
             )
 
-        # page title and margins as on Carbon Emissions / Construction Works Data
+        # page margins as on Carbon Emissions / Construction Works Data
         outer_layout = QVBoxLayout(self)
         outer_layout.setContentsMargins(24, 20, 24, 16)
         outer_layout.setSpacing(16)
-        outer_layout.addWidget(make_section_label("Recycling", pad_top=4, pad_bottom=0))
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -301,7 +299,7 @@ class Recycling(QWidget):
         head = QHBoxLayout()
         head.setContentsMargins(SP1, SP2, SP1, SP1)
         head.setSpacing(SP3)
-        title = QLabel("Materials")
+        title = QLabel("Recycling")
         title.setFont(font(FS_SECTION, FW_BOLD))
         self.count_lbl = _named_label("", "statLabel")
         self.count_lbl.setFont(font(FS_MD))
