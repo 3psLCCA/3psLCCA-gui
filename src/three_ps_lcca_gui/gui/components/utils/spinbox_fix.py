@@ -31,10 +31,9 @@ class SpinBoxFitFilter(QObject):
             and isinstance(obj, QAbstractSpinBox)
             and type(obj).__name__ not in ("TableSpinBox", "TableDoubleSpinBox")
         ):
-            _fit(obj)
-            # Qt's own resize handler runs after this filter and resets the
-            # editor, so fit again once it is done.
-            QTimer.singleShot(0, obj, lambda o=obj: _fit(o))
+            # Defer: the filter runs before QAbstractSpinBox's own resizeEvent,
+            # which would lay the editor out again at x=0.
+            QTimer.singleShot(0, obj, lambda: _fit(obj))
         return False
 
 
