@@ -1,11 +1,11 @@
 from three_ps_lcca_gui.gui.themes import get_token
-from three_ps_lcca_gui.gui.theme import FS_MD
-from ...utils.form_builder.form_builder import make_section_label
+from three_ps_lcca_gui.gui.theme import SP1, SP2, SP3, SP4, FS_MD, FS_SECTION, FW_BOLD
+from three_ps_lcca_gui.gui.styles import font
+from .transport_emissions import _named_label, _stat_grid
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
-    QPushButton,
     QLabel,
     QTableWidget,
     QTableWidgetItem,
@@ -302,7 +302,6 @@ class MaterialEmissions(QWidget):
     def __init__(self, controller=None):
         super().__init__()
         self.controller = controller
-        self._details_visible = False
         self._frozen = False
         self._loaded = False
         if controller and hasattr(controller, "project_loaded"):
@@ -316,46 +315,46 @@ class MaterialEmissions(QWidget):
         # Outer layout holds only the scroll area, so growing tables never
         # overlap sibling widgets - the scroll area absorbs all extra height.
         outer_layout = QVBoxLayout(self)
-        outer_layout.setContentsMargins(0, 0, 0, 0)
-        outer_layout.setSpacing(0)
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.NoFrame)
+        # as on Transportation: keep the scrollbar's room so width stays put
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
 
         container = QWidget()
         main_layout = QVBoxLayout(container)
-        main_layout.setSpacing(8)
+        main_layout.setSpacing(SP4)
 
-        # Summary Bar
-        self.summary_bar = QWidget()
-        summary_layout = QHBoxLayout(self.summary_bar)
-        self.total_lbl = QLabel("<b>Total:</b> - kgCO₂e")
-        self.count_lbl = QLabel("Included: - of - items")
-        self.details_btn = QPushButton("Show Details ▼")
-        self.details_btn.setFlat(True)
-        self.details_btn.clicked.connect(self._toggle_details)
-        summary_layout.addWidget(self.total_lbl)
-        summary_layout.addWidget(self._vline())
-        summary_layout.addWidget(self.count_lbl)
-        summary_layout.addStretch()
-        summary_layout.addWidget(self.details_btn)
-        main_layout.addWidget(self.summary_bar)
+        # Heading row and category totals card, as on Transportation
+        # (same helpers and #transportSummary style)
+        head = QHBoxLayout()
+        head.setContentsMargins(SP1, SP2, SP1, SP1)
+        head.setSpacing(SP3)
+        title = QLabel("Materials")
+        title.setFont(font(FS_SECTION, FW_BOLD))
+        self.count_lbl = _named_label("", "statLabel")
+        self.count_lbl.setFont(font(FS_MD))
+        self.total_lbl = QLabel("- kgCO₂e")
+        self.total_lbl.setFont(font(FS_SECTION, FW_BOLD))
+        head.addWidget(title, 0, Qt.AlignBottom)
+        head.addWidget(self.count_lbl, 0, Qt.AlignBottom)
+        head.addStretch()
+        head.addWidget(self.total_lbl, 0, Qt.AlignBottom)
+        main_layout.addLayout(head)
 
-        # Details Row
-        self.details_widget = QWidget()
-        details_layout = QHBoxLayout(self.details_widget)
-        self.foundation_lbl = QLabel("Foundation: -")
-        self.sub_lbl = QLabel("Sub-Structure: -")
-        self.super_lbl = QLabel("Super-Structure: -")
-        self.misc_lbl = QLabel("Misc: -")
-        for lbl in [self.foundation_lbl, self.sub_lbl, self.super_lbl, self.misc_lbl]:
-            details_layout.addWidget(lbl)
-            details_layout.addWidget(self._vline())
-        details_layout.addStretch()
-        self.details_widget.setVisible(False)
-        main_layout.addWidget(self.details_widget)
-        main_layout.addWidget(self._hline())
+        summary = QFrame()
+        summary.setObjectName("transportSummary")
+        summary_layout = QVBoxLayout(summary)
+        summary_layout.setContentsMargins(SP4, SP3, SP4, SP3)
+        cats, (self.foundation_lbl, self.sub_lbl, self.super_lbl, self.misc_lbl) = _stat_grid([
+            ("Foundation", "- kgCO₂e"),
+            ("Sub-Structure", "- kgCO₂e"),
+            ("Super-Structure", "- kgCO₂e"),
+            ("Misc", "- kgCO₂e"),
+        ])
+        summary_layout.addLayout(cats)
+        main_layout.addWidget(summary)
 
         # ── Included Section ─────────────────────────────────────────────
         self.included_table = CarbonTable(is_included=True, handler=self)
@@ -377,27 +376,6 @@ class MaterialEmissions(QWidget):
         scroll.setWidget(container)
         outer_layout.addWidget(scroll)
 
-    def _section_label(self, text: str) -> QLabel:
-        return make_section_label(text)
-
-    def _hline(self) -> QFrame:
-        f = QFrame()
-        f.setFrameShape(QFrame.HLine)
-        f.setFrameShadow(QFrame.Sunken)
-        return f
-
-    def _vline(self) -> QFrame:
-        f = QFrame()
-        f.setFrameShape(QFrame.VLine)
-        f.setFrameShadow(QFrame.Sunken)
-        return f
-
-    def _toggle_details(self):
-        self._details_visible = not self._details_visible
-        self.details_widget.setVisible(self._details_visible)
-        self.details_btn.setText(
-            "Hide Details ▲" if self._details_visible else "Show Details ▼"
-        )
 
     def on_refresh(self):
         if not self.controller or not getattr(self.controller, "engine", None):
@@ -564,18 +542,15 @@ class MaterialEmissions(QWidget):
     def _update_summary(
         self, total: float, included: int, total_count: int, cat_totals: dict
     ):
-        self.total_lbl.setText(f"<b>Total:</b> {fmt_comma(total)} kgCO₂e")
-        self.count_lbl.setText(f"Included: {included} of {total_count} items")
-        self.foundation_lbl.setText(
-            f"Foundation: {fmt_comma(cat_totals.get('Foundation', 0))}"
-        )
-        self.sub_lbl.setText(
-            f"Sub-Structure: {fmt_comma(cat_totals.get('Sub-Structure', 0))}"
-        )
-        self.super_lbl.setText(
-            f"Super-Structure: {fmt_comma(cat_totals.get('Super-Structure', 0))}"
-        )
-        self.misc_lbl.setText(f"Misc: {fmt_comma(cat_totals.get('Misc', 0))}")
+        self.total_lbl.setText(f"{fmt_comma(total)} kgCO₂e")
+        self.count_lbl.setText(f"{included} of {total_count} items included")
+        for lbl, cat in (
+            (self.foundation_lbl, "Foundation"),
+            (self.sub_lbl, "Sub-Structure"),
+            (self.super_lbl, "Super-Structure"),
+            (self.misc_lbl, "Misc"),
+        ):
+            lbl.setText(f"{fmt_comma(cat_totals.get(cat, 0))} kgCO₂e")
 
     def _find_row(self, table, chunk_id, comp_name, idx) -> int:
         """Row whose Action cell holds this item, or -1."""

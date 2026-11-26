@@ -326,7 +326,7 @@ class VehicleCard(TableCard):
             ("kg Factor", _R),
             ("Quantity",  _R),
             ("Trips",     _R),
-            ("Emission",  _R),
+            ("Emission (kgCO₂e)", _R),  # unit here, numbers only in the rows
         ]
         table.setColumnCount(len(headers))
         for col, (label, align) in enumerate(headers):
@@ -351,7 +351,7 @@ class VehicleCard(TableCard):
                     (f"{kf} kg/{unit}" if unit else kf, _R),
                     (f"{fmt_comma(mat.get('qty_kg', 0))} kg", _R),
                     (f"{mat.get('trips', 0):,}", _R),
-                    (f"{fmt_comma(mat.get('emission', 0))} kgCO₂e", _R),
+                    (fmt_comma(mat.get("emission", 0)), _R),
                 ]
             else:
                 label = "in Trash" if mat.get("status") == "trashed" else "removed"
