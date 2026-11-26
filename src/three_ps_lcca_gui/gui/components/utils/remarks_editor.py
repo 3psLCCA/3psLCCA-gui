@@ -171,7 +171,6 @@ class RemarksEditor(QGroupBox):
 
         # ── Editor ────────────────────────────────────────────────────────
         self._editor = QTextEdit()
-        self._editor.setMinimumHeight(150)
         self._editor.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         self._editor.setPlaceholderText(
             "Add notes or remarks here. These will appear in the LCCA report."

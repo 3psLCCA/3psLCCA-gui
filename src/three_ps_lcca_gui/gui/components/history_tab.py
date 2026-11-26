@@ -24,7 +24,7 @@ from three_ps_lcca_gui.gui.styles import font as _f, btn_primary
 from three_ps_lcca_gui.gui.theme import (
     SP1, SP2, SP3, SP4, SP5, SP6,
     RADIUS_SM, RADIUS_MD, RADIUS_LG,
-    BTN_SM, BTN_MD,
+    BTN_SM, BTN_MD, HIST_CARD_H,
     FS_SM, FS_MD, FS_MD, FS_MD,
     FW_NORMAL, FW_MEDIUM, FW_SEMIBOLD, FW_BOLD,
     FONT_FAMILY,
@@ -264,7 +264,7 @@ class _HistoryRow(QFrame):
 
         # ── Card Container Setup (~44px compact height) ──────────────────────
         self.setObjectName("histCard")
-        self.setFixedHeight(44)
+        self.setFixedHeight(HIST_CARD_H)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         card_h = QHBoxLayout(self)
         card_h.setContentsMargins(SP4, 0, SP3, 0)

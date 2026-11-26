@@ -564,9 +564,6 @@ class TableCard(QFrame):
     def __init__(self, table, title="", parent=None):
         super().__init__(parent)
         self.setObjectName("tableCard")
-        # height = its contents' (sizeHint): a scroll area gives a widget only
-        # its minimum, which squeezed the "+ Add" row down to its padding
-        self.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Fixed)
         self.table = table
         self.menu_btn = None
         self.footer = None

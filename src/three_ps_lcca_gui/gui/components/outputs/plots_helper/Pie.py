@@ -40,7 +40,8 @@ from three_ps_lcca_gui.gui.theme import (
     FONT_FAMILY,
     FS_SM, FS_MD, FS_SECTION, FS_DISP,
     FW_NORMAL, FW_BOLD,
-    SP1, SP2, SP3, SP4, SP5, SP6, RADIUS_SM, RADIUS_MD, RADIUS_LG, RADIUS_XL, FW_MEDIUM, FW_SEMIBOLD
+    SP1, SP2, SP3, SP4, SP5, SP6, RADIUS_SM, RADIUS_MD, RADIUS_LG, RADIUS_XL, FW_MEDIUM, FW_SEMIBOLD,
+    CHART_MIN_H, CHART_MAX_H,
 )
 from three_ps_lcca_gui.gui.themes import get_token, theme_manager
 from three_ps_lcca_gui.gui.styles import font as _f
@@ -674,7 +675,7 @@ class LCCPieWidget(QWidget):
             if pillar_bar_data:
                 p_bar = StageBarPlotter(pillar_bar_data, currency=self._currency)
                 c_bar = FigureCanvasQTAgg(p_bar.setup_plot())
-                c_bar.setMinimumHeight(400); c_bar.setMaximumHeight(500)
+                c_bar.setMinimumHeight(CHART_MIN_H); c_bar.setMaximumHeight(CHART_MAX_H)
                 c_bar.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
                 c_bar.setStyleSheet("background: transparent; border: none;")
                 c_bar.installEventFilter(WheelForwarder(self))
@@ -692,7 +693,7 @@ class LCCPieWidget(QWidget):
                 self._card_layout.addWidget(_no_data, 1)
         else:
             self._chart_stack = QStackedWidget()
-            self._chart_stack.setMaximumHeight(500)
+            self._chart_stack.setMaximumHeight(CHART_MAX_H)
             self._chart_stack.setStyleSheet("background: transparent; border: none;")
             self._toolbar_stack = QStackedWidget()
             self._toolbar_stack.setStyleSheet("background: transparent; border: none;")
@@ -700,7 +701,7 @@ class LCCPieWidget(QWidget):
 
             p0 = SimplePillarPlotter(self._results, currency=self._currency)
             c0 = FigureCanvasQTAgg(p0.setup_plot())
-            c0.setMinimumHeight(400); c0.setMaximumHeight(500)
+            c0.setMinimumHeight(CHART_MIN_H); c0.setMaximumHeight(CHART_MAX_H)
             c0.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
             c0.setStyleSheet("background: transparent; border: none;")
             c0.installEventFilter(scroller)
@@ -713,7 +714,7 @@ class LCCPieWidget(QWidget):
                 if data1:
                     p1 = SustainabilityCircularPlotter(data1, currency=self._currency)
                     c1 = FigureCanvasQTAgg(p1.setup_plot())
-                    c1.setMinimumHeight(400); c1.setMaximumHeight(500)
+                    c1.setMinimumHeight(CHART_MIN_H); c1.setMaximumHeight(CHART_MAX_H)
                     c1.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
                     c1.setStyleSheet("background: transparent; border: none;")
                     c1.installEventFilter(scroller)
@@ -727,7 +728,7 @@ class LCCPieWidget(QWidget):
             if pillar_bar_data:
                 p_bar = StageBarPlotter(pillar_bar_data, currency=self._currency)
                 c_bar = FigureCanvasQTAgg(p_bar.setup_plot())
-                c_bar.setMinimumHeight(400); c_bar.setMaximumHeight(500)
+                c_bar.setMinimumHeight(CHART_MIN_H); c_bar.setMaximumHeight(CHART_MAX_H)
                 c_bar.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
                 c_bar.setStyleSheet("background: transparent; border: none;")
                 c_bar.installEventFilter(scroller)
@@ -741,7 +742,7 @@ class LCCPieWidget(QWidget):
             if stage_bar_data:
                 p_sbar = PillarBreakdownBarPlotter(stage_bar_data, currency=self._currency)
                 c_sbar = FigureCanvasQTAgg(p_sbar.setup_plot())
-                c_sbar.setMinimumHeight(400); c_sbar.setMaximumHeight(500)
+                c_sbar.setMinimumHeight(CHART_MIN_H); c_sbar.setMaximumHeight(CHART_MAX_H)
                 c_sbar.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
                 c_sbar.setStyleSheet("background: transparent; border: none;")
                 c_sbar.installEventFilter(scroller)
@@ -849,4 +850,4 @@ class LCCPieWidget(QWidget):
             )
 
     def minimumSizeHint(self):
-        return QSize(0, 400)
+        return QSize(0, CHART_MIN_H)

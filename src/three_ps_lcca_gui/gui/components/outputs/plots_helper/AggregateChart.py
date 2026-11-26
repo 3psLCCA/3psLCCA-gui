@@ -43,6 +43,7 @@ from three_ps_lcca_gui.gui.theme import (
     FS_SM, FS_MD, FS_SECTION, FS_DISP,
     FW_NORMAL, FW_MEDIUM, FW_SEMIBOLD, FW_BOLD,
     SP1, SP2, SP3, SP4, SP5, SP6, RADIUS_SM, RADIUS_MD, RADIUS_LG, RADIUS_XL,
+    CHART_MIN_H, AGG_CHART_MAX_H,
 )
 from three_ps_lcca_gui.gui.themes import get_token, theme_manager
 from three_ps_lcca_gui.gui.styles import font as _f
@@ -775,7 +776,7 @@ class AggregateChartWidget(QWidget):
 
         # ── Chart stack ──────────────────────────────────────────────────────
         self._chart_stack = QStackedWidget()
-        self._chart_stack.setMaximumHeight(420)
+        self._chart_stack.setMaximumHeight(AGG_CHART_MAX_H)
         self._chart_stack.setStyleSheet("background: transparent; border: none;")
         self._toolbar_stack = QStackedWidget()
         self._toolbar_stack.setStyleSheet("background: transparent; border: none;")
@@ -790,7 +791,7 @@ class AggregateChartWidget(QWidget):
             c0   = FigureCanvasQTAgg(fig0)
             c0.setStyleSheet("background: transparent; border: none;")
             c0.setMinimumHeight(280)
-            c0.setMaximumHeight(420)
+            c0.setMaximumHeight(AGG_CHART_MAX_H)
             c0.installEventFilter(scroller)
             self._chart_stack.addWidget(c0)
             self._toolbar_stack.addWidget(ChartToolbar(c0, self))
@@ -808,7 +809,7 @@ class AggregateChartWidget(QWidget):
             c1   = FigureCanvasQTAgg(fig1)
             c1.setStyleSheet("background: transparent; border: none;")
             c1.setMinimumHeight(280)
-            c1.setMaximumHeight(420)
+            c1.setMaximumHeight(AGG_CHART_MAX_H)
             c1.installEventFilter(scroller)
             self._chart_stack.addWidget(c1)
             self._toolbar_stack.addWidget(ChartToolbar(c1, self))
@@ -899,5 +900,5 @@ class AggregateChartWidget(QWidget):
             )
 
     def minimumSizeHint(self):
-        return QSize(0, 400)
+        return QSize(0, CHART_MIN_H)
 

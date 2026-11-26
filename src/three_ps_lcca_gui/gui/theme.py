@@ -53,6 +53,15 @@ BTN_SM = 28   # compact / icon-adjacent
 BTN_MD = 36   # standard
 BTN_LG = 40   # primary CTA
 
+# ── Component heights ──────────────────────────────────────────────────────
+INPUT_MIN_H    =  30   # single-line text field
+TEXTAREA_H     = 100   # multi-line text field in a form
+NOTES_H        = 150   # writing area of the Notes box (remarks editor)
+HIST_CARD_H    =  44   # one compact row card in the History tab
+CHART_MIN_H    = 400   # a results chart never gets shorter than this
+CHART_MAX_H    = 500   # pie / bar charts on the results page
+AGG_CHART_MAX_H = 420  # aggregate cost chart
+
 # ── Typography ─────────────────────────────────────────────────────────────
 FONT_FAMILY = "Ubuntu"
 
@@ -95,6 +104,11 @@ QSS_RADII = {
     "radius-md": f"{RADIUS_MD}px",
     "radius-lg": f"{RADIUS_LG}px",
     "radius-xl": f"{RADIUS_XL}px",
+}
+
+# Centralized component height tokens for QSS substitution
+QSS_HEIGHTS = {
+    "notes-h": f"{NOTES_H}px",
 }
 
 # Centralized button height tokens for QSS substitution

@@ -547,7 +547,7 @@ QPushButton#cardFooter {
     border-bottom-left-radius: $radius-lg;
     border-bottom-right-radius: $radius-lg;
     padding: 12px;
-    min-height: 0px;
+    min-height: 1em;  /* one text line: the scroll area gives cards their minimum */
     color: $primary;
     font-weight: $weight-semibold;
 }
@@ -824,6 +824,12 @@ QGroupBox#remarksEditor QTextEdit,
 QGroupBox#remarksEditor QTextEdit:focus {
     background-color: transparent;
     border: none;
+}
+/* fixed writing area (theme.NOTES_H): a scroll page gets only its minimum
+   height, which would otherwise squeeze Notes to one line */
+QGroupBox#remarksEditor QTextEdit {
+    min-height: $notes-h;
+    max-height: $notes-h;
 }
 QGroupBox#remarksEditor QToolButton#notesClear { color: $danger; }
 QGroupBox#remarksEditor QToolButton#notesClear:disabled { color: $text_disabled; }

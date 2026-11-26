@@ -228,13 +228,10 @@ class ScrollableForm(BaseDataWidget):
         super().__init__(controller=controller, chunk_name=chunk_name)
 
         self._content = QWidget()
-        # Fixed vertical policy: _content never grows beyond its sizeHint.
-        # Preferred/Minimum still allow the scroll area to push extra height
-        # into the QFormLayout rows, producing visible gaps between fields.
         # Ignored horizontal policy: qSmartMinSize() skips minimumSizeHint() for
         # the horizontal axis entirely, so no child's minimum width can force the
         # scroll area to make _content wider than the viewport.
-        self._content.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Fixed)
+        self._content.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Preferred)
 
         self.form = QFormLayout(self._content)
         self.form.setContentsMargins(24, 20, 24, 20)

@@ -23,7 +23,7 @@ from typing import Any
 from PySide6.QtCore import Qt, QRegularExpression
 from PySide6.QtGui import QPixmap, QRegularExpressionValidator
 from three_ps_lcca_gui.gui.themes import get_token
-from three_ps_lcca_gui.gui.theme import FS_SECTION
+from three_ps_lcca_gui.gui.theme import FS_SECTION, INPUT_MIN_H, TEXTAREA_H
 from PySide6.QtWidgets import (
     QComboBox,
     QDoubleSpinBox,
@@ -335,7 +335,7 @@ def build_form(
         # ── text ──────────────────────────────────────────────────────────
         if f.field_type == "text":
             widget = QLineEdit()
-            widget.setMinimumHeight(30)
+            widget.setMinimumHeight(INPUT_MIN_H)
             if f.placeholder_text:
                 widget.setPlaceholderText(f.placeholder_text)
             setattr(host, f.key, host.field(f.key, widget))
@@ -344,7 +344,7 @@ def build_form(
         # ── textarea ──────────────────────────────────────────────────────
         elif f.field_type == "textarea":
             widget = QTextEdit()
-            widget.setFixedHeight(100)
+            widget.setFixedHeight(TEXTAREA_H)
             widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
             if f.placeholder_text:
                 widget.setPlaceholderText(f.placeholder_text)
@@ -361,14 +361,14 @@ def build_form(
                 widget.setValue(int(f.default))
                 if int(f.default) == lo:
                     widget.setSpecialValueText(" ")
-            widget.setMinimumHeight(30)
+            widget.setMinimumHeight(INPUT_MIN_H)
             setattr(host, f.key, host.field(f.key, widget))
             widget.valueChanged.connect(
                 lambda _, w=widget: w.setStyleSheet(""))
 
         elif f.field_type == "phone":
             widget = QLineEdit()
-            widget.setMinimumHeight(30)
+            widget.setMinimumHeight(INPUT_MIN_H)
             # widget.setPlaceholderText("e.g. +1 555 123 4567")
 
             # Allow: optional +, digits, spaces, dashes, parentheses
@@ -392,7 +392,7 @@ def build_form(
                 widget.setValue(float(f.default))
                 if float(f.default) == lo:
                     widget.setSpecialValueText(" ")
-            widget.setMinimumHeight(30)
+            widget.setMinimumHeight(INPUT_MIN_H)
             setattr(host, f.key, host.field(f.key, widget))
             widget.valueChanged.connect(
                 lambda _, w=widget: w.setStyleSheet(""))
@@ -411,7 +411,7 @@ def build_form(
             widget.setSizeAdjustPolicy(QComboBox.AdjustToMinimumContentsLengthWithIcon)
             widget.setMinimumContentsLength(15)
             
-            widget.setMinimumHeight(30)
+            widget.setMinimumHeight(INPUT_MIN_H)
             setattr(host, f.key, host.field(f.key, widget))
             widget.currentIndexChanged.connect(
                 lambda _, w=widget: w.setStyleSheet(""))
