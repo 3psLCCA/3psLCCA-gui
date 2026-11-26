@@ -354,7 +354,7 @@ OUTSIDE_INDIA_FIELDS = [
 ]
 
 PROJECT_MODE_FIELDS = [
-    Section("Calculation Mode"),
+    Section("Traffic Data"),
     FieldDef("mode", "Select Standard / Region", "", "combo", options=["INDIA", "GLOBAL"], combo_placeholder=""),
 ]
 
