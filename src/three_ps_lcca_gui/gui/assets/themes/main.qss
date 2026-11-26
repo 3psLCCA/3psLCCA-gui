@@ -521,12 +521,6 @@ QTableView QLineEdit[rowSelected="true"] {
     color: $text;
 }
 
-/* the import preview edits cells with Qt's own editor, drawn over the cell's
-   text: it must hide that text, so it is opaque */
-QTableView QLineEdit#importCellEditor {
-    background-color: $base;
-}
-
 /* ── Table card (TableCard in table_widgets.py) ─────────────────────────── */
 /* heading row (title · count, total, ••• menu), the table, "+ Add" row */
 QFrame#tableCard {
