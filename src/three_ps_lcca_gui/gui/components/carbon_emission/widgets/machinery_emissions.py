@@ -4,27 +4,34 @@ gui/components/carbon_emission/widgets/machinery_emissions.py
 Chunk: machinery_emissions_data
 
 Two modes toggled by radio buttons:
-  - Detailed Equipment List  (table with per-row calculation)
+  - Detailed Equipment List  (table card, one row per machine)
   - Lump Sum                 (electricity + fuel - built via build_form)
 
 Grand total shown at top and bottom.
 Currency label pulled from general_info chunk.
 """
 
+import math
+import re
+
 from three_ps_lcca_gui.gui.themes import get_token
-from three_ps_lcca_gui.gui.theme import FS_SECTION
+from three_ps_lcca_gui.gui.theme import FS_SECTION, SP1, SP2, SP3, SP4
+from three_ps_lcca_gui.gui.assets.themes.table_style import (
+    ColumnMinWidthMixin,
+    apply_column_style,
+)
 from PySide6.QtWidgets import (
-    QAbstractItemView,
     QButtonGroup,
     QComboBox,
     QDialog,
-    QDialogButtonBox,
     QDoubleSpinBox,
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
+    QHeaderView,
     QLabel,
     QLineEdit,
+    QMenu,
     QMessageBox,
     QPushButton,
     QRadioButton,
@@ -53,13 +60,8 @@ from ...utils.table_widgets import (
     WordWrapHeaderView,
     fit_to_contents,
 )
-from three_ps_lcca_gui.gui.assets.themes.column_style import (
-    apply_column_style,
-    pin_last_column,
-    pinned_view,
-    refit,
-)
 from ...utils.validation_helpers import freeze_widgets, confirm_clear_all
+from ...utils.common_requested_data import get_bridge_data
 
 CHUNK = "machinery_emissions_data"
 
@@ -218,15 +220,118 @@ _LUMPSUM_KEYS = [
 
 
 
-# ── Action delegate - paints edit + delete icon buttons ───────────────────────
+# ── Equipment table ───────────────────────────────────────────────────────────
+# Built from the shared table parts, like Construction Work Data's tables:
+# TableCard (heading, ••• menu, "+ Add" row), BaseActionDelegate (Edit /
+# Delete buttons), fit_to_contents (every row shows, the page scrolls) and
+# table_style.py (column widths from the header labels).
+
+_HEADERS = [
+    "Equipment Name",                    # 0
+    "Energy Source",                     # 1
+    "Fuel / Power\nRating",              # 2
+    "Avg\nHrs/Day",                      # 3
+    "No. of\nDays",                      # 4
+    "Emission Factor\n(kg CO₂e/unit)",   # 5
+    "Consumption",                       # 6
+    "Emissions\n(kg CO₂e)",              # 7
+    "Action",                            # 8  Edit / Delete buttons
+]
+_ACTION_COL = len(_HEADERS) - 1
+
+
+def _clean_row(d: dict) -> dict:
+    """A saved row with every key present and the right type."""
+    src = d.get("source") or ENERGY_SOURCES[0]
+    return {
+        "name":   str(d.get("name", "")),
+        "source": src,
+        "rate":   float(d.get("rate") or 0.0),
+        "hrs":    float(d.get("hrs") or 0.0),
+        "days":   int(d.get("days") or 0),
+        "ef":     float(d.get("ef", EF_DEFAULTS.get(src, 0.0)) or 0.0),
+    }
+
+
+def _consumption(r: dict) -> float:
+    return r["rate"] * r["hrs"] * r["days"]
+
+
+NAME_MAX_LEN = 100
+# letters, digits, spaces and - _ / . ( )  - brackets as in the default list
+_NAME_OK = re.compile(r"[\w \-/.()]+")  # plain space only: no tabs or line breaks
+# sources whose emission factor may be 0 (no combustion / grid draw)
+_ZERO_EF_OK = {"Electricity (Solar/Renewable)"}
+
+
+def _construction_days() -> int | None:
+    """The construction period in days (bridge data months x days per month),
+    or None when the project does not have it yet."""
+    bridge = get_bridge_data()
+    try:
+        months = float(bridge["duration_construction_months"])
+        per_month = float(bridge["days_per_month"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    return int(months * per_month) if months > 0 and per_month > 0 else None
+
+
+def check_equipment(row: dict, other_names, max_days: int | None
+                    ) -> list[tuple[str, str, str]]:
+    """The Add / Edit Equipment rules, in the order the dialog asks them.
+
+    Each problem is (level, field, message):
+      "error"   - cannot be saved
+      "warning" - saved only if the user continues
+    *other_names*: the names of the other rows (duplicates are blocked).
+    *max_days*: the construction period in days, or None.
+    """
+    problems = []
+    name, src = row["name"].strip(), row["source"]
+
+    if not name:
+        problems.append(("error", "name", "Equipment Name is required."))
+    elif len(name) > NAME_MAX_LEN:
+        problems.append(("error", "name", f"Equipment Name must be {NAME_MAX_LEN} characters or fewer."))
+    elif not _NAME_OK.fullmatch(name):
+        problems.append(("error", "name",
+                         "Equipment Name may use only letters, numbers, spaces and - _ / . ( )"))
+    elif name.casefold() in {n.strip().casefold() for n in other_names}:
+        problems.append(("error", "name", f"Equipment \"{name}\" is already in the list."))
+
+    if src not in ENERGY_SOURCES:
+        problems.append(("error", "source", "Please select an Energy Source."))
+
+    if not row["rate"] > 0:
+        problems.append(("error", "rate", "Fuel / Power Rating must be greater than zero."))
+    if not 0 < row["hrs"] <= 24:
+        problems.append(("error", "hrs", "Avg Hrs/Day must be greater than zero and at most 24."))
+    if row["days"] < 1:
+        problems.append(("error", "days", "No. of Days must be at least 1."))
+    elif max_days and row["days"] > max_days:
+        problems.append(("error", "days",
+                         f"No. of Days ({row['days']}) is longer than the construction "
+                         f"period ({max_days} days, from Bridge Data)."))
+
+    ef = row["ef"]
+    if ef < 0 or (ef == 0 and src not in _ZERO_EF_OK):
+        problems.append(("error", "ef", "Emission Factor must be greater than zero."))
+    elif src in EF_DEFAULTS and src != "Other" and ef != EF_DEFAULTS[src]:
+        problems.append(("warning", "ef",
+                         f"Emission Factor {fmt(ef)} differs from the default "
+                         f"{fmt(EF_DEFAULTS[src])} for {src}."))
+
+    if not math.isfinite(_consumption(row) * ef):
+        problems.append(("error", "rate", "The calculated emissions are too large."))
+    return problems
 
 
 class _ActionDelegate(BaseActionDelegate):
-    """Paints circular Edit and Delete buttons in the table's Action column."""
+    """Edit and Delete buttons in the Action column."""
 
-    def __init__(self, table, detail_table):
+    def __init__(self, table, owner):
         super().__init__(table)
-        self._detail_table = detail_table
+        self._owner = owner
         self._btns = [
             (make_icon("edit"), (46, 204, 113), "edit", "Edit"),
             (make_icon("trash", color=get_token("danger")), (231, 76, 60), "delete", "Remove row"),
@@ -236,321 +341,244 @@ class _ActionDelegate(BaseActionDelegate):
         return [(icon, hover_rgb, tooltip) for icon, hover_rgb, _, tooltip in self._btns]
 
     def editorEvent(self, event, model, option, index):
-        if self._frozen:
+        if self._frozen or event.type() != QEvent.MouseButtonRelease:
             return False
-        if event.type() == QEvent.MouseButtonRelease:
-            rects = self._btn_rects(option.rect, len(self._btns))
-            for i, (_, _, action, *__) in enumerate(self._btns):
-                if rects[i].contains(event.pos()):
-                    if action == "edit":
-                        self._detail_table._open_edit_dialog(index.row())
-                    elif action == "delete":
-                        self._detail_table._delete_row(index.row())
-                    return True
+        rects = self._btn_rects(option.rect, len(self._btns))
+        for rect, (_, _, action, _) in zip(rects, self._btns):
+            if rect.contains(event.pos()):
+                if action == "edit":
+                    self._owner.edit_row(index.row())
+                else:
+                    self._owner.delete_row(index.row())
+                return True
         return False
 
 
-# ── Edit row dialog ────────────────────────────────────────────────────────────
+class _EquipmentDialog(QDialog):
+    """Add / Edit one machine."""
 
-
-class _EditRowDialog(QDialog):
-    """Dialog for editing a single equipment row's fields."""
-
-    def __init__(self, row_data: dict, parent=None):
+    def __init__(self, row: dict, title: str, ok_text: str, other_names=(), parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Edit Equipment")
-        self.setMinimumWidth(400)
-
+        self.setWindowTitle(title)
+        self._other_names = list(other_names)
         layout = QFormLayout(self)
-        layout.setSpacing(10)
-        layout.setContentsMargins(16, 16, 16, 16)
+        layout.setSpacing(SP2)
+        layout.setContentsMargins(SP4, SP4, SP4, SP4)
 
-        self._name = QLineEdit(row_data.get("name", ""))
-
+        self._name = QLineEdit(row["name"])
+        self._name.setMaxLength(NAME_MAX_LEN)
         self._source = QComboBox()
         self._source.addItems(ENERGY_SOURCES)
-        src = row_data.get("source", ENERGY_SOURCES[0])
-        self._source.setCurrentIndex(max(0, self._source.findText(src)))
+        self._source.setCurrentIndex(max(0, self._source.findText(row["source"])))
 
-        self._rate = QDoubleSpinBox()
-        self._rate.setRange(0.0, 1e9)
-        self._rate.setDecimals(DECIMAL_PLACES)
-        self._rate.setValue(row_data.get("rate", 0.0))
-        self._rate.setSuffix(RATE_SUFFIX.get(src, " units/hr"))
+        def spin(cls, lo, hi, value, suffix):
+            w = cls()
+            w.setRange(lo, hi)
+            if cls is QDoubleSpinBox:
+                w.setDecimals(DECIMAL_PLACES)
+            w.setValue(value)
+            w.setSuffix(suffix)
+            return w
 
-        self._hrs = QDoubleSpinBox()
-        self._hrs.setRange(0.0, 24.0)
-        self._hrs.setDecimals(DECIMAL_PLACES)
-        self._hrs.setValue(row_data.get("hrs", 0.0))
-        self._hrs.setSuffix(" hrs/day")
-
-        self._days = QSpinBox()
-        self._days.setRange(0, 9999)
-        self._days.setValue(row_data.get("days", 0))
-        self._days.setSuffix(" days")
-
-        self._ef = QDoubleSpinBox()
-        self._ef.setRange(0.0, 999.0)
-        self._ef.setDecimals(DECIMAL_PLACES)
-        self._ef.setValue(row_data.get("ef", 0.0))
-        self._ef.setSuffix(" kg CO₂e/unit")
+        self._rate = spin(QDoubleSpinBox, 0.0, 1e9, row["rate"], RATE_SUFFIX.get(row["source"], " units/hr"))
+        self._hrs = spin(QDoubleSpinBox, 0.0, 24.0, row["hrs"], " hrs/day")
+        self._days = spin(QSpinBox, 0, 9999, row["days"], " days")
+        self._ef = spin(QDoubleSpinBox, 0.0, 999.0, row["ef"], " kg CO₂e/unit")
 
         layout.addRow("Equipment Name:", self._name)
         layout.addRow("Energy Source:", self._source)
         layout.addRow("Fuel / Power Rating:", self._rate)
         layout.addRow("Avg Hrs/Day:", self._hrs)
         layout.addRow("No. of Days:", self._days)
-        layout.addRow("EF:", self._ef)
-
+        layout.addRow("Emission Factor:", self._ef)
         self._source.currentTextChanged.connect(self._on_source_changed)
 
-        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
+        # Cancel | Add, right-aligned (as in the Material dialog)
+        cancel_btn = QPushButton("Cancel")
+        cancel_btn.clicked.connect(self.reject)
+        ok_btn = QPushButton(ok_text)
+        ok_btn.setDefault(True)
+        ok_btn.clicked.connect(self.validate_and_accept)
+        buttons = QHBoxLayout()
+        buttons.addStretch()
+        buttons.addWidget(cancel_btn)
+        buttons.addWidget(ok_btn)
         layout.addRow(buttons)
+        self._initial = self.values()
+
+    def validate_and_accept(self):
+        """Check the row (check_equipment); errors stop, warnings ask first.
+        The field with the problem gets the focus."""
+        fields = {"name": self._name, "source": self._source, "rate": self._rate,
+                  "hrs": self._hrs, "days": self._days, "ef": self._ef}
+        problems = check_equipment(self.values(), self._other_names, _construction_days())
+        for level, field, message in problems:
+            fields[field].setFocus()
+            if level == "error":
+                QMessageBox.critical(self, "Validation Error", message)
+                return
+            reply = QMessageBox.warning(self, "Check Value", f"{message}\n\nContinue?",
+                                        QMessageBox.Yes | QMessageBox.No)
+            if reply == QMessageBox.No:
+                return
+        self.accept()
+
+    def reject(self):
+        """Cancel, X or Esc: ask before throwing away edits."""
+        if self.values() != self._initial:
+            reply = QMessageBox.question(self, "Discard Changes",
+                                         "Discard the changes to this equipment?",
+                                         QMessageBox.Yes | QMessageBox.No)
+            if reply != QMessageBox.Yes:
+                return
+        super().reject()
 
     def _on_source_changed(self, src: str):
         self._rate.setSuffix(RATE_SUFFIX.get(src, " units/hr"))
         self._ef.setValue(EF_DEFAULTS.get(src, 0.0))
 
-    def get_values(self) -> dict:
+    def values(self) -> dict:
         return {
-            "name": self._name.text().strip(),
+            "name":   self._name.text().strip(),
             "source": self._source.currentText(),
-            "rate": self._rate.value(),
-            "hrs": self._hrs.value(),
-            "days": self._days.value(),
-            "ef": self._ef.value(),
+            "rate":   self._rate.value(),
+            "hrs":    self._hrs.value(),
+            "days":   self._days.value(),
+            "ef":     self._ef.value(),
         }
 
 
-# ── Detailed equipment table ──────────────────────────────────────────────────
-
-
-class _MachineryTable(TooltipTableMixin, QTableWidget):
-    """Equipment table; Qt sizes it to show every row (see fit_to_contents)."""
+class _EquipmentTable(TooltipTableMixin, ColumnMinWidthMixin, QTableWidget):
+    """Read-only rows (changed through the dialog); never narrower than its
+    columns' minimum widths (table_style.ColumnMinWidthMixin)."""
 
 
 class _DetailedTable(QWidget):
-    # Header labels are left-aligned even for numeric (right-aligned data)
-    # columns: when a column is too narrow for its full heading, Qt anchors
-    # visible text to the alignment edge - right-aligned text would show the
-    # *tail* of the label (e.g. "ssion") instead of its start ("Emiss").
-    # Left alignment keeps the beginning of the label visible regardless of
-    # column width. Data-cell alignment (set per-item in _add_blank_row) is
-    # unaffected by this and stays right-aligned for numbers.
-    HEADERS = [
-        ("Equipment Name",      Qt.AlignLeft   | Qt.AlignVCenter),  # 0
-        ("Energy Source",       Qt.AlignLeft   | Qt.AlignVCenter),  # 1
-        ("Fuel / Power\nRating", Qt.AlignLeft  | Qt.AlignVCenter),  # 2
-        ("Avg\nHrs/Day",        Qt.AlignLeft   | Qt.AlignVCenter),  # 3
-        ("No. of\nDays",        Qt.AlignLeft   | Qt.AlignVCenter),  # 4
-        ("EF\n(kg CO₂e/unit)",  Qt.AlignLeft   | Qt.AlignVCenter),  # 5
-        ("Consumption",         Qt.AlignLeft   | Qt.AlignVCenter),  # 6
-        ("Emissions\n(kg CO₂e)", Qt.AlignLeft   | Qt.AlignVCenter),  # 7
-        ("Action",              Qt.AlignCenter | Qt.AlignVCenter),  # 8  buttons, pinned to the right edge
-    ]
+    """The Equipment card. The rows live in self._rows; the table shows them."""
+
     def __init__(self, on_change, parent=None):
         super().__init__(parent)
         self._on_change = on_change
-        self._cached_total: float = 0.0  # updated by _recalculate, read by get_total
+        self._rows: list[dict] = []
+        self._frozen = False
+
+        t = self._table = _EquipmentTable(0, len(_HEADERS))
+        t.setHorizontalHeader(WordWrapHeaderView(Qt.Horizontal))
+        for col, label in enumerate(_HEADERS):
+            item = QTableWidgetItem(label)
+            # Equipment Name sits left over its text; the rest are centred
+            item.setTextAlignment(Qt.AlignLeft | Qt.AlignVCenter if col == 0 else Qt.AlignCenter)
+            t.setHorizontalHeaderItem(col, item)
+        t.verticalHeader().setVisible(False)
+        t.setSelectionBehavior(QTableWidget.SelectRows)
+        t.setSelectionMode(QTableWidget.SingleSelection)
+        t.setEditTriggers(QTableWidget.NoEditTriggers)
+        t.cellDoubleClicked.connect(lambda row, _col: self.edit_row(row))
+        fit_to_contents(t)  # every row shows; the page scrolls down
+
+        self._action_delegate = _ActionDelegate(t, self)
+        t.setItemDelegateForColumn(_ACTION_COL, self._action_delegate)
+        btn_h = self._action_delegate.sizeHint(QStyleOptionViewItem(), QModelIndex()).height()
+        t.verticalHeader().setMinimumSectionSize(btn_h)  # rows fit the buttons
+
+        # widths from the header labels (assets/themes/table_style.py);
+        # Action has no width rule there, so it sizes to its buttons
+        apply_column_style(t)
+        t.horizontalHeader().setSectionResizeMode(_ACTION_COL, QHeaderView.ResizeToContents)
+
+        # Card: heading (title, count, total, ••• menu), table, "+ Add" row
+        card = self._card = TableCard(t, "Equipment")
+        card.count_rows()
+        menu = QMenu(card)
+        # even spacing: icon, gap, text and separator share the SP2/SP3 grid
+        menu.setStyleSheet(
+            f"QMenu {{ padding: {SP1}px; }}"
+            f"QMenu::item {{ padding: {SP2}px {SP4}px {SP2}px {SP2}px; }}"
+            f"QMenu::icon {{ padding-left: {SP3}px; }}"
+            f"QMenu::separator {{ margin: {SP1}px {SP2}px; }}"
+        )
+        defaults_act = menu.addAction("Load defaults")
+        defaults_act.triggered.connect(lambda checked=False: self.load_defaults(confirm=True))
+        menu.addSeparator()
+        clear_act = menu.addAction("Clear all items")
+        clear_act.triggered.connect(lambda checked=False: self.clear_all())
+
+        def _on_menu_show():  # icons follow the theme, so set them on open
+            defaults_act.setIcon(make_icon("restore"))
+            clear_act.setIcon(make_icon("trash", color=get_token("danger")))
+            clear_act.setEnabled(bool(self._rows))
+        menu.aboutToShow.connect(_on_menu_show)
+        self.btn_more = card.set_menu(menu)
+
+        self.btn_add = card.add_footer()
+        self.btn_add.clicked.connect(lambda checked=False: self.add_row())
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(6)
-
-        # Table - Qt sizes it from its rows (fit_to_contents)
-        self._table = _MachineryTable(0, len(self.HEADERS))
-        self._table.setHorizontalHeader(WordWrapHeaderView(Qt.Horizontal))
-        for col, (label, align) in enumerate(self.HEADERS):
-            item = QTableWidgetItem(label)
-            item.setTextAlignment(align)
-            self._table.setHorizontalHeaderItem(col, item)
-        self._table.verticalHeader().setVisible(False)
-        self._table.setEditTriggers(QTableWidget.NoEditTriggers)
-        self._table.setSelectionMode(QTableWidget.SingleSelection)
-        self._table.setSelectionBehavior(QTableWidget.SelectRows)
-
-        self._table.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
-        self._table.cellChanged.connect(self._on_cell_changed)
-        self._table.cellDoubleClicked.connect(self._open_edit_dialog)
-        fit_to_contents(self._table)
-        card = TableCard(self._table, "Equipment")
-        card.count_rows()
         layout.addWidget(card)
+        self._render()
 
-        # Action buttons: paint and handle clicks in the last column
-        action_col = len(self.HEADERS) - 1
-        self._action_delegate = _ActionDelegate(self._table, self)
-        self._table.setItemDelegateForColumn(action_col, self._action_delegate)
-        btn_h = self._action_delegate.sizeHint(QStyleOptionViewItem(), QModelIndex()).height()
-        self._table.verticalHeader().setMinimumSectionSize(btn_h)  # rows fit the buttons
+    # ── Rows ──────────────────────────────────────────────────────────────
 
-        # widths from the header labels (assets/themes/column_style.py).
-        # The table scrolls sideways itself, with Action pinned to its right edge.
-        apply_column_style(self._table)
-        pin_last_column(self._table)
-        self._action_delegate.track(pinned_view(self._table))
+    def _render(self):
+        """Show self._rows in the table and the card, then report the total."""
+        t = self._table
+        _L = Qt.AlignLeft | Qt.AlignVCenter
+        _R = Qt.AlignRight | Qt.AlignVCenter
+        t.setRowCount(0)
+        t.setRowCount(len(self._rows))
+        for row, r in enumerate(self._rows):
+            use = _consumption(r)
+            unit = CONSUMPTION_UNIT.get(r["source"], "units")
+            for col, (text, align) in enumerate((
+                (r["name"], _L),
+                (r["source"], _L),
+                (fmt(r["rate"]), _R),
+                (fmt(r["hrs"]), _R),
+                (str(r["days"]), _R),
+                (fmt(r["ef"]), _R),
+                (f"{fmt_comma(use)} {unit}", _R),
+                (fmt_comma(use * r["ef"]), _R),
+                ("", _L),
+            )):
+                item = QTableWidgetItem(text)
+                item.setTextAlignment(align)
+                item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
+                t.setItem(row, col, item)
 
-        # Subtotals
-        sub_layout = QHBoxLayout()
-        self._lbl_diesel_sub = QLabel(f"Diesel: {fmt(0.0)} kg CO₂e")
-        self._lbl_elec_sub = QLabel(f"Electricity: {fmt(0.0)} kg CO₂e")
-        self._lbl_detail_total = QLabel(f"Subtotal: {fmt(0.0)} kg CO₂e")
-        bold = QFont()
-        bold.setBold(True)
-        self._lbl_detail_total.setFont(bold)
-        sub_layout.addWidget(self._lbl_diesel_sub)
-        sub_layout.addSpacing(20)
-        sub_layout.addWidget(self._lbl_elec_sub)
-        sub_layout.addStretch()
-        sub_layout.addWidget(self._lbl_detail_total)
-        layout.addLayout(sub_layout)
+        t.updateGeometry()  # tell the page the table's height changed
 
-        # Buttons
-        btn_layout = QHBoxLayout()
-        self.btn_add = QPushButton("＋ Add Equipment")
-        self.btn_add.setMinimumHeight(35)
-        self.btn_add.clicked.connect(self._add_blank_row)
-        self.btn_defaults = QPushButton("Load Defaults")
-        self.btn_defaults.setMinimumHeight(35)
-        self.btn_defaults.clicked.connect(self._load_defaults)
-        self.btn_clear = QPushButton("Clear All")
-        self.btn_clear.setMinimumHeight(35)
-        self.btn_clear.clicked.connect(self._clear_all)
-        # self.btn_apply = QPushButton("Apply Days to All Rows")
-        # self.btn_apply.setMinimumHeight(35)
-        # self.btn_apply.clicked.connect(self._apply_default_days)
-        btn_layout.addWidget(self.btn_add)
-        btn_layout.addWidget(self.btn_defaults)
-        btn_layout.addWidget(self.btn_clear)
-        # btn_layout.addWidget(self.btn_apply)
-        btn_layout.addStretch()
-        layout.addLayout(btn_layout)
-        self._frozen = False
+        empty = not self._rows
+        t.setVisible(not empty)  # no rows: just the heading and the Add row
+        self.btn_add.setText("+  Add first equipment" if empty else "+  Add equipment")
+        self._card.set_total(f"{fmt_comma(self.get_total())} kg CO₂e")
+        self._on_change()
 
-        # Report the initial (header-only) content height to the layout.
-        self._refresh_table_height()
-
-    # ── Height management ─────────────────────────────────────────────────
-
-    def _refresh_table_height(self):
-        """Row count changed: re-fit columns, rows and the pinned Action column,
-        and let the table re-report its content height to the layout."""
-        refit(self._table)
-        self._table.updateGeometry()
-        self.updateGeometry()
-
-    # ── Row management ────────────────────────────────────────────────────
-
-    # ── Cell helpers ──────────────────────────────────────────────────────
-
-    def _cell_text(self, row, col, default="") -> str:
-        item = self._table.item(row, col)
-        return item.text().strip() if item else default
-
-    def _cell_float(self, row, col, default=0.0) -> float:
-        try:
-            return float(self._cell_text(row, col, str(default)).replace(",", ""))
-        except (ValueError, TypeError):
-            return default
-
-    def _cell_int(self, row, col, default=0) -> int:
-        try:
-            return int(float(self._cell_text(row, col, str(default)).replace(",", "")))
-        except (ValueError, TypeError):
-            return default
-
-    def _make_item(self, text, align, editable=True) -> QTableWidgetItem:
-        it = QTableWidgetItem(str(text))
-        it.setTextAlignment(align)
-        if not editable:
-            it.setFlags(Qt.ItemIsEnabled)
-        elif self._frozen:
-            it.setFlags(Qt.ItemIsEnabled | Qt.ItemIsSelectable)
-        return it
-
-    # ── Row management ────────────────────────────────────────────────────
-
-    # def _apply_default_days(self):
-    #     days_val = str(self._default_days.value())
-    #     self._table.blockSignals(True)
-    #     for row in range(self._table.rowCount()):
-    #         item = self._table.item(row, 4)
-    #         if item:
-    #             item.setText(days_val)
-    #     self._table.blockSignals(False)
-    #     self._recalculate()
-
-    def _add_blank_row(self, d: dict | None = None):
-        self._table.blockSignals(True)
-        row_idx = self._table.rowCount()
-        self._table.insertRow(row_idx)
-
-        src  = d.get("source", ENERGY_SOURCES[0]) if d else ENERGY_SOURCES[0]
-        _L   = Qt.AlignLeft  | Qt.AlignVCenter
-        _R   = Qt.AlignRight | Qt.AlignVCenter
-
-        self._table.setItem(row_idx, 0, self._make_item(d.get("name", "") if d else "", _L))
-        self._table.setItem(row_idx, 1, self._make_item(src, _L))
-        self._table.setItem(row_idx, 2, self._make_item(d.get("rate", 0.0) if d else 0.0, _R))
-        self._table.setItem(row_idx, 3, self._make_item(d.get("hrs",  0.0) if d else 0.0, _R))
-        self._table.setItem(row_idx, 4, self._make_item(d.get("days", 0)   if d else 0,   _R))
-        self._table.setItem(row_idx, 5, self._make_item(d.get("ef", EF_DEFAULTS.get(src, 0.0)) if d else EF_DEFAULTS.get(src, 0.0), _R))
-        self._table.setItem(row_idx, 6, self._make_item("", _R, editable=False))
-        self._table.setItem(row_idx, 7, self._make_item("", _R, editable=False))
-
-        action_item = QTableWidgetItem()
-        action_item.setData(Qt.UserRole, row_idx)
-        action_item.setFlags(Qt.ItemIsEnabled)
-        self._table.setItem(row_idx, 8, action_item)
-
-        self._table.blockSignals(False)
-        self._refresh_table_height()
-        self._recalculate()
-
-    def _open_edit_dialog(self, row: int, _col: int = 0):
+    def add_row(self):
         if self._frozen:
             return
-        if not (0 <= row < self._table.rowCount()):
-            return
-        row_data = {
-            "name":   self._cell_text(row, 0),
-            "source": self._cell_text(row, 1, ENERGY_SOURCES[0]),
-            "rate":   self._cell_float(row, 2),
-            "hrs":    self._cell_float(row, 3),
-            "days":   self._cell_int(row, 4),
-            "ef":     self._cell_float(row, 5),
-        }
-        dlg = _EditRowDialog(row_data, parent=self)
-        if dlg.exec() != QDialog.Accepted:
-            return
-        v = dlg.get_values()
-        self._table.blockSignals(True)
-        for col, text in (
-            (0, v["name"]),
-            (1, v["source"]),
-            (2, fmt(v["rate"])),
-            (3, fmt(v["hrs"])),
-            (4, str(v["days"])),
-            (5, fmt(v["ef"])),
-        ):
-            item = self._table.item(row, col)
-            if item:
-                item.setText(text)
-        self._table.blockSignals(False)
-        if v != row_data:
-            self._recalculate()
+        dlg = _EquipmentDialog(_clean_row({}), "Add Equipment", "Add",
+                               [r["name"] for r in self._rows], self)
+        if dlg.exec() == QDialog.Accepted:
+            self._rows.append(dlg.values())
+            self._render()
 
-    def _delete_row(self, row_idx: int):
-        if not (0 <= row_idx < self._table.rowCount()):
+    def edit_row(self, row: int):
+        if self._frozen or not (0 <= row < len(self._rows)):
             return
-        self._table.removeRow(row_idx)
-        self._refresh_table_height()
-        self._recalculate()
+        dlg = _EquipmentDialog(self._rows[row], "Edit Equipment", "Save",
+                               [r["name"] for i, r in enumerate(self._rows) if i != row], self)
+        if dlg.exec() == QDialog.Accepted and dlg.values() != self._rows[row]:
+            self._rows[row] = dlg.values()
+            self._render()
 
-    def _load_defaults(self):
-        if self._table.rowCount() > 0:
+    def delete_row(self, row: int):
+        if 0 <= row < len(self._rows):
+            del self._rows[row]
+            self._render()
+
+    def load_defaults(self, confirm: bool = False):
+        if confirm and self._rows:
             reply = QMessageBox.question(
                 self,
                 "Load Defaults",
@@ -559,101 +587,30 @@ class _DetailedTable(QWidget):
             )
             if reply != QMessageBox.Yes:
                 return
-        self._clear_all(confirm=False)
-        for d in DEFAULT_MACHINERY_DATA:
-            self._add_blank_row(d)
+        self._rows = [_clean_row(d) for d in DEFAULT_MACHINERY_DATA]
+        self._render()
 
-    def _clear_all(self, confirm=True):
-        if confirm and self._table.rowCount() > 0:
-            if not confirm_clear_all(self):
-                return
-        self._table.setRowCount(0)
-        self._cached_total = 0.0
-        self._refresh_table_height()
-        self._recalculate()
+    def clear_all(self):
+        if self._rows and confirm_clear_all(self):
+            self._rows = []
+            self._render()
 
-    # ── Calculation ───────────────────────────────────────────────────────
-
-    def _on_cell_changed(self, row, col):
-        if col == 1:  # Energy Source changed - auto-update EF
-            src = self._cell_text(row, 1, ENERGY_SOURCES[0])
-            if src in EF_DEFAULTS:
-                self._table.blockSignals(True)
-                ef_item = self._table.item(row, 5)
-                if ef_item:
-                    ef_item.setText(str(EF_DEFAULTS[src]))
-                self._table.blockSignals(False)
-        self._recalculate()
-
-    def _recalculate(self):
-        diesel_total = elec_total = 0.0
-        self._table.blockSignals(True)
-        for row in range(self._table.rowCount()):
-            rate = self._cell_float(row, 2)
-            hrs  = self._cell_float(row, 3)
-            days = self._cell_int(row, 4)
-            ef   = self._cell_float(row, 5)
-            src  = self._cell_text(row, 1, ENERGY_SOURCES[0])
-
-            consumption = rate * hrs * days
-            emissions   = consumption * ef
-            unit = CONSUMPTION_UNIT.get(src, "units")
-
-            c_item = self._table.item(row, 6)
-            e_item = self._table.item(row, 7)
-            if c_item:
-                c_item.setText(f"{fmt_comma(consumption)} {unit}")
-            if e_item:
-                e_item.setText(fmt_comma(emissions))
-
-            if src == "Diesel":
-                diesel_total += emissions
-            else:
-                elec_total += emissions
-        self._table.blockSignals(False)
-
-        self._cached_total = diesel_total + elec_total
-        self._lbl_diesel_sub.setText(f"Diesel: {fmt_comma(diesel_total)} kg CO₂e")
-        self._lbl_elec_sub.setText(f"Electricity: {fmt_comma(elec_total)} kg CO₂e")
-        self._lbl_detail_total.setText(f"Subtotal: {fmt_comma(self._cached_total)} kg CO₂e")
-        self._on_change()
+    # ── Page interface ────────────────────────────────────────────────────
 
     def freeze(self, frozen: bool = True):
         self._frozen = frozen
-        freeze_widgets(frozen, self.btn_add, self.btn_defaults, self.btn_clear)
-        # freeze_widgets(frozen, ..., self.btn_apply)
-        flags_editable = Qt.ItemIsEnabled | Qt.ItemIsSelectable | Qt.ItemIsEditable
-        flags_frozen   = Qt.ItemIsEnabled | Qt.ItemIsSelectable
-        for row in range(self._table.rowCount()):
-            for col in range(6):  # cols 0-5 are user-editable
-                item = self._table.item(row, col)
-                if item:
-                    item.setFlags(flags_frozen if frozen else flags_editable)
+        freeze_widgets(frozen, self.btn_add, self.btn_more)
         self._action_delegate.set_frozen(frozen)
 
     def get_total(self) -> float:
-        """Return last recalculated total - avoids redundant row traversal."""
-        return self._cached_total
-
-    # ── Data I/O ──────────────────────────────────────────────────────────
+        return sum(_consumption(r) * r["ef"] for r in self._rows)
 
     def collect(self) -> dict:
-        rows = []
-        for row in range(self._table.rowCount()):
-            rows.append({
-                "name":   self._cell_text(row, 0),
-                "source": self._cell_text(row, 1, ENERGY_SOURCES[0]),
-                "rate":   self._cell_float(row, 2),
-                "hrs":    self._cell_float(row, 3),
-                "days":   self._cell_int(row, 4),
-                "ef":     self._cell_float(row, 5),
-            })
-        return {"rows": rows}
+        return {"rows": [dict(r) for r in self._rows]}
 
     def load(self, data: dict):
-        self._clear_all(confirm=False)
-        for d in data.get("rows", []):
-            self._add_blank_row(d)
+        self._rows = [_clean_row(d) for d in data.get("rows", [])]
+        self._render()
 
 
 # ── Main page ─────────────────────────────────────────────────────────────────
@@ -665,7 +622,7 @@ class MachineryEmissions(ScrollableForm):
         self._loading = False
         self._build_ui()
         self._loading = True
-        self._detailed_table._load_defaults()
+        self._detailed_table.load_defaults()
         self._loading = False
         self._on_totals_changed()
         if self.controller and hasattr(self.controller, "chunk_updated"):
@@ -812,22 +769,13 @@ class MachineryEmissions(ScrollableForm):
     # ── Slots ─────────────────────────────────────────────────────────────
 
     def _shrink_stack_to_current(self):
+        """The stack is as tall as the page on show: QStackedLayout leaves
+        Ignored pages out of its size, so it follows the current page as
+        that page grows (no fixed cap to go stale when rows are added)."""
         idx = self._stack.currentIndex()
         for i in range(self._stack.count()):
-            w = self._stack.widget(i)
-            if i == idx:
-                w.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
-                w.adjustSize()
-            else:
-                w.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
-
-        # Cap the stack to the sizeHint of the current panel in BOTH modes.
-        # The detailed panel's sizeHint is now reliable because _refresh_table_height
-        # pins the inner QTableWidget's min/max on every row change.
-        hint = self._stack.currentWidget().sizeHint().height()
-        self._stack.setMaximumHeight(max(hint, 0))
-
-        self._stack.adjustSize()
+            policy = QSizePolicy.Preferred if i == idx else QSizePolicy.Ignored
+            self._stack.widget(i).setSizePolicy(policy, policy)
         self._stack.updateGeometry()
 
     def _on_mode_toggled(self, btn_id: int, checked: bool):
@@ -845,12 +793,6 @@ class MachineryEmissions(ScrollableForm):
         mode = self._current_mode()
         if mode == "detailed":
             total = self._detailed_table.get_total()
-            # Only re-fit the stack when row count changes; skipping it on plain
-            # value edits prevents a spurious resizeEvent → column-width recalc.
-            new_count = self._detailed_table._table.rowCount()
-            if new_count != getattr(self, "_last_row_count", -1):
-                self._last_row_count = new_count
-                self._shrink_stack_to_current()
         else:
             total = self._lumpsum_elec_total() + self._lumpsum_fuel_total()
             self._lbl_lumpsum_total.setText(f"<b>Lump Sum Subtotal:</b> {fmt_comma(total)} kg CO₂e")
@@ -1002,6 +944,16 @@ class MachineryEmissions(ScrollableForm):
                     "Total machinery/equipment emissions is 0 kgCO₂e - "
                     "both lumpsum fuel consumption and electricity consumption are zero; enter at least one positive value to calculate machinery emissions"
                 )
+        if data.get("mode") == "detailed":
+            # the dialog's checks again, against the project as it is now
+            # (the construction period may have changed since a row was added)
+            rows = data["detailed"]["rows"]
+            max_days = _construction_days()
+            for i, r in enumerate(rows):
+                others = [o["name"] for j, o in enumerate(rows) if j != i]
+                errors = [msg for level, _, msg in check_equipment(r, others, max_days) if level == "error"]
+                if errors:
+                    warnings.append(f"Equipment \"{r['name'] or i + 1}\": {errors[0]}")
         return {"errors": [], "warnings": warnings}
 
     def freeze(self, frozen: bool = True):
