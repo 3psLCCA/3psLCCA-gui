@@ -15,18 +15,17 @@ import math
 import re
 
 from three_ps_lcca_gui.gui.themes import get_token
-from three_ps_lcca_gui.gui.theme import FS_SECTION, SP1, SP2, SP3, SP4
+from three_ps_lcca_gui.gui.theme import FS_SECTION, FW_BOLD, SP1, SP2, SP3, SP4
+from three_ps_lcca_gui.gui.styles import font
 from three_ps_lcca_gui.gui.assets.themes.table_style import (
     ColumnMinWidthMixin,
     apply_column_style,
 )
 from PySide6.QtWidgets import (
-    QButtonGroup,
     QComboBox,
     QDialog,
     QDoubleSpinBox,
     QFormLayout,
-    QGroupBox,
     QHBoxLayout,
     QHeaderView,
     QLabel,
@@ -34,7 +33,7 @@ from PySide6.QtWidgets import (
     QMenu,
     QMessageBox,
     QPushButton,
-    QRadioButton,
+    QScrollArea,
     QSizePolicy,
     QSpinBox,
     QStackedWidget,
@@ -232,12 +231,14 @@ _HEADERS = [
     "Fuel / Power\nRating",              # 2
     "Avg\nHrs/Day",                      # 3
     "No. of\nDays",                      # 4
-    "Emission Factor\n(kg CO₂e/unit)",   # 5
+    "Emission Factor\n(kgCO₂e/unit)",   # 5
     "Consumption",                       # 6
-    "Emissions\n(kg CO₂e)",              # 7
+    "Emissions\n(kgCO₂e)",             # 7
     "Action",                            # 8  Edit / Delete buttons
 ]
 _ACTION_COL = len(_HEADERS) - 1
+
+_MODES = ["Detailed Equipment List", "Lump Sum"]  # index = stack page
 
 
 def _clean_row(d: dict) -> dict:
@@ -551,7 +552,6 @@ class _DetailedTable(QWidget):
         empty = not self._rows
         t.setVisible(not empty)  # no rows: just the heading and the Add row
         self.btn_add.setText("+  Add first equipment" if empty else "+  Add equipment")
-        self._card.set_total(f"{fmt_comma(self.get_total())} kg CO₂e")
         self._on_change()
 
     def add_row(self):
@@ -619,6 +619,10 @@ class _DetailedTable(QWidget):
 class MachineryEmissions(ScrollableForm):
     def __init__(self, controller=None):
         super().__init__(controller=controller, chunk_name=CHUNK)
+        # page margins and scrollbar as on Transportation / Material
+        self.layout.unsetContentsMargins()
+        self.form.unsetContentsMargins()
+        self.findChild(QScrollArea).setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
         self._loading = False
         self._build_ui()
         self._loading = True
@@ -636,43 +640,26 @@ class MachineryEmissions(ScrollableForm):
 
     def _build_ui(self):
         f = self.form
-        bold = QFont()
-        bold.setBold(True)
-        bold.setPointSize(FS_SECTION)
 
-        # ── Grand total banner (top) ───────────────────────────────────────
-        banner = QGroupBox()
-        banner_layout = QHBoxLayout(banner)
-        banner_layout.setContentsMargins(12, 8, 12, 8)
-        self._lbl_grand_total = QLabel("<b>Total Machinery/Equipment Emissions:</b> - kg CO₂e")
-        self._lbl_grand_total.setFont(bold)
-        # note = QLabel(
-        #     "  ⓘ  Fill either Detailed Equipment List or Lump Sum - not both."
-        # )
-        # note.setStyleSheet("color: gray; font-style: italic;")
-        banner_layout.addWidget(self._lbl_grand_total)
-        # banner_layout.addWidget(note)
-        banner_layout.addStretch()
-        f.addRow(banner)
-
-        # ── Toggle ────────────────────────────────────────────────────────
-        toggle_widget = QWidget()
-        toggle_layout = QHBoxLayout(toggle_widget)
-        toggle_layout.setContentsMargins(0, 4, 0, 4)
-        self._radio_detailed = QRadioButton("Detailed Equipment List")
-        self._radio_lumpsum = QRadioButton("Lump Sum")
-        self._radio_detailed.setChecked(True)
-        self._toggle_group = QButtonGroup(self)
-        self._toggle_group.addButton(self._radio_detailed, 0)
-        self._toggle_group.addButton(self._radio_lumpsum, 1)
-        self._toggle_group.idToggled.connect(self._on_mode_toggled)
-        toggle_layout.addWidget(QLabel("Input Method:"))
-        toggle_layout.addSpacing(8)
-        toggle_layout.addWidget(self._radio_detailed)
-        toggle_layout.addSpacing(16)
-        toggle_layout.addWidget(self._radio_lumpsum)
-        toggle_layout.addStretch()
-        f.addRow(toggle_widget)
+        # ── Heading row: title and total, as on Transportation ─────────────
+        head = QWidget()
+        head_layout = QHBoxLayout(head)
+        head_layout.setContentsMargins(SP1, SP2, SP1, SP1)
+        head_layout.setSpacing(SP3)
+        title = QLabel("Machinery/Equipment")
+        title.setFont(font(FS_SECTION, FW_BOLD))
+        self._lbl_grand_total = QLabel("- kgCO₂e")
+        self._lbl_grand_total.setFont(font(FS_SECTION, FW_BOLD))
+        # input method dropdown sits beside the title (saved by collect_data)
+        self.mode = QComboBox()
+        self.mode.addItems(_MODES)
+        self.mode.setToolTip("Input method")
+        self.mode.currentIndexChanged.connect(self._on_mode_changed)
+        head_layout.addWidget(title)
+        head_layout.addWidget(self.mode)
+        head_layout.addStretch()
+        head_layout.addWidget(self._lbl_grand_total)
+        f.addRow(head)
 
         # ── Stack ─────────────────────────────────────────────────────────
         self._stack = QStackedWidget()
@@ -720,7 +707,7 @@ class MachineryEmissions(ScrollableForm):
         ls_total_row = QWidget()
         ls_total_layout = QHBoxLayout(ls_total_row)
         ls_total_layout.setContentsMargins(0, 8, 0, 4)
-        self._lbl_lumpsum_total = QLabel(f"Lump Sum Subtotal: {fmt(0.0)} kg CO₂e")
+        self._lbl_lumpsum_total = QLabel(f"Lump Sum Subtotal: {fmt(0.0)} kgCO₂e")
         bold2 = QFont()
         bold2.setBold(True)
         self._lbl_lumpsum_total.setFont(bold2)
@@ -731,16 +718,6 @@ class MachineryEmissions(ScrollableForm):
         self._stack.addWidget(lumpsum_widget)
         f.addRow(self._stack)
         self._shrink_stack_to_current()
-
-        # ── Grand total (bottom) ───────────────────────────────────────────
-        bottom_banner = QGroupBox()
-        bottom_layout = QHBoxLayout(bottom_banner)
-        bottom_layout.setContentsMargins(12, 8, 12, 8)
-        self._lbl_grand_total_bottom = QLabel("<b>Total Machinery/Equipment Emissions:</b> - kg CO₂e")
-        self._lbl_grand_total_bottom.setFont(bold)
-        bottom_layout.addStretch()
-        bottom_layout.addWidget(self._lbl_grand_total_bottom)
-        f.addRow(bottom_banner)
 
         # ── Remarks ───────────────────────────────────────────────────────
         self._remarks = RemarksEditor(
@@ -764,7 +741,7 @@ class MachineryEmissions(ScrollableForm):
         return c.value() * d.value() * e.value() if c and d and e else 0.0
 
     def _current_mode(self) -> str:
-        return "detailed" if self._radio_detailed.isChecked() else "lumpsum"
+        return "lumpsum" if self.mode.currentIndex() == 1 else "detailed"
 
     # ── Slots ─────────────────────────────────────────────────────────────
 
@@ -778,28 +755,25 @@ class MachineryEmissions(ScrollableForm):
             self._stack.widget(i).setSizePolicy(policy, policy)
         self._stack.updateGeometry()
 
-    def _on_mode_toggled(self, btn_id: int, checked: bool):
-        if checked:
-            self._stack.setCurrentIndex(btn_id)
-            self._shrink_stack_to_current()
-            self._on_totals_changed()
+    def _on_mode_changed(self, idx: int):
+        self._stack.setCurrentIndex(idx)
+        self._shrink_stack_to_current()
+        self._on_totals_changed()
 
     def _on_totals_changed(self):
         if self._loading:
             return
         # Guard: may fire during build_form before all labels are created
-        if not hasattr(self, "_lbl_grand_total_bottom"):
+        if not hasattr(self, "_lbl_lumpsum_total"):
             return
         mode = self._current_mode()
         if mode == "detailed":
             total = self._detailed_table.get_total()
         else:
             total = self._lumpsum_elec_total() + self._lumpsum_fuel_total()
-            self._lbl_lumpsum_total.setText(f"<b>Lump Sum Subtotal:</b> {fmt_comma(total)} kg CO₂e")
+            self._lbl_lumpsum_total.setText(f"<b>Lump Sum Subtotal:</b> {fmt_comma(total)} kgCO₂e")
 
-        text = f"<b>Total Machinery/Equipment Emissions:</b> {fmt_comma(total)} kg CO₂e"
-        self._lbl_grand_total.setText(text)
-        self._lbl_grand_total_bottom.setText(text)
+        self._lbl_grand_total.setText(f"{fmt_comma(total)} kgCO₂e")
         self._on_field_changed()
 
     # ── Currency ──────────────────────────────────────────────────────────
@@ -808,9 +782,6 @@ class MachineryEmissions(ScrollableForm):
         currency = self._get_currency()
         note = f" (Currency: {currency})" if currency else ""
         self._lbl_grand_total.setToolTip(f"Total CO₂e emissions from machinery{note}")
-        self._lbl_grand_total_bottom.setToolTip(
-            f"Total CO₂e emissions from machinery{note}"
-        )
 
     def _on_chunk_updated(self, chunk_name: str):
         if chunk_name == "general_info":
@@ -854,9 +825,7 @@ class MachineryEmissions(ScrollableForm):
         self._loading = True
         try:
             mode = data.get("mode", "detailed")
-            self._radio_lumpsum.setChecked(mode == "lumpsum")
-            self._radio_detailed.setChecked(mode != "lumpsum")
-            self._stack.setCurrentIndex(1 if mode == "lumpsum" else 0)
+            self.mode.setCurrentIndex(1 if mode == "lumpsum" else 0)
 
             self._detailed_table.load(data.get("detailed", {}))
 
@@ -957,8 +926,7 @@ class MachineryEmissions(ScrollableForm):
         return {"errors": [], "warnings": warnings}
 
     def freeze(self, frozen: bool = True):
-        self._radio_detailed.setEnabled(not frozen)
-        self._radio_lumpsum.setEnabled(not frozen)
+        self.mode.setEnabled(not frozen)
         self._detailed_table.freeze(frozen)
         for key, _ in _LUMPSUM_KEYS:
             w = getattr(self, key, None)
