@@ -1,17 +1,18 @@
 from three_ps_lcca_gui.gui.themes import get_token
-from three_ps_lcca_gui.gui.theme import FS_MD
+from three_ps_lcca_gui.gui.theme import SP1, SP2, SP3, SP4, FS_MD, FS_SECTION, FW_BOLD
+from three_ps_lcca_gui.gui.styles import font
+from ..carbon_emission.widgets.transport_emissions import _named_label, _stat_grid
+from ..utils.form_builder.form_builder import make_section_label
 from three_ps_lcca_gui.gui.assets.themes.column_style import (
     apply_column_style,
     pin_last_column,
     pinned_view,
     refit,
 )
-from ..utils.form_builder.form_builder import make_section_label
 from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
     QHBoxLayout,
-    QPushButton,
     QLabel,
     QTableWidget,
     QTableWidgetItem,
@@ -269,7 +270,6 @@ class Recycling(QWidget):
         self.controller = controller
         self.setObjectName("RecyclingWidget")
 
-        self._details_visible = False
         self._frozen = False
         self._loaded = False
         if controller and hasattr(controller, "project_loaded"):
@@ -280,55 +280,52 @@ class Recycling(QWidget):
                 lambda name: QTimer.singleShot(0, self.on_refresh) if name in _STRUCTURE_CHUNKS else None
             )
 
+        # page title and margins as on Carbon Emissions / Construction Works Data
         outer_layout = QVBoxLayout(self)
-        outer_layout.setContentsMargins(0, 0, 0, 0)
-        outer_layout.setSpacing(0)
+        outer_layout.setContentsMargins(24, 20, 24, 16)
+        outer_layout.setSpacing(16)
+        outer_layout.addWidget(make_section_label("Recycling", pad_top=4, pad_bottom=0))
 
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.NoFrame)
+        # as on Transportation / Material: keep the scrollbar's room so width stays put
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
 
         container = QWidget()
         main_layout = QVBoxLayout(container)
-        main_layout.setSpacing(8)
+        main_layout.setSpacing(SP4)
 
-        # ── Summary Bar ──────────────────────────────────────────────────
-        self.summary_bar = QWidget()
-        summary_layout = QHBoxLayout(self.summary_bar)
-        summary_layout.setContentsMargins(8, 8, 8, 8)
+        # Heading row and category totals card, as on Material / Transportation
+        # (same helpers and #transportSummary style)
+        head = QHBoxLayout()
+        head.setContentsMargins(SP1, SP2, SP1, SP1)
+        head.setSpacing(SP3)
+        title = QLabel("Materials")
+        title.setFont(font(FS_SECTION, FW_BOLD))
+        self.count_lbl = _named_label("", "statLabel")
+        self.count_lbl.setFont(font(FS_MD))
+        self.total_lbl = QLabel("-")
+        self.total_lbl.setFont(font(FS_SECTION, FW_BOLD))
+        self.total_lbl.setToolTip("Total recovered value")
+        head.addWidget(title, 0, Qt.AlignBottom)
+        head.addWidget(self.count_lbl, 0, Qt.AlignBottom)
+        head.addStretch()
+        head.addWidget(self.total_lbl, 0, Qt.AlignBottom)
+        main_layout.addLayout(head)
 
-        self.total_lbl = QLabel("<b>Total Recovered Value:</b> -")
-        self.count_lbl = QLabel("Included: - of - items")
-        self.details_btn = QPushButton("Show Details ▼")
-        self.details_btn.setFlat(True)
-        self.details_btn.setCursor(Qt.PointingHandCursor)
-        self.details_btn.clicked.connect(self._toggle_details)
-
-        summary_layout.addWidget(self.total_lbl)
-        summary_layout.addWidget(self._vline())
-        summary_layout.addWidget(self.count_lbl)
-        summary_layout.addStretch()
-        summary_layout.addWidget(self.details_btn)
-        main_layout.addWidget(self.summary_bar)
-
-        # ── Details Row (hidden by default) ──────────────────────────────
-        self.details_widget = QWidget()
-        details_layout = QHBoxLayout(self.details_widget)
-        details_layout.setContentsMargins(8, 0, 8, 8)
-
-        self.foundation_lbl = QLabel("Foundation: -")
-        self.sub_lbl = QLabel("Sub-Structure: -")
-        self.super_lbl = QLabel("Super-Structure: -")
-        self.misc_lbl = QLabel("Misc: -")
-
-        for lbl in [self.foundation_lbl, self.sub_lbl, self.super_lbl, self.misc_lbl]:
-            details_layout.addWidget(lbl)
-            details_layout.addWidget(self._vline())
-
-        details_layout.addStretch()
-        self.details_widget.setVisible(False)
-        main_layout.addWidget(self.details_widget)
-        main_layout.addWidget(self._hline())
+        summary = QFrame()
+        summary.setObjectName("transportSummary")
+        summary_layout = QVBoxLayout(summary)
+        summary_layout.setContentsMargins(SP4, SP3, SP4, SP3)
+        cats, (self.foundation_lbl, self.sub_lbl, self.super_lbl, self.misc_lbl) = _stat_grid([
+            ("Foundation", "-"),
+            ("Sub-Structure", "-"),
+            ("Super-Structure", "-"),
+            ("Misc", "-"),
+        ])
+        summary_layout.addLayout(cats)
+        main_layout.addWidget(summary)
 
         # ── Included Section ─────────────────────────────────────────────
         self.included_table = RecyclingTable(is_included=True, handler=self)
@@ -349,30 +346,6 @@ class Recycling(QWidget):
 
         scroll.setWidget(container)
         outer_layout.addWidget(scroll)
-
-    # ── UI Helpers ───────────────────────────────────────────────────────
-
-    def _section_label(self, text: str) -> QLabel:
-        return make_section_label(text)
-
-    def _hline(self) -> QFrame:
-        f = QFrame()
-        f.setFrameShape(QFrame.HLine)
-        f.setFrameShadow(QFrame.Sunken)
-        return f
-
-    def _vline(self) -> QFrame:
-        f = QFrame()
-        f.setFrameShape(QFrame.VLine)
-        f.setFrameShadow(QFrame.Sunken)
-        return f
-
-    def _toggle_details(self):
-        self._details_visible = not self._details_visible
-        self.details_widget.setVisible(self._details_visible)
-        self.details_btn.setText(
-            "Hide Details ▲" if self._details_visible else "Show Details ▼"
-        )
 
     def _get_currency(self) -> str:
         try:
@@ -540,22 +513,18 @@ class Recycling(QWidget):
         cat_totals: dict,
         currency: str,
     ):
-        self.total_lbl.setText(
-            f"<b>Total Recovered Value:</b> {currency} {fmt_comma(total)}".strip()
-        )
-        self.count_lbl.setText(f"Included: {included} of {total_count} items")
-        self.foundation_lbl.setText(
-            f"Foundation: {currency} {fmt_comma(cat_totals.get('Foundation', 0))}".strip()
-        )
-        self.sub_lbl.setText(
-            f"Sub-Structure: {currency} {fmt_comma(cat_totals.get('Sub-Structure', 0))}".strip()
-        )
-        self.super_lbl.setText(
-            f"Super-Structure: {currency} {fmt_comma(cat_totals.get('Super-Structure', 0))}".strip()
-        )
-        self.misc_lbl.setText(
-            f"Misc: {currency} {fmt_comma(cat_totals.get('Misc', 0))}".strip()
-        )
+        def money(v):
+            return f"{currency} {fmt_comma(v)}".strip()
+
+        self.total_lbl.setText(money(total))
+        self.count_lbl.setText(f"{included} of {total_count} items included")
+        for lbl, cat in (
+            (self.foundation_lbl, "Foundation"),
+            (self.sub_lbl, "Sub-Structure"),
+            (self.super_lbl, "Super-Structure"),
+            (self.misc_lbl, "Misc"),
+        ):
+            lbl.setText(money(cat_totals.get(cat, 0)))
 
     # ── Actions ──────────────────────────────────────────────────────────
 
