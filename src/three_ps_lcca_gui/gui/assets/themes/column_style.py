@@ -428,7 +428,10 @@ class _Controller(QObject):
             t.resizeRowsToContents()
 
     def _on_section_resized(self, col, _old, new):
-        if self._busy:
+        # hiding a column reports a resize to 0 (before it is marked hidden) and
+        # showing it a resize from 0; a drag never reaches 0 (minimum section 16):
+        # neither is the user's, and widening a hiding section leaves a gap
+        if self._busy or new == 0 or _old == 0:
             return
         floor = self.floor(col)
         if new < floor:
