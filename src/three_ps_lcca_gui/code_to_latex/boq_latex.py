@@ -135,7 +135,7 @@ def boq_document(controller=None) -> str:
     matter, bridge data section, header and footer, plus the detailed BOQ."""
     parts = boq_parts(controller)
     body = [
-        title_page(controller, "Bill of Quantities", disclaimer=DISCLAIMER_BOQ),
+        title_page(controller, "Total Initial Construction Cost", disclaimer=DISCLAIMER_BOQ),
         front_matter(figures=False),
         input_data_heading(),
         bridge_description(controller),

@@ -19,9 +19,9 @@ def test_report_heading_is_balanced_over_two_lines():
 
 
 def test_size_fills_the_band_and_is_capped():
-    assert _heading_tex(["Bill of Quantities"])[1] >= 46
-    assert _heading_tex(["Hi"])[1] == 50
-    assert _heading_tex(["x" * 20])[1] < 50
+    assert _heading_tex(["Bill of Quantities"])[1] == 40
+    assert _heading_tex(["Hi"])[1] == 40
+    assert _heading_tex(["x" * 30])[1] < 40
 
 
 def test_long_heading_is_clipped_and_long_word_split():

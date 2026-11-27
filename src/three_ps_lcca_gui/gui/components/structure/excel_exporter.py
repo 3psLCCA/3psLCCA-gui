@@ -246,7 +246,7 @@ def _build_boq(engine):
     bold: set = set()
     fills: dict = {}
 
-    cells[(1, 1)] = "BILL OF QUANTITIES"
+    cells[(1, 1)] = "Total Initial Construction Cost"
     cells[(2, 1)] = f"Project: {gi.get('project_name', '')}"
     cells[(3, 1)] = f"Date: {_dt.date.today().isoformat()}"
     bold.add(1)

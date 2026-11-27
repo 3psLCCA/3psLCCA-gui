@@ -191,7 +191,7 @@ _WORD_MAX = 20        # a single word longer than this is split
 _HEADING_LIMIT = 60   # longer headings are clipped
 _TITLE_WIDTH_PT = 455  # width of the title block (16.0 cm)
 _EM = 0.46            # average bold-serif character width, in em
-_MAX_PT, _MIN_PT = 50, 36
+_MAX_PT, _MIN_PT = 40, 36
 
 
 def _size_for(lines: list[str]) -> float:
@@ -289,13 +289,14 @@ def _cover_art(logo: Path, agency: str, kicker: str, title: str, title_size: int
     kicker_line = (
         _c("textcolor", "lg!70!black", _c("large") + _c("bfseries") + " " + escape_latex(kicker))
         + r"\\[10pt]" if kicker else "")
-    heading = _c("textbf", _c("fontsize", title_size, title_size + 2) + _c("selectfont")
-                 + " " + title)
+    # \par inside the group, so the title's own line height applies
+    heading = ("{" + _c("bfseries") + _c("fontsize", title_size, title_size)
+               + _c("selectfont") + " " + title + _c("par") + "}")
     subtitle = _c("textcolor", "mute", _c("Large") + _c("itshape") + " " + fit(name, 80, 22))
     art.append(TikZNode(
         options=TikZOptions(NoEscape("anchor=west, text=ink, align=left, text width=16cm")),
         at=TikZCoordinate(2.6, 21.85),
-        text=NoEscape(kicker_line + heading + r"\\[12pt]"
+        text=NoEscape(kicker_line + heading + _c("vspace", "12pt")
                       + _c("rule", "2.5cm", "0.8pt") + r"\\[8pt]" + subtitle)))
     # \noindent and % keep the overlay from indenting "Project information"
     return _c("noindent") + art.dumps() + "%"
