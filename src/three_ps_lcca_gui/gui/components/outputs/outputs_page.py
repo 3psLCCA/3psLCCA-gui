@@ -556,7 +556,7 @@ class LCCIntroWidget(QWidget):
 
         ap_str = f"{analysis_period}-year" if analysis_period else "full"
         body = (
-            f"This report presents a <b>{ap_str}</b> life-cycle cost analysis "
+            f"This report presents a <b>{ap_str}</b> life cycle cost analysis "
             f"in <b>{currency}</b>, covering: {stage_str}."
         )
 
@@ -1110,7 +1110,7 @@ class OutputsPage(ScrollableForm):
 
         hint = QLabel(
             "Press Validate to check all input pages before running the "
-            "life-cycle cost calculation."
+            "life cycle cost calculation."
         )
         hint.setFont(_f(FS_MD))
         hint.setWordWrap(True)
@@ -1138,7 +1138,7 @@ class OutputsPage(ScrollableForm):
         h.setContentsMargins(0, 0, 0, 0)
         h.setSpacing(SP2)
 
-        status_lbl = QLabel("Running lifecycle cost analysis…")
+        status_lbl = QLabel("Running life cycle cost analysis…")
         status_lbl.setFont(_f(FS_MD, FW_MEDIUM))
         status_lbl.setStyleSheet(f"color: {get_token('text')}; background: transparent;")
         h.addWidget(status_lbl)

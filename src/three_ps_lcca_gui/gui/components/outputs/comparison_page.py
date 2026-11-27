@@ -8,7 +8,7 @@ Sections (in scroll order):
   1. Header  – title + "Generate PDF Report" button
   2. Total Life Cycle Cost – one hero card per project with NPV total
   3. Across 3 Pillars of Sustainability – grouped bar chart (Eco / Env / Social)
-  4. Across 3 Lifecycle Stages – grouped bar chart (Initial / Use / End-of-Life)
+  4. Across 3 Life Cycle Stages – grouped bar chart (Initial / Use / End-of-Life)
   5. Consolidated Comparison – flat table rows: pillars, stages, grand total
   6. Detailed Cost Item Breakdown – diverging-heatmap table
 
@@ -1003,7 +1003,7 @@ class _StageChartSection(QWidget):
         root.setSpacing(SP3)
 
         root.addWidget(_section_header(
-            "Across 3 Lifecycle Stages",
+            "Across 3 Life Cycle Stages",
             "Compares Initial, Use, and End-of-Life cost across projects to identify "
             "which phase carries the most weight for each option."
         ))
@@ -1527,7 +1527,7 @@ class _DetailedBreakdownSection(QWidget):
         if not stage_groups:
             root.addWidget(_section_header(
                 "Detailed Cost Item Breakdown",
-                "Itemized breakdown across lifecycle stages. Values are rendered with a diverging "
+                "Itemized breakdown across life cycle stages. Values are rendered with a diverging "
                 "heat map — green indicates credits/savings, while gold to purple indicates increasing costs."
             ))
             root.addWidget(QLabel("No detailed breakdown available."))
@@ -1567,7 +1567,7 @@ class _DetailedBreakdownSection(QWidget):
 
         root.addWidget(_section_header(
             "Detailed Cost Item Breakdown",
-            "Itemized breakdown across lifecycle stages. Values are rendered with a diverging "
+            "Itemized breakdown across life cycle stages. Values are rendered with a diverging "
             "heat map — green indicates credits/savings, while gold to purple indicates increasing costs.",
             action_widget=export_btn,
         ))

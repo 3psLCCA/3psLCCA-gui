@@ -1804,7 +1804,7 @@ class HomePage(QWidget):
                     show_cta = False
                 else:
                     head = None  # Triggers Logo display in _EmptyState
-                    sub = "Start your bridge life-cycle cost analysis by creating a new project."
+                    sub = "Start your bridge life cycle cost analysis by creating a new project."
                     show_cta = True
 
             empty = _EmptyState(

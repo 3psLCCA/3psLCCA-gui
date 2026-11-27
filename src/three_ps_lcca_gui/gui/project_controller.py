@@ -23,7 +23,7 @@ class ProjectController(QObject):
         self._chunk_cache: dict = {}
 
     # --------------------------------------------------------------------------
-    # PROJECT LIFECYCLE
+    # PROJECT LIFE CYCLE
     # --------------------------------------------------------------------------
 
     def init_project(

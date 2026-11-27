@@ -4,7 +4,7 @@ COLORS = {
     "env_color": "#8ad400",
     "soc_color": "#ff5a2a",
 
-    # Stage colors (life-cycle phases)
+    # Stage colors (life cycle phases)
     "init_color": "#CCCCCC",
     "use_color": "#00C49A",
     "end_color": "#EA9E9E",

@@ -709,7 +709,7 @@ class AggregateChartWidget(QWidget):
         )
         text_v.addWidget(title)
 
-        sub_desc = QLabel(f"Total cost breakdown across 3 lifecycle stages, in {self._currency}.")
+        sub_desc = QLabel(f"Total cost breakdown across 3 life cycle stages, in {self._currency}.")
         sub_desc.setAlignment(Qt.AlignLeft)
         sub_desc.setWordWrap(True)
         sub_desc.setFont(_f(FS_MD))

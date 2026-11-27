@@ -113,7 +113,7 @@ class SysTracker(QObject):
             cls._inst = cls(interval_ms)
         return cls._inst
 
-    # ── Lifecycle ─────────────────────────────────────────────────────────────
+    # ── Life cycle ────────────────────────────────────────────────────────────
 
     def start(self):
         self._baseline_ram = _ram_mb()
