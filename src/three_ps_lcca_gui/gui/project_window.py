@@ -553,6 +553,12 @@ class ProjectWindow(QMainWindow):
 
         self.menuProject.addSeparator()
 
+        action_wpi = QAction("WPI Editor", self)
+        action_wpi.triggered.connect(self._open_wpi_editor)
+        self.menuProject.addAction(action_wpi)
+
+        self.menuProject.addSeparator()
+
         # self.actionBlobManager = QAction("Blob Manager", self)
         # self.actionBlobManager.triggered.connect(self._open_blob_manager)
         # self.menuProject.addAction(self.actionBlobManager)
@@ -1289,6 +1295,12 @@ class ProjectWindow(QMainWindow):
         page = self._get_or_create_widget("Construction Works Data")
         if page is not None:
             page._download_excel(boq)
+
+    def _open_wpi_editor(self):
+        """Open the WPI profile editor (same as Traffic Data's ••• menu)."""
+        page = self._get_or_create_widget("Traffic Data")
+        if page is not None:
+            page._wpi_selector.open_editor()
 
     def _export_inputs_json(self):
         for name in self._page_names:

@@ -131,9 +131,17 @@ class _WPIEditorDialog(QDialog):
         layout.addWidget(self._table, 1)
 
         # ── Footer: Actions ───────────────────────────────────────────────────
-        btns = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
+        btns = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel
+                                | QDialogButtonBox.Reset)
         if self._duplicate:
             btns.button(QDialogButtonBox.Save).setText("Create")
+        # 2019 is the base year (ratio = selected / 2019), so its values
+        # mean "no adjustment"
+        reset = btns.button(QDialogButtonBox.Reset)
+        reset.setText("Reset to 2019")
+        reset.setToolTip("Set every value to the 2019 base profile (ratio 1, no adjustment)")
+        reset.setEnabled(self._manager.get_by_id("wpi_2019") is not None)
+        reset.clicked.connect(self._reset_to_base)
         btns.accepted.connect(self._on_save)
         btns.rejected.connect(self.reject)
         layout.addWidget(btns)
@@ -143,6 +151,12 @@ class _WPIEditorDialog(QDialog):
         self._year.setValue(self._profile.year)
         self._remark.setText(self._profile.remark)
         self._shared.setChecked(self._profile.is_shared)
+
+    def _reset_to_base(self):
+        """Table values back to the 2019 base profile; name/year/remark stay."""
+        base = self._manager.get_by_id("wpi_2019")
+        if base:
+            self._table.load_from_data(json.loads(json.dumps(base.data)))
 
     def _on_save(self):
         name = self._name.text().strip()
@@ -325,6 +339,13 @@ class _WPISelector(QWidget):
         self.profile_deleted.emit(deleted_id)
 
     # ── Public API ────────────────────────────────────────────────────────────
+
+    def open_editor(self):
+        """Project > WPI Editor…: edit the current profile if it is your
+        own, otherwise duplicate it (built-in profiles are read-only)."""
+        if self._frozen or not self._current:
+            return
+        self._open_dialog(duplicate=not self._current.is_custom)
 
     def current_profile(self) -> Optional[WPIProfile]:
         return self._current
