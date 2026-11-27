@@ -433,6 +433,7 @@ class LCCBreakdownTable(QWidget):
 
     def _make_table(self) -> QTableWidget:
         t = QTableWidget(len(self._rows), 4)
+        t.setObjectName("itemizedTable")  # main.qss
         t.setHorizontalHeaderLabels(
             ["Stage", "Cost Item", f"Value ({self._currency})", "Relative Cost"])
         t.verticalHeader().setVisible(False)

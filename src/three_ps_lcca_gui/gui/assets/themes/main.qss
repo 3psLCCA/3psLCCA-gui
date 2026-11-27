@@ -486,6 +486,11 @@ QTableWidget#consolidatedTable QHeaderView::section {
     color: $text;
 }
 
+/* Itemized Cost Breakdown: no lines between cells (lcc_plot.py) */
+QTableWidget#itemizedTable {
+    qproperty-showGrid: false;
+}
+
 /* top-left square where the row and column headers meet */
 QTableCornerButton::section {
     background-color: $base;
