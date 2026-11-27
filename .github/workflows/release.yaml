@@ -67,16 +67,31 @@ jobs:
         TAG="$GITHUB_REF_NAME"
         echo "Full tag: $TAG"
         
-        # Validate tag format
-        if [[ ! $TAG =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-          echo "[ERROR] ERROR: Tag format invalid. Expected v1.0.0, got: $TAG"
-          exit 1
-        fi
-        
+
+        # conda versions cannot contain '-': v2026.11.3-beta -> 2026.11.3beta
         VERSION=${TAG#v}
+        VERSION=${VERSION//-/}
         echo "VERSION=$VERSION" >> $GITHUB_ENV
         echo "[SUCCESS] Extracted version: $VERSION"
-    
+
+    - name: Set app version in version.py from tag
+
+      run: |
+        set -e
+        TAG="$GITHUB_REF_NAME"
+        VERSION_PY="src/three_ps_lcca_gui/gui/version.py"
+
+        sed -i "s/^VERSION = .*/VERSION = \"3psLCCA $TAG\"/" "$VERSION_PY"
+
+        if grep -q "^VERSION = \"3psLCCA $TAG\"" "$VERSION_PY"; then
+          echo "[SUCCESS] version.py updated"
+          grep "^VERSION" "$VERSION_PY"
+        else
+          echo "[ERROR] ERROR: version.py not updated"
+          cat "$VERSION_PY"
+          exit 1
+        fi
+
     - name: Verify conda-recipe/meta.yaml exists
       
       run: |
@@ -391,13 +406,10 @@ jobs:
           TAG="$GITHUB_REF_NAME"
           echo "Full tag: $TAG"
           
-          # Validate tag format
-          if [[ ! $TAG =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "[ERROR] ERROR: Tag format invalid. Expected v1.0.0, got: $TAG"
-            exit 1
-          fi
-          
+
+          # must match the conda package version: v2026.11.3-beta -> 2026.11.3beta
           VERSION=${TAG#v}
+          VERSION=${VERSION//-/}
           echo "VERSION=$VERSION" >> $GITHUB_ENV
           echo "[SUCCESS] Extracted version: $VERSION"
 
