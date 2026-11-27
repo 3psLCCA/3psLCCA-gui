@@ -30,6 +30,10 @@ from ...utils.display_format import fmt, fmt_comma
 from three_ps_lcca_gui.gui.styles import font
 from ...utils.icons import make_icon
 from ...utils.common_requested_data import get_chunk
+from three_ps_lcca_gui.gui._CONFIG import LOG_DATA_UPDATES
+
+# data update log: prints only with LOG_DATA_UPDATES on (_CONFIG.py)
+_dev_log = print if LOG_DATA_UPDATES else (lambda *a, **k: None)
 
 
 _FAB_FULL_TEXT = "+ Add Component"
@@ -420,6 +424,8 @@ class StructureManagerWidget(QWidget):
         self.controller.engine.stage_update(
             chunk_name=self.chunk_name, data=current_data
         )
+        _dev_log(f"[Construction Works] {self.chunk_name} > {comp_name}: added "
+                 f"{new_entry.get('values', {}).get('material_name', '')!r}")  # DEBUG data update log
         self.controller.chunk_updated.emit(self.chunk_name)
         self.save_current_state()
 
@@ -540,6 +546,8 @@ class StructureManagerWidget(QWidget):
                     self.controller.engine.stage_update(
                         chunk_name=self.chunk_name, data=current_data
                     )
+                    _dev_log(f"[Construction Works] {self.chunk_name} > {comp_name}: updated "
+                             f"{item_to_edit.get('values', {}).get('material_name', '')!r}")  # DEBUG data update log
                     self.controller.chunk_updated.emit(self.chunk_name)
                     self.save_current_state()
 
@@ -666,6 +674,8 @@ class StructureManagerWidget(QWidget):
         self.data = data
 
         self.controller.engine.stage_update(chunk_name=self.chunk_name, data=data)
+        _dev_log(f"[Construction Works] {self.chunk_name} > {comp_name}: "
+                 f"{'trashed' if should_trash else 'restored'} item #{data_index}")  # DEBUG data update log
         # If restoring a material whose component was deleted, un-delete the component
         if not should_trash:
             registry = self._get_registry()
@@ -737,6 +747,7 @@ class StructureManagerWidget(QWidget):
             current_data = self.controller.engine.fetch_chunk(self.chunk_name) or {}
             current_data[clean_name] = []
             self.controller.engine.stage_update(chunk_name=self.chunk_name, data=current_data)
+            _dev_log(f"[Construction Works] {self.chunk_name}: added component {clean_name!r} (no chunk_updated)")  # DEBUG data update log
             sc = registry[self.chunk_name][clean_name]["search_cat"]
             self.create_section(clean_name, has_items=False, search_cat=sc)
             self.refresh_summary()  # component count
@@ -767,6 +778,7 @@ class StructureManagerWidget(QWidget):
         current_data = self.controller.engine.fetch_chunk(self.chunk_name) or {}
         current_data[new_name] = current_data.pop(old_name, [])
         self.controller.engine.stage_update(chunk_name=self.chunk_name, data=current_data)
+        _dev_log(f"[Construction Works] {self.chunk_name}: renamed component {old_name!r} -> {new_name!r}")  # DEBUG data update log
         # Update registry: rename key, update search_cat component name
         registry = self._get_registry()
         page_reg = registry.setdefault(self.chunk_name, {})
@@ -796,6 +808,7 @@ class StructureManagerWidget(QWidget):
             for item in items:
                 item.setdefault("state", {})["in_trash"] = True
             self.controller.engine.stage_update(chunk_name=self.chunk_name, data=current_data)
+            _dev_log(f"[Construction Works] {self.chunk_name} > {name}: moved {active_count} item(s) to trash")  # DEBUG data update log
             # is_deleted stays False — section remains visible with empty table
             self.controller.chunk_updated.emit(self.chunk_name)
             self.save_current_state()
@@ -814,6 +827,7 @@ class StructureManagerWidget(QWidget):
             registry.setdefault(self.chunk_name, {}).setdefault(name, {})["is_deleted"] = True
             self._page_registry = registry[self.chunk_name]
             self._save_registry(registry)
+            _dev_log(f"[Construction Works] {self.chunk_name}: deleted component {name!r}")  # DEBUG data update log
             self.controller.chunk_updated.emit(self.chunk_name)
             self.save_current_state()
             self.data = current_data

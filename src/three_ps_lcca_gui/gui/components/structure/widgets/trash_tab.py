@@ -9,6 +9,10 @@ from three_ps_lcca_gui.gui.themes import get_token
 from .base_table import _make_msgbox
 from .items_by_tab import ItemsByTabView, TAB_NAMES
 from .material_dialog import name_key
+from three_ps_lcca_gui.gui._CONFIG import LOG_DATA_UPDATES
+
+# data update log: prints only with LOG_DATA_UPDATES on (_CONFIG.py)
+_dev_log = print if LOG_DATA_UPDATES else (lambda *a, **k: None)
 
 
 class TrashTabWidget(ItemsByTabView):
@@ -64,6 +68,7 @@ class TrashTabWidget(ItemsByTabView):
                     changed = True
             if changed:
                 self.controller.save_chunk_data(chunk_id, data)
+                _dev_log(f"[Trash] {chunk_id}: deleted all trashed items")  # DEBUG data update log
 
         self.on_refresh()
         main_view = self.window().findChild(QWidget, "StructureTabView")
@@ -82,6 +87,7 @@ class TrashTabWidget(ItemsByTabView):
 
         del items[data_index]
         self.controller.save_chunk_data(chunk_id, data)
+        _dev_log(f"[Trash] {chunk_id} > {comp_name}: deleted item #{data_index} for good")  # DEBUG data update log
 
         def _do():
             self.on_refresh()  # row keys shift after a delete, so rebuild
@@ -129,6 +135,8 @@ class TrashTabWidget(ItemsByTabView):
             item["state"].pop("_transport_snapshot", None)
 
         self.controller.save_chunk_data(chunk_id, data)
+        _dev_log(f"[Trash] {chunk_id} > {comp_name}: "
+                 f"{'trashed' if should_trash else 'restored'} item #{data_index}")  # DEBUG data update log
 
         # When restoring, clear is_deleted from the component registry
         if not should_trash:

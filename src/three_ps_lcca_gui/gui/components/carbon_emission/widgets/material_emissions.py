@@ -1,4 +1,5 @@
 from three_ps_lcca_gui.gui.themes import get_token
+from three_ps_lcca_gui.gui._CONFIG import LOG_DATA_UPDATES
 from three_ps_lcca_gui.gui.theme import SP1, SP2, SP3, SP4, FS_MD, FS_SECTION, FW_BOLD
 from three_ps_lcca_gui.gui.styles import font
 from .transport_emissions import _named_label, _stat_grid
@@ -16,6 +17,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, QTimer, QRect, QEvent, QModelIndex
 import datetime
+import time
 
 from ...utils.unit_resolver import analyze_conversion_sympy
 from ...utils.definitions import UNIT_DISPLAY
@@ -34,6 +36,9 @@ from three_ps_lcca_gui.gui.assets.themes.column_style import (
     pinned_view,
     refit,
 )
+
+# rebuild log: prints only with LOG_DATA_UPDATES on (_CONFIG.py)
+_dev_log = print if LOG_DATA_UPDATES else (lambda *a, **k: None)
 
 
 def _fmt_unit(code: str) -> str:
@@ -309,7 +314,8 @@ class MaterialEmissions(QWidget):
         if controller and hasattr(controller, "chunk_updated"):
             _STRUCTURE_CHUNKS = {"str_foundation", "str_sub_structure", "str_super_structure", "str_misc"}
             controller.chunk_updated.connect(
-                lambda name: QTimer.singleShot(0, self.on_refresh) if name in _STRUCTURE_CHUNKS else None
+                lambda name: (_dev_log(f"[Material Emissions] {name} changed -> rebuild queued"),  # DEBUG rebuild log
+                              QTimer.singleShot(0, self.on_refresh)) if name in _STRUCTURE_CHUNKS else None
             )
 
         # Outer layout holds only the scroll area, so growing tables never
@@ -380,6 +386,10 @@ class MaterialEmissions(QWidget):
     def on_refresh(self):
         if not self.controller or not getattr(self.controller, "engine", None):
             return
+        if LOG_DATA_UPDATES:  # DEBUG rebuild log
+            _t0 = time.perf_counter()
+            QTimer.singleShot(0, lambda: _dev_log(
+                f"[Material Emissions] rebuilt in {(time.perf_counter() - _t0) * 1000:.0f} ms"))
 
         included_items = []
         excluded_items = []
@@ -859,6 +869,7 @@ class MaterialEmissions(QWidget):
     def showEvent(self, event):
         super().showEvent(event)
         if not self._loaded:
+            _dev_log("[Material Emissions] page shown -> rebuild")  # DEBUG rebuild log
             self.on_refresh()
             self._loaded = True
 
@@ -867,6 +878,7 @@ class MaterialEmissions(QWidget):
         self._loaded = False
 
     def _on_project_reloaded(self):
+        _dev_log("[Material Emissions] project loaded")  # DEBUG rebuild log
         self._loaded = False
         if self.isVisible():
             self.on_refresh()
