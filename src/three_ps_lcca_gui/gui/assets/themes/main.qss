@@ -479,6 +479,13 @@ QHeaderView::section:horizontal:last {
     border-right: none;
 }
 
+/* Consolidated Stage Summary: titles in the stage cells' font (lcc_plot.py) */
+QTableWidget#consolidatedTable QHeaderView::section {
+    font-size: $font-size-md;
+    font-weight: $weight-semibold;
+    color: $text;
+}
+
 /* top-left square where the row and column headers meet */
 QTableCornerButton::section {
     background-color: $base;

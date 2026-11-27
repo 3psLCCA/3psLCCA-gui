@@ -1,47 +1,33 @@
 """
 gui/components/outputs/lcc_plot.py
 
-Creates an interactive matplotlib chart from LCC analysis results.
-Use LCCChartWidget(results) to get a QWidget ready to embed in Qt.
+Results tables: LCCDetailsTable (stage x pillar summary) and
+LCCBreakdownTable (itemized cost breakdown).
 """
-
-import matplotlib
-matplotlib.use("QtAgg")
 
 from three_ps_lcca_gui.gui.themes import get_token
 from three_ps_lcca_gui.gui.theme import (
     FONT_FAMILY,
-    FS_SM, FS_MD, FW_NORMAL, FW_SEMIBOLD, FW_BOLD, RADIUS_SM, SP2
+    FS_MD, FW_NORMAL, FW_SEMIBOLD, FW_BOLD, SP2, ACCENT_W
 )
 from three_ps_lcca_gui.gui.components.utils.display_format import fmt_currency
-from three_ps_lcca_gui.gui.components.utils.table_widgets import contrast_color, fit_to_contents, item_text_rect
-from .plots_helper.Pie import COLORS
+from three_ps_lcca_gui.gui.components.utils.table_widgets import (
+    WordWrapHeaderView, contrast_color, fit_to_contents, item_text_rect,
+)
 from .helper_functions.lcc_colors import COLORS as LCC_PALETTE
 from .lcc_data import (
-    _get,
-    build_chart_data,
     STAGE_DEFS, stage_totals,
     BREAKDOWN_STAGES,
-    CATEGORY_COLORS,
 )
-from .plots_helper.bar_chart import create_bar_chart
 
-matplotlib.rcParams["font.family"] = FONT_FAMILY
-
-from PySide6.QtCore import QEvent, QObject, QRect, QSize, Qt
+from PySide6.QtCore import QRect, QSize, Qt
 from PySide6.QtGui import QColor, QFont
 from PySide6.QtWidgets import (
     QApplication, QHeaderView, QLabel, QScrollArea, QFrame,
     QSizePolicy, QStyle, QStyledItemDelegate, QStyleOptionViewItem,
-    QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget, QToolTip, QHBoxLayout,
+    QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
-try:
-    from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
-except ImportError:
-    from matplotlib.backends.backend_qt import FigureCanvasQTAgg
-
-from .plots_helper.plot_utils import ChartToolbar, WheelForwarder as _ScrollForwarder
 from .table_export import (
     attach_table_context_menu,
     create_table_context_menu,
@@ -49,107 +35,11 @@ from .table_export import (
     copy_widget_to_clipboard,
 )
 
-
-
-class HeatmapDelegate(QStyledItemDelegate):
-    """Native Qt delegate for rendering heatmap cells."""
-    def __init__(self, col_maxima, currency, parent=None):
-        super().__init__(parent)
-        self.col_maxima = col_maxima
-        self.currency = currency
-
-    def _std_heat_color(self, intensity: float) -> QColor:
-        t = max(0.0, min(1.0, intensity))
-        # Light Pale Yellow (255, 255, 200) -> Deep Forest Green (34, 139, 34)
-        r = 255 + int((34 - 255) * t)
-        g = 255 + int((139 - 255) * t)
-        b = 200 + int((34 - 200) * t)
-        return QColor(r, g, b)
-
-    def _text_on(self, bg: QColor) -> QColor:
-        return contrast_color(bg)
-
-    def paint(self, painter, option, index):
-        # Index breakdown:
-        # Col 0: Stage Name (slight tint)
-        # Col 1-3: Economic, Environmental, Social (Heatmap)
-        # Col 4: Stage Total (Neutral)
-        # Last Row: Grand Total (Neutral Highlight)
-        
-        row_count = index.model().rowCount()
-        is_total_row = (index.row() == row_count - 1)
-        is_heatmap_col = (1 <= index.column() <= 3)
-        is_stage_col = (index.column() == 0)
-        
-        # Determine background color
-        if is_heatmap_col and not is_total_row:
-            # Main Heatmap Area
-            val = index.data(Qt.UserRole)
-            col_idx = index.column() - 1
-            max_val = self.col_maxima[col_idx]
-            intensity = val / max_val if max_val > 0 else 0
-            bg_color = self._std_heat_color(intensity)
-        elif is_total_row:
-            # Bottom Total Row
-            bg_color = QColor(get_token("surface_mid"))
-        elif is_stage_col:
-            bg_data = index.data(Qt.BackgroundRole)
-            if hasattr(bg_data, 'color'):
-                bg_color = bg_data.color()
-            elif isinstance(bg_data, QColor) and bg_data.isValid():
-                bg_color = bg_data
-            else:
-                bg_color = QColor(get_token("window"))
-        else:
-            # Right Total Column (index 4)
-            bg_color = QColor(get_token("surface"))
-
-        fg_color = self._text_on(bg_color)
-
-        painter.save()
-        painter.fillRect(option.rect, bg_color)
-        
-        painter.setFont(option.font)
-        painter.setPen(fg_color)
-        
-        # Draw text
-        display_text = index.data(Qt.DisplayRole)
-        if display_text is None:
-            val = index.data(Qt.UserRole)
-            if val is not None:
-                display_text = fmt_currency(val, self.currency, decimals=2)
-        
-        if display_text:
-            padding = 8
-            rect = option.rect.adjusted(padding, 0, -padding, 0)
-            align = Qt.AlignLeft if is_stage_col else Qt.AlignRight
-            painter.drawText(rect, align | Qt.AlignVCenter, display_text)
-            
-        painter.restore()
-
-    def helpEvent(self, event, view, option, index):
-        if not index.isValid():
-            return False
-
-        val = index.data(Qt.UserRole)
-        if val is not None:
-            actual_val = val * 1_000_000
-            QToolTip.showText(
-                event.globalPos(),
-                f"Actual Value: {self.currency} {fmt_currency(actual_val, self.currency, decimals=0, style='both')}",
-            )
-            return True
-        else:
-            txt = index.data(Qt.DisplayRole)
-            if txt:
-                QToolTip.showText(event.globalPos(), str(txt))
-                return True
-                
-        return super().helpEvent(event, view, option, index)
+_STAGE_COLOR_ROLE = Qt.UserRole + 1  # hex of a stage cell's strip
 
 
 class _StageLabelDelegate(QStyledItemDelegate):
-    """Paints col-0 stage cells with explicit background and centered text."""
+    """Paints col-0 stage cells: stage-coloured strip on the left, centered text."""
 
     def paint(self, painter, option, index):
         bg = index.data(Qt.BackgroundRole)
@@ -160,6 +50,11 @@ class _StageLabelDelegate(QStyledItemDelegate):
             painter.setPen(contrast_color(bg_color))
         else:
             painter.fillRect(option.rect, option.palette.base())
+            painter.setPen(option.palette.text().color())
+        stage = index.data(_STAGE_COLOR_ROLE)
+        if stage:
+            r = option.rect
+            painter.fillRect(QRect(r.x(), r.y(), ACCENT_W, r.height()), QColor(stage))
         font = index.data(Qt.FontRole)
         if font:
             painter.setFont(font)
@@ -167,6 +62,22 @@ class _StageLabelDelegate(QStyledItemDelegate):
         painter.drawText(item_text_rect(self, option, index),
                          Qt.AlignCenter | Qt.TextWordWrap, str(text))
         painter.restore()
+
+
+class _PillarHeaderView(WordWrapHeaderView):
+    """Header that paints a pillar-coloured strip along the top of a section."""
+
+    def __init__(self, colors: dict, parent=None):
+        super().__init__(Qt.Horizontal, parent)
+        self._colors = colors  # {logical column: hex}
+
+    def paintSection(self, painter, rect, logical_index):
+        painter.save()
+        super().paintSection(painter, rect, logical_index)
+        painter.restore()
+        color = self._colors.get(logical_index)
+        if color:
+            painter.fillRect(QRect(rect.x(), rect.y(), rect.width(), ACCENT_W), QColor(color))
 
 
 class LCCDetailsTable(QWidget):
@@ -181,6 +92,7 @@ class LCCDetailsTable(QWidget):
         lay.setSpacing(0)
 
         self.table = QTableWidget()
+        self.table.setObjectName("consolidatedTable")  # main.qss
         self.table.setItemDelegateForColumn(0, _StageLabelDelegate(self.table))
         self.table.setColumnCount(5)
         self.table.verticalHeader().setVisible(False)
@@ -194,13 +106,12 @@ class LCCDetailsTable(QWidget):
             f"Social\n({currency})",
             f"Stage Total\n({currency})"
         ]
+        self.table.setHorizontalHeader(_PillarHeaderView({
+            1: LCC_PALETTE["eco_color"],
+            2: LCC_PALETTE["env_color"],
+            3: LCC_PALETTE["soc_color"],
+        }, self.table))
         self.table.setHorizontalHeaderLabels(headers)
-        _hdr_bg = [None, LCC_PALETTE["eco_color"], LCC_PALETTE["env_color"], LCC_PALETTE["soc_color"], None]
-        for col, hex_color in enumerate(_hdr_bg):
-            if hex_color:
-                item = self.table.horizontalHeaderItem(col)
-                if item:
-                    item.setBackground(QColor(hex_color))
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Interactive)
         self.table.horizontalHeader().setDefaultAlignment(Qt.AlignCenter)
@@ -269,7 +180,7 @@ class LCCDetailsTable(QWidget):
             item = QTableWidgetItem(label)
             item.setFont(f_base)
             if key in _stage_bg:
-                item.setBackground(QColor(_stage_bg[key]))
+                item.setData(_STAGE_COLOR_ROLE, _stage_bg[key])
             self.table.setItem(r_idx, 0, item)
 
             for c_idx, v in enumerate(vals):
@@ -615,126 +526,3 @@ class LCCBreakdownTable(QWidget):
         scroll.setMinimumWidth(0)
         scroll.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         return scroll
-
-
-# ---------------------------------------------------------------------------
-# Public widget
-# ---------------------------------------------------------------------------
-
-class _ScrollForwarder(QObject):
-    """Forward wheel events from the canvas to the nearest parent QScrollArea."""
-
-    def eventFilter(self, obj, event):
-        if event.type() == QEvent.Wheel:
-            parent = obj.parent()
-            while parent is not None:
-                if isinstance(parent, QScrollArea):
-                    QApplication.sendEvent(parent.verticalScrollBar(), event)
-                    return True
-                parent = parent.parent()
-        return False
-
-
-class LCCChartWidget(QWidget):
-    """
-    Interactive LCC bar chart widget.
-    Includes a navigation toolbar (zoom / pan / save) and hover tooltips.
-    """
-
-    def __init__(self, results: dict, currency: str = "INR", parent=None):
-        super().__init__(parent)
-        self._currency = currency
-
-        # Use theme colors for the graph
-        text_color = get_token("text")
-        bg_color   = get_token("window")
-
-        self._values, self._labels, stage_info = build_chart_data(results)
-        fig, self._bars = create_bar_chart(
-            self._values, self._labels, stage_info, text_color, bg_color, currency=currency
-        )
-
-        self._canvas = FigureCanvasQTAgg(fig)
-        self._canvas.setMinimumHeight(480)
-        self._canvas.setMaximumHeight(600)
-        self._canvas.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        self._scroll_forwarder = _ScrollForwarder(self)
-        self._canvas.installEventFilter(self._scroll_forwarder)
-        toolbar = _ChartToolbar(self._canvas, self)
-
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
-        layout.addWidget(toolbar)
-        layout.addWidget(self._canvas)
-
-        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-
-        # ── Hover annotation ──────────────────────────────────────────────
-        ax = fig.axes[0]
-        self._annot = ax.annotate(
-            "",
-            xy=(0, 0),
-            xytext=(14, 14),
-            textcoords="offset points",
-            bbox=dict(
-                boxstyle="round,pad=0.5",
-                fc=bg_color,
-                ec="#aaaaaa",
-                alpha=0.95,
-                linewidth=1,
-            ),
-            fontsize=FS_SM,
-            fontfamily=FONT_FAMILY,
-            color=text_color,
-            zorder=10,
-        )
-        self._annot.set_visible(False)
-
-        self._canvas.mpl_connect("motion_notify_event", self._on_hover)
-        self._canvas.mpl_connect("axes_leave_event",    self._on_leave)
-
-    def sizeHint(self):
-        # toolbar ≈ 36px + canvas minimum 480px
-        return QSize(super().sizeHint().width(), 520)
-
-    # ── Hover handlers ────────────────────────────────────────────────────
-
-    def _on_hover(self, event):
-        if event.inaxes is None:
-            self._set_annot_visible(False)
-            return
-
-        for bar, label, val in zip(self._bars, self._labels, self._values):
-            if bar.contains(event)[0]:
-                x = bar.get_x() + bar.get_width() / 2
-                self._annot.xy = (x, val)
-                inr_val = val * 1_000_000
-                sign = "−" if val < 0 else ""
-                self._annot.set_text(
-                    f"{label}\n"
-                    f"{self._currency} {sign}{fmt_currency(abs(inr_val), self._currency, decimals=0, style='both')}\n"
-                    f"({sign}{fmt_currency(abs(val), self._currency, decimals=4)} Million {self._currency})"
-                )
-                self._set_annot_visible(True)
-                return
-
-        self._set_annot_visible(False)
-
-    def _on_leave(self, event):
-        self._set_annot_visible(False)
-
-    def _set_annot_visible(self, visible: bool):
-        if self._annot.get_visible() != visible:
-            self._annot.set_visible(visible)
-            self._canvas.draw_idle()
-
-
-# Keep backward-compatible alias for any existing call sites
-def create_lcc_figure(results: dict):
-    palette = QApplication.instance().palette()
-    text_color = palette.windowText().color().name()
-    bg_color   = palette.window().color().name()
-    values, labels, stage_info = build_chart_data(results)
-    fig, _ = create_bar_chart(values, labels, stage_info, text_color, bg_color)
-    return fig

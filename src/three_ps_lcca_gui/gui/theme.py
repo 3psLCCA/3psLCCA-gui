@@ -48,6 +48,9 @@ RADIUS_MD =  6
 RADIUS_LG =  8
 RADIUS_XL = 12
 
+# ── Accent strip ───────────────────────────────────────────────────────────
+ACCENT_W = 3   # coloured strip marking a pillar / stage (card edge, table header top)
+
 # ── Button heights ─────────────────────────────────────────────────────────
 BTN_SM = 28   # compact / icon-adjacent
 BTN_MD = 36   # standard
