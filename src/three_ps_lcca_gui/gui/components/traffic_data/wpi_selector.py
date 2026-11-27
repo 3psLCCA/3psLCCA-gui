@@ -4,7 +4,9 @@ gui/components/traffic_data/wpi_selector.py
 _WPISelector - profile selector bar for WPI adjustment ratio profiles.
 
 Layout:
-    [Profile: ▾ combo] [✅/⚠/❌] [+ New] [✎ Save As] [🗑 Delete]
+    [▾ profile combo] - sits in the table card heading; the card's •••
+    menu holds Duplicate… / Edit… / Delete (built-in profiles are
+    read-only, so Edit and Delete work only on custom ones)
 
 Signals:
     profile_selected(WPIProfile)   - user picked a profile from combo
@@ -17,8 +19,9 @@ from __future__ import annotations
 
 from typing import Optional
 
-from three_ps_lcca_gui.gui.themes import get_token, theme_manager
-from three_ps_lcca_gui.gui.theme import FS_SECTION
+from three_ps_lcca_gui.gui.themes import get_token
+from three_ps_lcca_gui.gui.theme import SP1, SP2, SP3, SP4
+from ..utils.icons import make_icon
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QColor, QFont, QScreen
 from PySide6.QtWidgets import (
@@ -29,8 +32,8 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QMenu,
     QMessageBox,
-    QPushButton,
     QSizePolicy,
     QSpinBox,
     QTabWidget,
@@ -41,37 +44,30 @@ from PySide6.QtWidgets import (
     QScrollArea,
 )
 from ..utils.wpi_manager import (
-    WPIManager, WPIProfile, IntegrityState, empty_data,
+    WPIManager, WPIProfile,
     save_to_user_library, delete_from_user_library,
 )
-import datetime
 import json
+import uuid
 
 # ── Dev mode ──────────────────────────────────────────────────────────────────
 
 DEV = False # Set to True to print JSON data on add/edit
 
-# ── Integrity badge ───────────────────────────────────────────────────────────
-# Store token keys, not resolved colors- colors are fetched live in _update_badge
-
-_BADGE = {
-    IntegrityState.OK:       ("✅", "success", "Integrity verified"),
-    IntegrityState.MISMATCH: ("⚠",  "danger",  "Hash mismatch - data may be tampered"),
-    IntegrityState.MISSING:  ("❓", "warning", "No hash - unverified profile"),
-}
-
-
 # ── WPI Editor Dialog ─────────────────────────────────────────────────────────
 
 class _WPIEditorDialog(QDialog):
     """
-    Unified dialog for creating/cloning or editing profiles.
+    Duplicate: a new copy of any profile under a new name.
+    Edit: change one of the user's own (custom) profiles in place.
     Contains metadata fields and an integrated _WPITable.
     """
 
-    def __init__(self, manager: WPIManager, profile: Optional[WPIProfile] = None, parent=None):
+    def __init__(self, manager: WPIManager, profile: WPIProfile,
+                 duplicate: bool, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("WPI Profile Editor")
+        verb = "Duplicate" if duplicate else "Edit"
+        self.setWindowTitle(f"{verb} {profile.name}")
         self.setMinimumWidth(900)
 
         from PySide6.QtWidgets import QApplication
@@ -81,33 +77,24 @@ class _WPIEditorDialog(QDialog):
         self.resize(900, min(780, max_h))
         
         self._manager = manager
-        self._is_new = profile is None
+        self._duplicate = duplicate
         self._result_profile: Optional[WPIProfile] = None
 
-        if self._is_new:
-            # Default for adding new
-            self._profile = WPIProfile(
-                id="", name=self._manager.suggest_custom_name("custom"),
-                year=datetime.datetime.now().year, is_custom=True,
-                remark="", hash="", data=empty_data(), is_shared=True
-            )
-        else:
-            # Edit a copy
-            import json as _json
-            self._profile = WPIProfile(
-                id=profile.id, name=profile.name, year=profile.year,
-                is_custom=True, remark=profile.remark, hash=profile.hash,
-                data=_json.loads(_json.dumps(profile.data)),
-                is_shared=profile.is_shared
-            )
+        # Work on a copy; a duplicate gets its own id, a free name
+        # (e.g. "2019-user") and an empty remark (the source's remark
+        # describes the source, not the copy)
+        self._profile = WPIProfile(
+            id=(f"wpi_custom_{uuid.uuid4().hex[:8]}" if duplicate else profile.id),
+            name=(manager.suggest_custom_name(profile.name) if duplicate else profile.name),
+            year=profile.year, is_custom=True,
+            remark="" if duplicate else profile.remark,
+            hash=profile.hash, data=json.loads(json.dumps(profile.data)),
+            is_shared=profile.is_shared if profile.is_custom else True,
+        )
 
         self._build_ui()
         self._load_meta()
-
-        if self._is_new:
-            self._on_template_changed() # load initial scratch
-        else:
-            self._table.load_from_data(self._profile.data)
+        self._table.load_from_data(self._profile.data)
 
     def _build_ui(self):
         from .wpi_table import _WPITable
@@ -117,14 +104,6 @@ class _WPIEditorDialog(QDialog):
         meta_group = QWidget()
         meta_layout = QFormLayout(meta_group)
         meta_layout.setContentsMargins(0, 0, 0, 10)
-
-        if self._is_new:
-            self._template = QComboBox()
-            self._template.addItem("Scratch (all 1.0)", userData="scratch")
-            for p in self._manager.all_listed():
-                self._template.addItem(f"Clone: {p.name}", userData=p.id)
-            self._template.currentIndexChanged.connect(self._on_template_changed)
-            meta_layout.addRow("Based on Template:", self._template)
 
         self._name = QLineEdit()
         meta_layout.addRow("Profile Name:", self._name)
@@ -153,6 +132,8 @@ class _WPIEditorDialog(QDialog):
 
         # ── Footer: Actions ───────────────────────────────────────────────────
         btns = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
+        if self._duplicate:
+            btns.button(QDialogButtonBox.Save).setText("Create")
         btns.accepted.connect(self._on_save)
         btns.rejected.connect(self.reject)
         layout.addWidget(btns)
@@ -163,27 +144,15 @@ class _WPIEditorDialog(QDialog):
         self._remark.setText(self._profile.remark)
         self._shared.setChecked(self._profile.is_shared)
 
-    def _on_template_changed(self):
-        tid = self._template.currentData()
-        if tid == "scratch":
-            data = empty_data()
-        else:
-            tpl = self._manager.get_by_id(tid)
-            import json as _json
-            data = _json.loads(_json.dumps(tpl.data)) if tpl else empty_data()
-        self._table.load_from_data(data)
-
     def _on_save(self):
         name = self._name.text().strip()
         if not name:
             QMessageBox.warning(self, "Validation", "Profile name is required.")
             return
-        
-        # Only check name clashes if creating new or changing the name
-        if self._is_new or name.lower() != self._profile.name.lower():
-            if self._manager.is_name_taken(name):
-                QMessageBox.warning(self, "Taken", f"A profile named '{name}' already exists.")
-                return
+
+        if self._manager.is_name_taken(name, exclude_id=self._profile.id):
+            QMessageBox.warning(self, "Taken", f"A profile named '{name}' already exists.")
+            return
 
         self._profile.name = name
         self._profile.year = self._year.value()
@@ -191,11 +160,6 @@ class _WPIEditorDialog(QDialog):
         self._profile.is_shared = self._shared.isChecked()
         self._profile.data = self._table.collect_to_data()
         self._profile.stamp_hash()
-
-        if self._is_new:
-            import uuid as _uuid
-            self._profile.id = f"wpi_custom_{_uuid.uuid4().hex[:8]}"
-        
         self._result_profile = self._profile
         self.accept()
 
@@ -220,51 +184,61 @@ class _WPISelector(QWidget):
         self._build_ui()
         self._populate_combo()
         self._select_first()
-        theme_manager().theme_changed.connect(self._refresh_styles)
 
     # ── UI construction ───────────────────────────────────────────────────────
 
     def _build_ui(self):
+        # just the dropdown: the page puts it in the card heading, after
+        # the "WPI Profile" title
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(6)
-
-        lbl = QLabel("WPI Profile:")
-        lbl.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-        layout.addWidget(lbl)
+        self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
 
         self._combo = QComboBox()
+        self._combo.setObjectName("wpiProfileCombo")  # compact, main.qss
         self._combo.setMinimumWidth(180)
         self._combo.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self._combo.currentIndexChanged.connect(self._on_combo_changed)
         layout.addWidget(self._combo)
 
-        self._badge = QLabel("-")
-        self._badge.setFixedWidth(24)
-        self._badge.setAlignment(Qt.AlignCenter)
-        layout.addWidget(self._badge)
+        # Profile actions: the page puts this menu behind the ••• button of
+        # the Adjustment Factors card, as on Machinery
+        self._frozen = False
+        menu = self.menu = QMenu(self)
+        menu.setStyleSheet(
+            f"QMenu {{ padding: {SP1}px; }}"
+            f"QMenu::item {{ padding: {SP2}px {SP4}px {SP2}px {SP2}px; }}"
+            f"QMenu::icon {{ padding-left: {SP3}px; }}"
+            f"QMenu::separator {{ margin: {SP1}px {SP2}px; }}"
+        )
+        # built-in profiles are read-only: Duplicate makes one you can change
+        self._act_duplicate = menu.addAction("Duplicate…")
+        self._act_edit = menu.addAction("Edit…")
+        menu.addSeparator()
+        self._act_delete = menu.addAction("Delete")
+        self._act_duplicate.triggered.connect(lambda checked=False: self._open_dialog(duplicate=True))
+        self._act_edit.triggered.connect(lambda checked=False: self._open_dialog(duplicate=False))
+        self._act_delete.triggered.connect(lambda checked=False: self._on_delete_current())
 
-        layout.addStretch()
-
-        self._btn_add    = QPushButton("+ Add New")
-        self._btn_edit   = QPushButton("✎ Edit")
-        self._btn_delete = QPushButton("🗑 Delete")
-
-        for btn in (self._btn_add, self._btn_edit, self._btn_delete):
-            btn.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-            layout.addWidget(btn)
-
-        self._btn_add.clicked.connect(self._on_add)
-        self._btn_edit.clicked.connect(self._on_edit_current)
-        self._btn_delete.clicked.connect(self._on_delete_current)
+        def _on_menu_show():  # icons follow the theme, so set them on open
+            self._act_edit.setIcon(make_icon("edit"))
+            self._act_delete.setIcon(make_icon("trash", color=get_token("danger")))
+        menu.aboutToShow.connect(_on_menu_show)
+        self._sync_actions()
 
     # ── Combo management ──────────────────────────────────────────────────────
 
     def freeze(self, frozen: bool = True):
         self._combo.setEnabled(not frozen)
-        self._btn_add.setEnabled(not frozen)
-        self._btn_edit.setEnabled(not frozen and (self._current.is_custom if self._current else False))
-        self._btn_delete.setEnabled(not frozen and (self._current.is_custom if self._current else False))
+        self._frozen = frozen
+        self._sync_actions()
+
+    def _sync_actions(self):
+        """Duplicate any profile; Edit and Delete only your own (custom) ones."""
+        custom = bool(self._current and self._current.is_custom)
+        self._act_duplicate.setEnabled(not self._frozen and self._current is not None)
+        self._act_edit.setEnabled(not self._frozen and custom)
+        self._act_delete.setEnabled(not self._frozen and custom)
 
     def _populate_combo(self, select_id: Optional[str] = None):
         self._combo.blockSignals(True)
@@ -292,10 +266,7 @@ class _WPISelector(QWidget):
         profile = self._manager.get_by_id(profile_id)
         if profile:
             self._current = profile
-            self._update_badge(profile)
-            # Edit and Delete are only enabled for custom profiles
-            self._btn_edit.setEnabled(profile.is_custom)
-            self._btn_delete.setEnabled(profile.is_custom)
+            self._sync_actions()
             self.profile_selected.emit(profile)
 
     def _select_first(self):
@@ -303,58 +274,32 @@ class _WPISelector(QWidget):
             self._combo.setCurrentIndex(0)
             self._on_combo_changed(0)
 
-    def _update_badge(self, profile: WPIProfile):
-        icon, token_key, tip = _BADGE[profile.integrity]
-        self._badge.setText(icon)
-        self._badge.setToolTip(f"{tip}\n({'DB' if not profile.is_custom else 'Custom'})")
-        self._badge.setStyleSheet(f"color: {get_token(token_key)}; font-size: {FS_SECTION}pt;")
-
     # ── Slot handlers ─────────────────────────────────────────────────────────
 
-    def _on_add(self):
-        dlg = _WPIEditorDialog(self._manager, parent=self)
-        if dlg.exec() == QDialog.Accepted and dlg.result_profile:
-            p = dlg.result_profile
-            self._manager.add_custom(p)
-            if p.is_shared:
-                save_to_user_library(p)
-            
-            if DEV:
-                print("\n[DEV] Added New WPI Profile:")
-                print(json.dumps(p.to_dict(), indent=2))
-                
-            self.refresh(select_id=p.id)
-            self.profile_saved.emit(p)
-
-    def _on_edit_current(self):
-        if not self._current:
+    def _open_dialog(self, duplicate: bool):
+        """Duplicate the current profile, or edit it in place (custom only)."""
+        if not self._current or (not duplicate and not self._current.is_custom):
             return
-        
-        # If current is DB, we open the editor in "Add" mode but pre-cloned 
-        # from this DB. If custom, we open in "Edit" mode.
-        is_db = not self._current.is_custom
-        dlg = _WPIEditorDialog(self._manager, profile=(None if is_db else self._current), parent=self)
-        
-        if is_db:
-            # Manually set template and trigger clone in the "Add" dialog
-            dlg._template.setCurrentIndex(dlg._template.findData(self._current.id))
-        
-        if dlg.exec() == QDialog.Accepted and dlg.result_profile:
-            new_p = dlg.result_profile
-            if is_db:
-                self._manager.add_custom(new_p)
-            else:
-                self._manager.save_custom(new_p)
-                
-            if new_p.is_shared:
-                save_to_user_library(new_p)
-            
-            if DEV:
-                print(f"\n[DEV] {'Added (via Edit DB)' if is_db else 'Edited'} WPI Profile:")
-                print(json.dumps(new_p.to_dict(), indent=2))
-                
-            self.refresh(select_id=new_p.id)
-            self.profile_saved.emit(new_p)
+        dlg = _WPIEditorDialog(self._manager, self._current, duplicate, parent=self)
+        if dlg.exec() != QDialog.Accepted or not dlg.result_profile:
+            return
+        p = dlg.result_profile
+        if duplicate:
+            self._manager.add_custom(p)
+        else:
+            self._manager.save_custom(p)
+
+        if p.is_shared:
+            save_to_user_library(p)
+        elif not duplicate:
+            delete_from_user_library(p.id)  # unticked "Save for later projects"
+
+        if DEV:
+            print(f"\n[DEV] {'Duplicated' if duplicate else 'Edited'} WPI Profile:")
+            print(json.dumps(p.to_dict(), indent=2))
+
+        self.refresh(select_id=p.id)
+        self.profile_saved.emit(p)
 
     def _on_delete_current(self):
         if not self._current or not self._current.is_custom:
@@ -378,12 +323,6 @@ class _WPISelector(QWidget):
         self._populate_combo()
         self._select_first()
         self.profile_deleted.emit(deleted_id)
-
-    # ── Theme refresh ─────────────────────────────────────────────────────────
-
-    def _refresh_styles(self):
-        if self._current:
-            self._update_badge(self._current)
 
     # ── Public API ────────────────────────────────────────────────────────────
 

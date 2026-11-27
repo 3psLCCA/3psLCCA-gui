@@ -3,7 +3,8 @@ gui/components/traffic_data/wpi_table.py
 
 _WPITable - vehicle × category matrix for WPI adjustment ratios.
 
-Rows    : 8 vehicles + 2 header rows (group + individual label) + 1 checkbox row
+Header  : group label over the column labels (GroupedHeaderView)
+Rows    : 1 checkbox row + 8 vehicles
 Columns : 16 cost categories grouped under 6 headings
 Modes   : read-only (DB profile) / editable (custom profile)
 """
@@ -12,19 +13,19 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from PySide6.QtCore import Qt, Signal, QEvent, QTimer
+from PySide6.QtCore import Qt, Signal, QTimer
 from PySide6.QtWidgets import (
     QCheckBox,
     QHeaderView,
     QSizePolicy,
     QTableWidget,
     QTableWidgetItem,
-    QToolTip,
     QWidget,
     QHBoxLayout,
     QAbstractScrollArea,
 )
-from ..utils.table_widgets import EditableCellDelegate, TableDoubleSpinBox
+from ..utils.table_widgets import EditableCellDelegate, GroupedHeaderView, TableDoubleSpinBox
+from three_ps_lcca_gui.gui.assets.themes.table_style import apply_column_style
 
 # ── Vehicles ──────────────────────────────────────────────────────────────────
 
@@ -40,7 +41,6 @@ _VEHICLES = [
 ]
 from ..utils.wpi_manager import WPIManager, WPIProfile, empty_data
 from three_ps_lcca_gui.gui.themes import theme_manager
-from three_ps_lcca_gui.gui.theme import COL_PAD_X, COL_W_WPI
 
 # ── Column definitions ────────────────────────────────────────────────────────
 
@@ -50,38 +50,41 @@ class _ColDef:
     group: str
     label: str
     path: tuple
+    head: str = ""  # header text with line breaks; label is the plain name
+
+    @property
+    def header(self) -> str:
+        return self.head or self.label
 
 
 _COLUMNS: list[_ColDef] = [
-    _ColDef("Fuel Cost\n(INR)", "Petrol Cost", ("fuel_cost", "petrol", "{v}")),
-    _ColDef("Fuel Cost\n(INR)", "Diesel Cost", ("fuel_cost", "diesel", "{v}")),
-    _ColDef("Fuel Cost\n(INR)", "Engine Oil Cost", ("fuel_cost", "engine_oil", "{v}")),
-    _ColDef("Fuel Cost\n(INR)", "Other Oil Cost", ("fuel_cost", "other_oil", "{v}")),
-    _ColDef("Fuel Cost\n(INR)", "Grease Cost", ("fuel_cost", "grease", "{v}")),
+    _ColDef("Fuel Cost\n(INR)", "Petrol Cost", ("fuel_cost", "petrol", "{v}"), "Petrol\nCost"),
+    _ColDef("Fuel Cost\n(INR)", "Diesel Cost", ("fuel_cost", "diesel", "{v}"), "Diesel\nCost"),
+    _ColDef("Fuel Cost\n(INR)", "Engine Oil Cost", ("fuel_cost", "engine_oil", "{v}"), "Engine Oil\nCost"),
+    _ColDef("Fuel Cost\n(INR)", "Other Oil Cost", ("fuel_cost", "other_oil", "{v}"), "Other Oil\nCost"),
+    _ColDef("Fuel Cost\n(INR)", "Grease Cost", ("fuel_cost", "grease", "{v}"), "Grease\nCost"),
 
-    _ColDef("Vehicle Cost\n(INR)", "Property Damage Cost", ("vehicle_cost", "property_damage", "{v}")),
-    _ColDef("Vehicle Cost\n(INR)", "Tyre Cost", ("vehicle_cost", "tyre_cost", "{v}")),
-    _ColDef("Vehicle Cost\n(INR)", "Spare Parts Cost", ("vehicle_cost", "spare_parts", "{v}")),
-    _ColDef("Vehicle Cost\n(INR)", "Fixed Depreciation", ("vehicle_cost", "fixed_depreciation", "{v}")),
+    _ColDef("Vehicle Cost\n(INR)", "Property Damage Cost", ("vehicle_cost", "property_damage", "{v}"), "Property\nDamage Cost"),
+    _ColDef("Vehicle Cost\n(INR)", "Tyre Cost", ("vehicle_cost", "tyre_cost", "{v}"), "Tyre\nCost"),
+    _ColDef("Vehicle Cost\n(INR)", "Spare Parts Cost", ("vehicle_cost", "spare_parts", "{v}"), "Spare Parts\nCost"),
+    _ColDef("Vehicle Cost\n(INR)", "Fixed Depreciation", ("vehicle_cost", "fixed_depreciation", "{v}"), "Fixed\nDepreciation"),
 
-    _ColDef("Commodity Cost\n(INR)", "Commodity Holding Cost", ("commodity_holding_cost", "{v}")),
+    _ColDef("Commodity\nCost (INR)", "Commodity Holding Cost", ("commodity_holding_cost", "{v}"), "Commodity\nHolding Cost"),
 
-    _ColDef("Passenger and Crew Cost\n(INR)", "Passenger Cost", ("passenger_crew_cost", "passenger_cost", "{v}")),
-    _ColDef("Passenger and Crew Cost\n(INR)", "Crew Cost", ("passenger_crew_cost", "crew_cost", "{v}")),
+    _ColDef("Passenger and Crew Cost\n(INR)", "Passenger Cost", ("passenger_crew_cost", "passenger_cost", "{v}"), "Passenger\nCost"),
+    _ColDef("Passenger and Crew Cost\n(INR)", "Crew Cost", ("passenger_crew_cost", "crew_cost", "{v}"), "Crew\nCost"),
 
-    _ColDef("Medical Cost\n(INR)", "Fatal Injury Cost", ("medical_cost", "fatal", "{v}")),
-    _ColDef("Medical Cost\n(INR)", "Major Injury Cost", ("medical_cost", "major", "{v}")),
-    _ColDef("Medical Cost\n(INR)", "Minor Injury Cost", ("medical_cost", "minor", "{v}")),
+    _ColDef("Medical Cost\n(INR)", "Fatal Injury Cost", ("medical_cost", "fatal", "{v}"), "Fatal\nInjury Cost"),
+    _ColDef("Medical Cost\n(INR)", "Major Injury Cost", ("medical_cost", "major", "{v}"), "Major\nInjury Cost"),
+    _ColDef("Medical Cost\n(INR)", "Minor Injury Cost", ("medical_cost", "minor", "{v}"), "Minor\nInjury Cost"),
 
-    _ColDef("Value of Time Cost\n(INR)", "Value of Time Cost", ("vot_cost", "{v}")),
+    _ColDef("Value of Time\nCost (INR)", "Value of Time Cost", ("vot_cost", "{v}"), "Value of Time\nCost"),
 ]
 
 _N_COLS = len(_COLUMNS)
-_N_ROWS = len(_VEHICLES) + 3  # group + label + checkbox + 8 vehicles
-_ROW_GROUP = 0
-_ROW_LABEL = 1
-_ROW_CB = 2
-_ROW_DATA = 3
+_N_ROWS = len(_VEHICLES) + 1  # checkbox + 8 vehicles
+_ROW_CB = 0
+_ROW_DATA = 1
 
 
 def _col_key(col: _ColDef) -> str:
@@ -98,6 +101,17 @@ def _set_value(data: dict, col: _ColDef, vehicle_key: str, value: float):
     data.setdefault(vehicle_key, {})[_col_key(col)] = value
 
 
+def _header_groups() -> list[tuple[int, int, str]]:
+    """(first column, span, label) for each cost group, for GroupedHeaderView."""
+    groups: list[list] = []
+    for col, cdef in enumerate(_COLUMNS):
+        if groups and groups[-1][2] == cdef.group:
+            groups[-1][1] += 1
+        else:
+            groups.append([col, 1, cdef.group])
+    return [tuple(g) for g in groups]
+
+
 def _is_vehicle_dim(col: _ColDef) -> bool:
     """All columns now support vehicle-specific overrides."""
     return True
@@ -110,10 +124,9 @@ class _WPITable(QTableWidget):
     """
     Vehicle × Category WPI ratio table.
 
-    Row 0 : group colour band  (Fuel Cost, Vehicle Cost …)
-    Row 1 : individual labels  (Petrol, Diesel …)
-    Row 2 : "Common to All" checkboxes
-    Rows 3+: one row per vehicle
+    Header : group labels (Fuel Cost, Vehicle Cost …) over column labels
+    Row 0  : "Common to All" checkboxes
+    Rows 1+: one row per vehicle
     """
 
     data_changed = Signal()
@@ -128,8 +141,6 @@ class _WPITable(QTableWidget):
 
         self._setup_table()
         self.verticalHeader().sectionResized.connect(lambda: QTimer.singleShot(0, self.updateGeometry))
-        self._build_group_row()
-        self._build_label_row()
         self._build_checkbox_row()
         self._build_data_rows()
         # Apply initial read-only opacity to all spinboxes
@@ -151,50 +162,18 @@ class _WPITable(QTableWidget):
         self.setTextElideMode(Qt.ElideNone)
         self.setSizeAdjustPolicy(QAbstractScrollArea.AdjustToContents)
 
-        # Hide Qt's built-in column header - we use row 0 and 1 instead
-        self.horizontalHeader().setVisible(False)
-        self.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
-        # columns share the width but never shrink below a 4-decimal value;
-        # past that the table scrolls sideways instead of clipping values
-        self.horizontalHeader().setMinimumSectionSize(COL_W_WPI + 2 * COL_PAD_X)
+        # two-tier header: each cost group spans its columns
+        self.setHorizontalHeader(GroupedHeaderView(groups=_header_groups()))
+        for col, cdef in enumerate(_COLUMNS):
+            item = QTableWidgetItem(cdef.header)
+            item.setToolTip(f"{' '.join(cdef.group.split())} - {cdef.label}")
+            self.setHorizontalHeaderItem(col, item)
+        # every column holds a 4-decimal ratio (assets/themes/table_style.py)
+        apply_column_style(self, {col: "wpi" for col in range(_N_COLS)})
 
         self.verticalHeader().setVisible(True)
         self.verticalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
         self.verticalHeader().setTextElideMode(Qt.ElideNone)
-
-    def _build_group_row(self):
-        """Row 0 - group labels with colspan (setSpan) per group."""
-
-        group_spans: dict[str, list] = {}
-        for col, cdef in enumerate(_COLUMNS):
-            if cdef.group not in group_spans:
-                group_spans[cdef.group] = [col, 0]
-            group_spans[cdef.group][1] += 1
-
-        placed: set[str] = set()
-        for col, cdef in enumerate(_COLUMNS):
-            if cdef.group not in placed:
-                first_col, span = group_spans[cdef.group]
-                item = QTableWidgetItem(cdef.group)
-                item.setFlags(Qt.ItemIsEnabled)
-                item.setTextAlignment(Qt.AlignCenter | Qt.TextWordWrap)
-                item.setToolTip(cdef.group)
-                self.setItem(_ROW_GROUP, col, item)
-                if span > 1:
-                    self.setSpan(_ROW_GROUP, col, 1, span)
-                placed.add(cdef.group)
-
-        self.setVerticalHeaderItem(_ROW_GROUP, QTableWidgetItem(""))
-
-    def _build_label_row(self):
-        """Row 1 - individual column labels."""
-        for col, cdef in enumerate(_COLUMNS):
-            item = QTableWidgetItem(cdef.label)
-            item.setFlags(Qt.ItemIsEnabled)
-            item.setTextAlignment(Qt.AlignCenter | Qt.TextWordWrap)
-            item.setToolTip(f"{cdef.group} - {cdef.label}")
-            self.setItem(_ROW_LABEL, col, item)
-        self.setVerticalHeaderItem(_ROW_LABEL, QTableWidgetItem(""))
 
     def _build_checkbox_row(self):
         """Row 2 - one centered QCheckBox per column."""
@@ -248,19 +227,6 @@ class _WPITable(QTableWidget):
                 )
                 self.setCellWidget(row, col, sb)
                 self._spinboxes[(row, col)] = sb
-
-    def viewportEvent(self, event):
-        """Show item tooltips for all columns (no action-column skip)."""
-        if event.type() == QEvent.ToolTip:
-            index = self.indexAt(event.pos())
-            if index.isValid():
-                item = self.item(index.row(), index.column())
-                if item and item.toolTip():
-                    QToolTip.showText(event.globalPos(), item.toolTip())
-                    return True
-            QToolTip.hideText()
-            return True
-        return super().viewportEvent(event)
 
     # ── Theme refresh ─────────────────────────────────────────────────────────
 

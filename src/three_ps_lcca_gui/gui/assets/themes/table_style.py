@@ -49,6 +49,7 @@ from three_ps_lcca_gui.gui.theme import (
     COL_W_RATE_SRC,
     COL_W_SRC_ID,
     COL_W_UNIT,
+    COL_W_WPI,
 )
 
 # ids whose column takes the table's spare width
@@ -72,6 +73,7 @@ COLUMN_STYLE = {
     "percent":     COL_W_PERCENT,
     "note":        COL_W_NOTE,
     "datetime":    COL_W_DATETIME,
+    "wpi":         COL_W_WPI,
 }
 
 # column id -> the header labels that share it.

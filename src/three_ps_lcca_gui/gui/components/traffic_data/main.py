@@ -703,19 +703,21 @@ class TrafficData(ScrollableForm):
             self._wpi_warning.setText(warn)
             self._wpi_warning.setVisible(True)
 
-        # Selector bar
+        # Profile dropdown: sits in the table card's heading (below)
         self._wpi_selector = _WPISelector(self._wpi_manager)
         self._wpi_selector.profile_selected.connect(self._on_wpi_profile_selected)
         self._wpi_selector.profile_saved.connect(self._on_wpi_profile_saved)
         self._wpi_selector.profile_deleted.connect(self._on_wpi_profile_deleted)
         self._wpi_selector.edit_requested.connect(self._on_wpi_edit_requested)
-        india_layout.addRow(self._wpi_selector)
 
         # Table
         self._wpi_table = _WPITable(strict_read_only=True)
         self._wpi_table.data_changed.connect(self._on_field_changed)
         self._wpi_table.verticalHeader().sectionResized.connect(self._shrink_stack_to_current)
-        india_layout.addRow(TableCard(self._wpi_table, "Adjustment Factors"))
+        wpi_card = TableCard(self._wpi_table, "WPI Profile")
+        wpi_card.add_heading_widget(self._wpi_selector)
+        wpi_card.set_menu(self._wpi_selector.menu)  # New / Edit / Delete profile
+        india_layout.addRow(wpi_card)
 
         if DEV:
             _print_btn = QPushButton("Print WPI Data")
@@ -1092,8 +1094,10 @@ class TrafficData(ScrollableForm):
             if idx >= 0:
                 self.alternate_road_carriageway.setCurrentIndex(idx)
             self._suppress_lane_signal = False
-        # Reset WPI to first DB profile
-        self._wpi_selector.refresh()
+        # Reset WPI to the first profile in the list
+        listed = self._wpi_manager.all_listed()
+        if listed:
+            self._wpi_selector.select_by_id(listed[0].id)
         first = self._wpi_selector.current_profile()
         if first:
             self._wpi_table.load_from_data(first.data)

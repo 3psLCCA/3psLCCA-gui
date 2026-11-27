@@ -608,6 +608,10 @@ class TableCard(QFrame):
         model.rowsRemoved.connect(refresh)
         refresh()
 
+    def add_heading_widget(self, widget):
+        """Put a widget (e.g. a dropdown) after the title in the heading row."""
+        self._head.insertWidget(self._head.indexOf(self.count_lbl) + 1, widget)
+
     def set_menu(self, menu) -> QToolButton:
         """Add a "more actions" button at the end of the heading row; returns it."""
         btn = QToolButton()

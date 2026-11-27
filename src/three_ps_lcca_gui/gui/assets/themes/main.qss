@@ -565,6 +565,14 @@ QFrame#tableCard QToolButton:hover   { background-color: $surface; color: $text;
 QFrame#tableCard QToolButton:pressed { background-color: $surface_pressed; color: $text; }
 QFrame#tableCard QToolButton::menu-indicator { image: none; width: 0px; }
 
+/* WPI profile dropdown in the Traffic Data card heading: as tall as the
+   heading row (one small button), not a full form field */
+QFrame#tableCard QComboBox#wpiProfileCombo {
+    padding-top: 5px;      /* text line + 2 x 5px + border = $btn-sm */
+    padding-bottom: 5px;
+    min-height: 0px;
+}
+
 QPushButton#cardFooter:hover  { background-color: $primary-hover; color: $text; }
 QPushButton#cardFooter:pressed { background-color: $primary-active; color: $text; }
 QPushButton#cardFooter:disabled { color: $text_disabled; }
@@ -680,6 +688,10 @@ QMenu::item {
 QMenu::item:selected {
     background-color: $surface;
     color: $text;
+}
+
+QMenu::item:disabled {
+    color: $text_disabled;
 }
 
 QMenu::separator {

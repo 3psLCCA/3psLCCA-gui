@@ -365,8 +365,6 @@ def _load_app(app, splash):
     app.installEventFilter(title_bar_filter)
     # Keep them alive after _load_app() returns.
     app._lcca_event_filters = (wheel_filter, table_filter, focus_filter, hdr_wrap_filter, title_bar_filter)
-    from three_ps_lcca_gui.gui.components.utils.spinbox_fix import install as _install_spinbox_fix
-    _install_spinbox_fix(app)
 
     # Runtime Theme Switching (Qt 6.5+)
     try:

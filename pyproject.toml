@@ -32,7 +32,7 @@ name = "three_ps_lcca_gui"
 version = "1.1.0"
 dependencies = [
     "platformdirs",
-    "PySide6>=6.11,<6.12",  # keep in sync with environment.yml / conda-recipe
+    "PySide6>=6.11,!=6.11.3,<6.12",  # keep in sync with requirements.txt / environment.yml / conda-recipe; 6.11.3 drops QSpinBox padding (QTBUG-151308)
     "psutil",
     "Pillow",
     "matplotlib",
@@ -43,7 +43,8 @@ dependencies = [
     "pylatex",
     "pywebview",
     "odfpy",
-    "beautifulsoup4"
+    "beautifulsoup4",
+    "three_ps_lcca_core",  # not on PyPI: requirements.txt installs ./3psLCCA-core; conda gets zehen-249::three-ps-lcca-core
 ]
 requires-python = ">= 3.10,<3.13"
 

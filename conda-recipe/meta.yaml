@@ -39,7 +39,7 @@ requirements:
   run:
     - python>=3.10,<3.13
     - pip
-    - pyside6>=6.11,<6.12  # keep in sync with pyproject.toml / requirements.txt
+    - pyside6>=6.11,!=6.11.3,<6.12  # keep in sync with pyproject.toml / requirements.txt; 6.11.3 drops QSpinBox padding (QTBUG-151308)
     - psutil
     - Pillow
     - matplotlib
@@ -53,6 +53,7 @@ requirements:
     - platformdirs
     - beautifulsoup4
     - odfpy
+    - pywebview
     - fontconfig >=2.18.3  # [linux] skip 2.18.1 segfault; Qt 6.11 needs >=2.18.3
 
 
