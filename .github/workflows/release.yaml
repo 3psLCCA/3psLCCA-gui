@@ -15,13 +15,14 @@ jobs:
 
     strategy:
       fail-fast: false
+      max-parallel: 1  # one OS at a time, in matrix order (Windows first)
       matrix:
         include:
-          - os: ubuntu-latest
-            subdir: linux-64
-
           - os: windows-latest
             subdir: win-64
+
+          - os: ubuntu-latest
+            subdir: linux-64
 
           # - os: macos-13
           #   subdir: osx-64
@@ -210,64 +211,65 @@ jobs:
         echo "[SUCCESS] Build artifacts found:"
         ls -lh dist/$SUBDIR/
     
-    - name: Publish to Anaconda Cloud
-      
-      if: success()
-      env:
-        ANACONDA_TOKEN: ${{ secrets.ANACONDA_TOKEN }}
-      run: |
-        set -e
+    # Anaconda upload disabled for now; the token step and the wait for indexing are hidden below.
+    # - name: Publish to Anaconda Cloud
+    #   
+    #   if: success()
+    #   env:
+    #     ANACONDA_TOKEN: ${{ secrets.ANACONDA_TOKEN }}
+    #   run: |
+    #     set -e
 
-        if [ -z "$ANACONDA_TOKEN" ]; then
-          echo "[ERROR] ERROR: ANACONDA_TOKEN secret not set"
-          exit 1
-        fi
+    #     if [ -z "$ANACONDA_TOKEN" ]; then
+    #       echo "[ERROR] ERROR: ANACONDA_TOKEN secret not set"
+    #       exit 1
+    #     fi
 
-        SUBDIR="${{ matrix.subdir }}"
+    #     SUBDIR="${{ matrix.subdir }}"
 
-        echo "Uploading packages from dist/$SUBDIR"
+    #     echo "Uploading packages from dist/$SUBDIR"
 
-        if ls "dist/$SUBDIR"/* >/dev/null 2>&1; then
+    #     if ls "dist/$SUBDIR"/* >/dev/null 2>&1; then
 
-          echo "Files to upload:"
-          ls -lh "dist/$SUBDIR"
+    #       echo "Files to upload:"
+    #       ls -lh "dist/$SUBDIR"
 
-          if ls dist/$SUBDIR/*.conda >/dev/null 2>&1; then
-            anaconda -t "$ANACONDA_TOKEN" upload \
-              dist/$SUBDIR/*.conda \
-              --force
-          fi
+    #       if ls dist/$SUBDIR/*.conda >/dev/null 2>&1; then
+    #         anaconda -t "$ANACONDA_TOKEN" upload \
+    #           dist/$SUBDIR/*.conda \
+    #           --force
+    #       fi
 
-          if ls dist/$SUBDIR/*.tar.bz2 >/dev/null 2>&1; then
-            anaconda -t "$ANACONDA_TOKEN" upload \
-              dist/$SUBDIR/*.tar.bz2 \
-              --force
-          fi
+    #       if ls dist/$SUBDIR/*.tar.bz2 >/dev/null 2>&1; then
+    #         anaconda -t "$ANACONDA_TOKEN" upload \
+    #           dist/$SUBDIR/*.tar.bz2 \
+    #           --force
+    #       fi
 
-          echo "[SUCCESS] Upload successful"
+    #       echo "[SUCCESS] Upload successful"
 
-        else
-          echo "[ERROR] No packages found in dist/$SUBDIR"
-          exit 1
-        fi
-    
-    - name: Wait for Anaconda indexing
-      run: |
-        VERSION="${{ env.VERSION }}"
-        MAX_ATTEMPTS=20
-        ATTEMPT=1
+    #     else
+    #       echo "[ERROR] No packages found in dist/$SUBDIR"
+    #       exit 1
+    #     fi
+    # 
+    # - name: Wait for Anaconda indexing
+    #   run: |
+    #     VERSION="${{ env.VERSION }}"
+    #     MAX_ATTEMPTS=20
+    #     ATTEMPT=1
 
-        until conda search zehen-249::three-ps-lcca-gui=$VERSION; do
-          if [ $ATTEMPT -ge $MAX_ATTEMPTS ]; then
-            echo "Package not indexed after 10 minutes"
-            exit 1
-          fi
+    #     until conda search zehen-249::three-ps-lcca-gui=$VERSION; do
+    #       if [ $ATTEMPT -ge $MAX_ATTEMPTS ]; then
+    #         echo "Package not indexed after 10 minutes"
+    #         exit 1
+    #       fi
 
-          echo "Waiting for package indexing..."
-          sleep 30
-          ATTEMPT=$((ATTEMPT+1))
-        done
-        
+    #       echo "Waiting for package indexing..."
+    #       sleep 30
+    #       ATTEMPT=$((ATTEMPT+1))
+    #     done
+    #     
     
     - name: Upload build artifacts to GitHub
       uses: actions/upload-artifact@v4
@@ -327,13 +329,14 @@ jobs:
   publish-installer:
     strategy:
       fail-fast: false
+      max-parallel: 1  # one OS at a time, in matrix order (Windows first)
       matrix:
         include:
-          - os: ubuntu-latest
-            subdir: linux-64
-
           - os: windows-latest
             subdir: win-64
+
+          - os: ubuntu-latest
+            subdir: linux-64
 
           # - os: macos-13
           #   subdir: osx-64
