@@ -575,8 +575,11 @@ def apply_title_bar_color(widget) -> None:
         print(f"[themes] title bar colour not applied: {e}", file=sys.stderr)
 
 
-def reapply(app=None) -> None:
-    """Re-apply the current active themes to the running QApplication."""
+def reapply(app=None, on_step=None) -> None:
+    """Re-apply the current active themes to the running QApplication.
+    on_step(), if given, is called between the slow stages so a caller can
+    update a status message while the main thread is busy."""
+    step = on_step or (lambda: None)
     from PySide6.QtWidgets import QApplication
 
     if app is None:
@@ -600,6 +603,7 @@ def reapply(app=None) -> None:
 
     app.setPalette(palette)
     _write_arrow_svgs(tokens)
+    step()
 
     if os.path.exists(_QSS_PATH):
         try:
@@ -627,10 +631,16 @@ def reapply(app=None) -> None:
                 
             # Clear first - forces Qt to fully re-evaluate all style rules
             # on every existing widget, including window backgrounds.
-            app.setStyleSheet("")
+            app.setStyleSheet("")  # no step() here: a repaint now shows the app unstyled
             app.setStyleSheet(qss)
         except Exception as e:
             print(f"[themes] Error applying stylesheet: {e}")
+
+    # Notify all subscribed listeners (widgets that colour themselves from
+    # tokens) right after the stylesheet, so a repaint from step() never shows
+    # them still in the old theme next to restyled widgets.
+    theme_manager().theme_changed.emit()
+    step()
 
     # Force every top-level window (and its children) to repaint immediately.
     # Without this, palette(window) backgrounds stay stale until the next
@@ -640,9 +650,6 @@ def reapply(app=None) -> None:
         w.style().polish(w)
         w.update()
         apply_title_bar_color(w)
-
-    # Notify all subscribed listeners
-    theme_manager().theme_changed.emit()
 
 
 def list_themes(variant: str) -> list[str]:

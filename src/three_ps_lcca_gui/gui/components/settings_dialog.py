@@ -30,6 +30,7 @@ from PySide6.QtWidgets import (
 )
 import os
 import json
+import time
 from PySide6.QtGui import QPalette, QColor, QPainter, QFont, QPixmap, QPainterPath
 from three_ps_lcca_gui.gui.themes import (
     list_themes,
@@ -43,11 +44,19 @@ from three_ps_lcca_gui.gui.theme import FS_SM
 from three_ps_lcca_gui.gui.styles import btn_outline, font
 from three_ps_lcca_gui.gui.theme import FS_SM, FW_MEDIUM, SP10
 from three_ps_lcca_gui.gui.components.agency_profile_dialog import AgencyProfileForm
+from three_ps_lcca_gui.gui.components.utils.busy_status import busy_status
 from three_ps_lcca_gui.gui.themes import get_token
 
 
 # Subfolder created inside a user-chosen location to hold the projects
 PROJECTS_SUBFOLDER = "3psLCCA_User_Files"
+
+# Status bar text while a new theme is applied: (seconds elapsed, message)
+_THEME_STEPS = (
+    (0.0, "Applying theme"),
+    (1.5, "Still applying theme"),
+    (3.0, "Applying the theme is taking longer than usual"),
+)
 
 
 # ── Shared form panel ─────────────────────────────────────────────────────────
@@ -226,8 +235,10 @@ class SettingsPanel(QWidget):
     def get_name(self) -> str:
         return self._name_edit.text().strip()
 
-    def save(self) -> None:
-        """Persist name + theme choices; re-applies theme live if anything changed."""
+    def save(self, apply_theme: bool = True) -> bool:
+        """Persist name + theme choices; re-applies theme live if anything changed.
+        With apply_theme=False the caller applies it (reapply()) later.
+        Returns True if the theme changed."""
         sm.set_name(self.get_name())
 
         if self._projects_dir != self._saved_projects_dir:
@@ -248,8 +259,9 @@ class SettingsPanel(QWidget):
         set_active_theme("light", light_mod)
         set_active_theme("dark", dark_mod)
 
-        if changed:
+        if changed and apply_theme:
             reapply()
+        return changed
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -433,6 +445,7 @@ class SettingsDialog(QDialog):
         self.setWindowTitle("Settings")
         self.setMinimumWidth(520)
         self.setModal(True)
+        self._theme_pending = False  # saved theme change, applied in done()
         self._build()
         # Resizable; opens at 720 tall, or shorter on a small screen so
         # Save / Cancel stay visible (the tabs scroll).
@@ -610,7 +623,9 @@ class SettingsDialog(QDialog):
             self._populate_profiles()
 
     def _on_accept(self):
-        self._panel.save()
+        # The theme is applied in done(), after the dialog closes
+        if self._panel.save(apply_theme=False):
+            self._theme_pending = True
 
         # Only save profile data when the Profiles tab is active
         if self.tabs.currentWidget() is self.prof_tab:
@@ -639,5 +654,25 @@ class SettingsDialog(QDialog):
                     sm.set_pref("agency_profile", json.dumps(data))
 
         self.accept()
+
+    def done(self, result):
+        """Close first, then apply a saved theme change. Restyling the whole
+        app blocks the UI for a few seconds; with the dialog gone, the window's
+        status bar says what is happening instead of a frozen dialog."""
+        super().done(result)
+        if not self._theme_pending:
+            return
+        self._theme_pending = False
+        owner = self.parentWidget() or self
+        owner.window().repaint()  # clear the closed dialog off the screen now
+        with busy_status(owner) as step:
+            start = time.monotonic()
+            step(_THEME_STEPS[0][1])
+
+            def on_step():  # between reapply stages; the UI can't update mid-stage
+                elapsed = time.monotonic() - start
+                step(next(t for s, t in reversed(_THEME_STEPS) if elapsed >= s))
+
+            reapply(on_step=on_step)
 
 
