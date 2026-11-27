@@ -980,6 +980,8 @@ class TrafficData(ScrollableForm):
 
         self.blockSignals(True)
         self._suppress_lane_signal = True
+        # _on_field_changed skips saving while loading (child spinboxes and the WPI combo still emit)
+        self._loading = True
         try:
             self._remarks.from_html(data.get("remarks", ""))
             self._force_free_flow.setChecked(
@@ -1001,6 +1003,7 @@ class TrafficData(ScrollableForm):
 
             self.mode.blockSignals(True)
             super().load_data_dict(load_data)
+            self._loading = True  # load_data_dict clears it when done
             self.mode.blockSignals(False)
             self._stack.setCurrentIndex(self.mode.currentIndex())
 
@@ -1020,6 +1023,7 @@ class TrafficData(ScrollableForm):
                 self._load_wpi(wpi)
 
         finally:
+            self._loading = False
             self.blockSignals(False)
             self._suppress_lane_signal = False
             self._vehicle_table.update_height()
