@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
 from three_ps_lcca_gui.gui.theme import SP4
 from three_ps_lcca_gui.gui.themes import get_token
 from .base_table import StructureTableWidget
+from ...utils.busy_status import busy_status
 
 # chunk id -> tab name, in tab order
 TAB_NAMES = {
@@ -52,6 +53,7 @@ class ItemsByTabView(QWidget):
     TITLE = "{tab}"           # title above each table
     EMPTY_TEXT = ""
     TABLE_OPTIONS = {}        # extra StructureTableWidget arguments
+    PAGE_NAME = ""            # shown in the status bar while building
 
     def __init__(self, controller=None):
         super().__init__()
@@ -124,21 +126,24 @@ class ItemsByTabView(QWidget):
             return
 
         rows_by_chunk = {chunk_id: self._rows(chunk_id) for chunk_id in self.chunks}
-        for chunk_id, rows in rows_by_chunk.items():
-            if not rows:
-                continue
-            tab_name = TAB_NAMES.get(chunk_id, chunk_id)
+        # slow on big projects - say which table is being built
+        with busy_status(self) as step:
+            for chunk_id, rows in rows_by_chunk.items():
+                if not rows:
+                    continue
+                tab_name = TAB_NAMES.get(chunk_id, chunk_id)
+                step(f"Loading {self.PAGE_NAME}: {tab_name}…")
 
-            scope = _RowScope(self, chunk_id)
-            table = StructureTableWidget(scope, tab_name, show_component=True,
-                                         title=self.TITLE.format(tab=tab_name), **self.TABLE_OPTIONS)
-            self._setup_table(table)
-            for comp_name, idx, item in rows:
-                table.add_row(item, len(scope.rows), comp_name)
-                scope.rows.append((comp_name, idx))
-            self._table_filled(table, rows)
-            # card: heading row (title, count, total) above the table
-            self.container_layout.addWidget(table.card())
+                scope = _RowScope(self, chunk_id)
+                table = StructureTableWidget(scope, tab_name, show_component=True,
+                                             title=self.TITLE.format(tab=tab_name), **self.TABLE_OPTIONS)
+                self._setup_table(table)
+                for comp_name, idx, item in rows:
+                    table.add_row(item, len(scope.rows), comp_name)
+                    scope.rows.append((comp_name, idx))
+                self._table_filled(table, rows)
+                # card: heading row (title, count, total) above the table
+                self.container_layout.addWidget(table.card())
 
         if not any(rows_by_chunk.values()):
             empty_lbl = QLabel(self.EMPTY_TEXT)

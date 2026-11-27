@@ -18,6 +18,7 @@ class TrashTabWidget(ItemsByTabView):
     """
 
     SHOW_TRASHED = True
+    PAGE_NAME = "Trash"
     TITLE = "Deleted from: {tab}"
     EMPTY_TEXT = "No items in Trash Bin."
     TABLE_OPTIONS = {"is_trash_view": True}

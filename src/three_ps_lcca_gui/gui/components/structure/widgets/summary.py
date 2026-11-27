@@ -146,6 +146,7 @@ class StructureSummaryWidget(ItemsByTabView):
     with the grand total and an Export BOQ button.
     """
 
+    PAGE_NAME = "Summary"
     EMPTY_TEXT = (
         "No items yet. Add materials in the Foundation, Sub-Structure, "
         "Super-Structure and Miscellaneous tabs."

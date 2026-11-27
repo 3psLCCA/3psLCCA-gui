@@ -17,6 +17,7 @@ import os
 from PySide6.QtCore import QThread, Signal, QSize, Qt, QStandardPaths, QUrl
 from PySide6.QtGui import QColor, QDesktopServices
 from ..utils.icons import make_icon
+from ..utils.busy_status import busy_status
 from three_ps_lcca_gui.gui.themes import get_token, theme_manager
 from three_ps_lcca_gui.gui.theme import FS_SM
 from ..utils.form_builder.form_builder import make_section_label
@@ -412,11 +413,15 @@ class StructureTabView(QWidget):
         ):
             return
 
-        # Refresh all nested managers (this triggers their fetch_chunk calls)
-        self.foundation_tab.on_refresh()
-        self.substructure_tab.on_refresh()
-        self.superstructure_tab.on_refresh()
-        self.misc_tab.on_refresh()
+        # Refresh all nested managers (this triggers their fetch_chunk calls).
+        # Slow on big projects - say which part is being built.
+        with busy_status(self) as step:
+            for name, tab in (("Foundation", self.foundation_tab),
+                              ("Sub-Structure", self.substructure_tab),
+                              ("Super-Structure", self.superstructure_tab),
+                              ("Miscellaneous", self.misc_tab)):
+                step(f"Loading Construction Works: {name}…")
+                tab.on_refresh()
 
         # Update the counter whenever the main view refreshes
         self.update_trash_count()

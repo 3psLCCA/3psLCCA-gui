@@ -178,6 +178,26 @@ class SelectTextOnFocus(QObject):
         return super().eventFilter(obj, event)
 
 
+class _AppEventFilter(QObject):
+    """The filters above in one app-wide filter. Every event in the app
+    passes through each app filter, so read its type once and call only
+    the filters that handle it."""
+
+    def __init__(self, filters):
+        super().__init__()
+        self._filters = filters  # keep them alive
+        self._by_type = {}
+        for types, flt in filters:
+            for t in types:
+                self._by_type.setdefault(t, []).append(flt)
+
+    def eventFilter(self, obj, event):
+        for flt in self._by_type.get(event.type(), ()):
+            if flt.eventFilter(obj, event):
+                return True
+        return False
+
+
 # ── Main Entry Point ──────────────────────────────────────────────────────────
 
 
@@ -352,19 +372,17 @@ def _load_app(app, splash):
     QTimer.singleShot(0, _load_custom_units)
 
     # Install Global Event Filters
-    # NOTE: named references required - Python GC will collect anonymous instances
-    wheel_filter      = DisableSpinBoxScroll()
-    table_filter      = _TableRowSelectFilter()
-    focus_filter      = SelectTextOnFocus()
-    hdr_wrap_filter   = _TableHeaderWordWrapFilter()
-    app.installEventFilter(wheel_filter)
-    app.installEventFilter(table_filter)
-    app.installEventFilter(focus_filter)
-    app.installEventFilter(hdr_wrap_filter)
-    title_bar_filter  = _TitleBarColorFilter()
-    app.installEventFilter(title_bar_filter)
-    # Keep them alive after _load_app() returns.
-    app._lcca_event_filters = (wheel_filter, table_filter, focus_filter, hdr_wrap_filter, title_bar_filter)
+    # NOTE: named reference required - Python GC will collect anonymous instances
+    app_filter = _AppEventFilter([
+        ((QEvent.Wheel,), DisableSpinBoxScroll()),
+        ((QEvent.Polish,), _TableRowSelectFilter()),
+        ((QEvent.MouseButtonRelease,), SelectTextOnFocus()),
+        ((QEvent.Polish,), _TableHeaderWordWrapFilter()),
+        ((QEvent.Show,), _TitleBarColorFilter()),
+    ])
+    app.installEventFilter(app_filter)
+    # Keep it alive after _load_app() returns.
+    app._lcca_event_filters = app_filter
 
     # Runtime Theme Switching (Qt 6.5+)
     try:
