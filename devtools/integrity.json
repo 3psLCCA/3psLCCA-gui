@@ -10,9 +10,9 @@
       "regen_at": "2026-07-15T20:34:51.909267"
     },
     "gui/components/structure/registry/material_catalog.json": {
-      "md5": "542e2aaae43c8d866122b807eaa70e10",
-      "size_bytes": 245499,
-      "regen_at": "2026-07-15T20:34:51.911057"
+      "md5": "c690a2a6ca5123a6b48bd3f3d6095ffb",
+      "size_bytes": 163930,
+      "regen_at": "2026-11-28T00:04:02.516399"
     },
     "data/wpi_db.json": {
       "md5": "71723a5c1ceff85418c80879e18028e2",

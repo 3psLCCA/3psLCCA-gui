@@ -3,9 +3,12 @@ material_catalog.py
 ===================
 Auto-discovers every material database JSON file under a configurable
 root folder (default: material_database/), validates each file's
-integrity, and writes a single catalog manifest (material_catalog.json)
-that downstream tools (search_engine.py, etc.) use to locate and filter
-databases by region / city.
+integrity, and writes two catalog manifests:
+  - material_catalog.json: lite copy (no errors/warnings) that downstream
+    tools (search_engine.py, etc.) use to locate and filter databases by
+    region / city.
+  - material_catalog_full.json: full copy with per-file errors/warnings,
+    for devtools only (gitignored).
 
 Folder convention expected
 --------------------------
@@ -70,6 +73,11 @@ MATERIAL_DB_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)),
 # Output manifest written by build_registry()
 CATALOG_MANIFEST_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                       "material_catalog.json")
+
+# Full manifest with per-file errors/warnings - for devtools only.
+# CATALOG_MANIFEST_PATH is the lite copy (no errors/warnings) the app reads.
+CATALOG_FULL_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                  "material_catalog_full.json")
 
 # Schema every SOR JSON file must satisfy
 EXPECTED_SCHEMA = {
@@ -326,8 +334,13 @@ def check_integrity(db_key: str) -> dict:
 def build_registry(root: str = MATERIAL_DB_ROOT,
                    manifest_path: str = CATALOG_MANIFEST_PATH) -> dict:
     """
-    Crawl `root` recursively, validate every *.json file, and write
-    `manifest_path` (material_catalog.json).
+    Crawl `root` recursively, validate every *.json file, and write two files:
+      - `manifest_path` (material_catalog.json): lite copy the app reads,
+        without the "errors" and "warnings" fields.
+      - `<manifest_path stem>_full.json` (material_catalog_full.json): full
+        copy with errors/warnings, for devtools only (gitignored).
+    When run from a source checkout on the default manifest path, also
+    refreshes the material_catalog.json hash in devtools/integrity.json.
 
     Manifest structure
     ------------------
@@ -350,7 +363,7 @@ def build_registry(root: str = MATERIAL_DB_ROOT,
       ...
     }
 
-    Returns the manifest dict.
+    Returns the full manifest dict (with errors/warnings).
     """
     if not os.path.isdir(root):
         raise FileNotFoundError(f"Material database root not found: {root}")
@@ -405,10 +418,38 @@ def build_registry(root: str = MATERIAL_DB_ROOT,
         "failed":         failed_count,
     }
 
-    with open(manifest_path, "w", encoding="utf-8") as f:
+    # Full copy (with errors/warnings) next to the manifest, for devtools
+    full_path = str(Path(manifest_path).with_name(Path(manifest_path).stem + "_full.json"))
+    with open(full_path, "w", encoding="utf-8") as f:
         json.dump(manifest, f, indent=2)
 
+    # Lite manifest for the app: same entries without errors/warnings
+    lite = {
+        k: v if k == "_meta" else {f: x for f, x in v.items() if f not in ("errors", "warnings")}
+        for k, v in manifest.items()
+    }
+    with open(manifest_path, "w", encoding="utf-8") as f:
+        json.dump(lite, f, indent=2)
+
     print(f"[material_catalog] Registry written -> {manifest_path}")
+    print(f"[material_catalog] Full registry written -> {full_path}")
+
+    # Refresh the material_catalog.json hash in devtools/integrity.json.
+    # Only in a source checkout (devtools/ is not shipped with the app).
+    project_root = Path(__file__).resolve().parents[6]
+    integrity_path = project_root / "devtools" / "integrity.json"
+    integrity_key = "gui/components/structure/registry/material_catalog.json"
+    if integrity_path.is_file() and Path(manifest_path).resolve() == Path(CATALOG_MANIFEST_PATH).resolve():
+        with open(integrity_path, "r", encoding="utf-8") as f:
+            integrity = json.load(f)
+        integrity.setdefault("files", {})[integrity_key] = {
+            "md5":        _md5(manifest_path),
+            "size_bytes": os.path.getsize(manifest_path),
+            "regen_at":   datetime.datetime.now().isoformat(),
+        }
+        with open(integrity_path, "w", encoding="utf-8") as f:
+            json.dump(integrity, f, indent=2, ensure_ascii=False)
+        print(f"[material_catalog] Integrity hash updated -> {integrity_path}")
     print(f"[material_catalog] Scanned {len(json_files)} file(s): "
           f"{ok_count} OK, {failed_count} FAILED")
     return manifest

@@ -203,7 +203,7 @@ class CatalogBuilderDialog(QDialog):
 
     Workflow:
       1. Root auto-detected (or browse to a material_database/ folder)
-      2. Click Load  → reads existing material_catalog.json into the table
+      2. Click Load  → reads existing material_catalog_full.json into the table
       3. Select a row and click Check Integrity for a single-entry report
       4. Click Rebuild Registry → re-crawls all *.json files, refreshes table
     """
@@ -476,11 +476,11 @@ class CatalogBuilderDialog(QDialog):
         self._sor_generator_btn.setEnabled(True)
 
         # Load manifest if it exists
-        manifest_path = Path(mod.CATALOG_MANIFEST_PATH)
+        manifest_path = Path(mod.CATALOG_FULL_PATH)
         if manifest_path.exists():
             self._load_registry()
         else:
-            self._log_line("No material_catalog.json found - click Rebuild Registry to create it.", color=_YELLOW)
+            self._log_line("No material_catalog_full.json found - click Rebuild Registry to create it.", color=_YELLOW)
 
     # ── Browse root ────────────────────────────────────────────────────────────
 
@@ -526,9 +526,9 @@ class CatalogBuilderDialog(QDialog):
     def _load_registry(self):
         if self._mod is None:
             return
-        manifest_path = Path(self._mod.CATALOG_MANIFEST_PATH)
+        manifest_path = Path(self._mod.CATALOG_FULL_PATH)
         if not manifest_path.exists():
-            self._log_line("material_catalog.json not found - rebuild first.", color=_YELLOW)
+            self._log_line("material_catalog_full.json not found - rebuild first.", color=_YELLOW)
             return
 
         try:
