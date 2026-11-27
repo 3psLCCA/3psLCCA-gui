@@ -17,6 +17,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, QTimer, QRect, QEvent, QModelIndex
 import datetime
+import json
 import time
 
 from ...utils.unit_resolver import analyze_conversion_sympy
@@ -308,14 +309,13 @@ class MaterialEmissions(QWidget):
         super().__init__()
         self.controller = controller
         self._frozen = False
-        self._loaded = False
+        self._shown_data = None  # data the table was last built from; None = rebuild on next show
         if controller and hasattr(controller, "project_loaded"):
             controller.project_loaded.connect(self._on_project_reloaded)
         if controller and hasattr(controller, "chunk_updated"):
             _STRUCTURE_CHUNKS = {"str_foundation", "str_sub_structure", "str_super_structure", "str_misc"}
             controller.chunk_updated.connect(
-                lambda name: (_dev_log(f"[Material Emissions] {name} changed -> rebuild queued"),  # DEBUG rebuild log
-                              QTimer.singleShot(0, self.on_refresh)) if name in _STRUCTURE_CHUNKS else None
+                lambda name: self._on_structure_changed(name) if name in _STRUCTURE_CHUNKS else None
             )
 
         # Outer layout holds only the scroll area, so growing tables never
@@ -454,6 +454,7 @@ class MaterialEmissions(QWidget):
         self._populate_included(included_items)
         self._populate_excluded(excluded_items)
         self._update_summary(total_carbon, included_count, total_count, cat_totals)
+        self._shown_data = self._data_snapshot()
 
     def _populate_included(self, items):
         t = self.included_table
@@ -669,6 +670,7 @@ class MaterialEmissions(QWidget):
 
         t.update_height()
         self._refresh_summary_only()
+        self._shown_data = self._data_snapshot()
 
     def _toggle_inclusion(
         self, chunk_id: str, comp_name: str, data_index: int, include: bool
@@ -866,20 +868,28 @@ class MaterialEmissions(QWidget):
         self._included_action.set_frozen(frozen)
         self._excluded_action.set_frozen(frozen)
 
+    def _data_snapshot(self) -> str:
+        """Everything this page shows, as one string, to tell whether it changed while hidden."""
+        if not self.controller or not getattr(self.controller, "engine", None):
+            return ""
+        return json.dumps([[self.controller.engine.fetch_chunk(c) for c, _ in CHUNKS]], default=str)
+
+    def _on_structure_changed(self, name):
+        # Hidden: skip; showEvent rebuilds if the data differs from what the table was built from
+        if self.isVisible():
+            _dev_log(f"[Material Emissions] {name} changed -> rebuild queued")  # DEBUG rebuild log
+            QTimer.singleShot(0, self.on_refresh)
+
     def showEvent(self, event):
         super().showEvent(event)
-        if not self._loaded:
-            _dev_log("[Material Emissions] page shown -> rebuild")  # DEBUG rebuild log
+        if self._shown_data is None or self._data_snapshot() != self._shown_data:
+            _dev_log("[Material Emissions] page shown -> data changed, rebuild")  # DEBUG rebuild log
             self.on_refresh()
-            self._loaded = True
-
-    def hideEvent(self, event):
-        super().hideEvent(event)
-        self._loaded = False
+        else:
+            _dev_log("[Material Emissions] page shown -> no change, kept")  # DEBUG rebuild log
 
     def _on_project_reloaded(self):
         _dev_log("[Material Emissions] project loaded")  # DEBUG rebuild log
-        self._loaded = False
+        self._shown_data = None
         if self.isVisible():
             self.on_refresh()
-            self._loaded = True

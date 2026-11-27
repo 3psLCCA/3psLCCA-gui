@@ -165,6 +165,7 @@ class ProjectController(QObject):
             success = self.engine.rollback_chunk(chunk_name, source_path)
             if success:
                 self._chunk_cache.pop(chunk_name, None)
+                self.chunk_updated.emit(chunk_name)
             return success
         return False
 
